@@ -36,7 +36,6 @@ pub fn stem_of(command: &str) -> String {
 use std::collections::HashMap;
 use std::path::PathBuf;
 use crate::rules::Rule;
-use regex::Regex;
 
 pub struct CommandRecord {
     pub command: String,
@@ -124,16 +123,9 @@ pub fn discover(
             continue;
         }
 
-        // Check against rules
-        let rule_id = rules.iter().find(|r| {
-            if !r.enabled { return false; }
-            let pat = if r.pattern_flags.contains('i') {
-                format!("(?i){}", r.pattern)
-            } else {
-                r.pattern.clone()
-            };
-            Regex::new(&pat).map(|re| re.is_match(&rec.command)).unwrap_or(false)
-        }).map(|r| r.id.clone());
+        // Check against rules — use the same logic as the pre-tool hook,
+        // including exception evaluation, so discover matches what actually fires.
+        let rule_id = crate::rules::matched_rule_id(&rec.command, rules);
 
         let bucket = if rule_id.is_some() { &mut intercepted } else { &mut unhandled };
         let entry = bucket.entry(stem.clone()).or_insert_with(|| CommandFreq {

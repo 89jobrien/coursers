@@ -85,6 +85,33 @@ pub fn load() -> RulesConfig {
     })
 }
 
+/// Returns the id of the first matching rule (respecting exceptions), None otherwise.
+/// Used by discover to attribute commands to the rule that would actually fire.
+pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
+    for rule in rules {
+        if !rule.enabled {
+            continue;
+        }
+        let pattern_str = if rule.pattern_flags.contains('i') || rule.pattern.contains("(?i)") {
+            format!("(?i){}", rule.pattern)
+        } else {
+            rule.pattern.clone()
+        };
+        let Ok(re) = Regex::new(&pattern_str) else { continue };
+        if !re.is_match(command) {
+            continue;
+        }
+        let excepted = rule.exceptions.iter().any(|exc| {
+            Regex::new(exc).map(|re| re.is_match(command)).unwrap_or(false)
+        });
+        if excepted {
+            continue;
+        }
+        return Some(rule.id.clone());
+    }
+    None
+}
+
 /// Returns the deny message if any rule matches, None otherwise.
 pub fn check(command: &str, rules: &[Rule]) -> Option<String> {
     for rule in rules {
