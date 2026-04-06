@@ -1,6 +1,7 @@
 project: coursers
 id: coursers
 updated: 2026-04-06
+notes: null
 items:
 - id: coursers-1
   name: crs-filter-posttooluse
@@ -94,6 +95,24 @@ items:
   completed: 2026-04-06
 
 log:
+- date: 2026-04-06
+  summary: >-
+    Built full test harness: extracted RulesLoader/StateStore traits into crs-core, added
+    64 tests (unit + integration + smoke script). Wrote README and updated docs to reflect
+    crs filter/rewrite as implemented. Full hook wiring example added to README.
+  commits:
+  - 50aa03c
+  - b973f89
+  - 11d93c4
+  - 5ee6102
+  - 5523352
+  - dfd8cd3
+  - 933343e
+  - f151666
+  - cdfbc5c
+  - dbcee96
+  - 56cc3cf
+  - fffa120
 - date: 2026-04-06
   summary: >-
     Implemented all P1 items: crs-filters-toml-schema (FiltersConfig + RewriteConfig in
