@@ -127,12 +127,10 @@ name = "coursers"
 version = "0.1.0"
 dependencies = [
  "clap",
- "dirs",
- "hex",
+ "crs-core",
  "regex",
  "serde",
  "serde_json",
- "sha2",
 ]
 
 [[package]]
@@ -142,6 +140,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "crs"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "crs-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "crs-core"
+version = "0.1.0"
+dependencies = [
+ "dirs",
+ "hex",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

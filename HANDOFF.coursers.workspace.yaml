@@ -1,0 +1,100 @@
+project: coursers
+id: coursers
+updated: 2026-04-06
+items:
+- id: coursers-1
+  name: crs-filter-posttooluse
+  priority: P1
+  status: open
+  title: Implement `crs filter` PostToolUse hook — output compression
+  description: |
+    Core value-add of crs. Reads PostToolUse JSON payload, matches command against
+    filter rules in .ctx/crs-filters.toml (project) or ~/.config/crs/filters.toml (global),
+    applies filter mode (failures-only, errors-only, truncate, passthrough), emits
+    compressed output as hook message with decision: allow.
+  files:
+  - crates/crs/src/main.rs
+  - crates/core/src/filters.rs
+  extra: []
+
+- id: coursers-2
+  name: crs-rewrite-pretooluse
+  priority: P1
+  status: open
+  title: Implement `crs rewrite` PreToolUse hook — optional command rewriting
+  description: |
+    Narrow scope: only rewrites when changing how a command runs (e.g. force --format json).
+    Exit 0 + rewritten command on stdout, exit 1 = passthrough unchanged.
+    Rewrite rules defined in crs-filters.toml alongside filter rules.
+  files:
+  - crates/crs/src/main.rs
+  - crates/core/src/rewrite.rs
+  extra: []
+
+- id: coursers-3
+  name: crs-filters-toml-schema
+  priority: P1
+  status: open
+  title: Define crs-filters.toml schema and config loader
+  description: |
+    TOML schema for filter and rewrite rules. Config hierarchy:
+      1. .ctx/crs-filters.toml (project-local, wins)
+      2. ~/.config/crs/filters.toml (global fallback)
+    Filter modes: failures-only, errors-only, truncate, passthrough, custom.
+    Rewrite rules: pattern + replace string.
+  files:
+  - crates/core/src/filters.rs
+  - crates/core/src/config.rs
+  extra: []
+
+- id: coursers-4
+  name: crs-discover
+  priority: P2
+  status: open
+  title: Implement `crs discover` — scan Claude Code history for missed savings
+  description: |
+    Read ~/.claude/projects/**/*.jsonl, extract Bash tool calls, identify commands
+    that match filter/rewrite rules but weren't intercepted. Output savings report
+    similar to rtk discover. Top unhandled from current data: doob todo (737),
+    cargo nextest (439), cargo xtask (412), nu (249).
+  files:
+  - crates/crs/src/main.rs
+  - crates/core/src/history.rs
+  extra: []
+
+- id: coursers-5
+  name: wire-crs-hooks
+  priority: P2
+  status: open
+  title: Wire `crs rewrite` and `crs filter` into settings.json
+  description: |
+    Add crs rewrite to PreToolUse/Bash chain (after coursers pre).
+    Add crs filter to PostToolUse/Bash chain (after coursers post).
+    Update coursers-companion agent to reflect full hook chain.
+  files:
+  - ~/.claude/settings.json
+  extra: []
+
+- id: coursers-6
+  name: coursers-companion-plugin
+  priority: P2
+  status: done
+  title: Create coursers Claude Code plugin with companion agent
+  description: |
+    Plugin at ~/dev/coursers/ with coursers-companion agent. Diagnoses blocks,
+    visualizes rules, inspects failure learning, integrates rtk discover.
+    Registered in local marketplace.
+  files:
+  - .claude-plugin/plugin.json
+  - agents/coursers-companion.md
+  extra: []
+  completed: 2026-04-06
+
+log:
+- date: 2026-04-06
+  summary: >-
+    Converted to workspace (crates/core, crates/coursers, crates/crs). Wired coursers pre/post
+    directly in settings.json replacing nu wrappers. Uninstalled RTK. Created coursers plugin
+    with companion agent. Designed crs hybrid filter architecture.
+  commits:
+  - ca7ffdc

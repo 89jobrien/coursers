@@ -1,0 +1,9 @@
+{
+  "name": "coursers",
+  "version": "0.1.0",
+  "description": "Diagnose and manage Claude Code hook course-correction rules via the coursers binary.",
+  "author": {
+    "name": "Joseph O'Brien",
+    "email": ""
+  }
+}
