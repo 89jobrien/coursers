@@ -5,7 +5,7 @@ items:
 - id: coursers-1
   name: crs-filter-posttooluse
   priority: P1
-  status: open
+  status: done
   title: Implement `crs filter` PostToolUse hook — output compression
   description: |
     Core value-add of crs. Reads PostToolUse JSON payload, matches command against
@@ -16,11 +16,12 @@ items:
   - crates/crs/src/main.rs
   - crates/core/src/filters.rs
   extra: []
+  completed: 2026-04-06
 
 - id: coursers-2
   name: crs-rewrite-pretooluse
   priority: P1
-  status: open
+  status: done
   title: Implement `crs rewrite` PreToolUse hook — optional command rewriting
   description: |
     Narrow scope: only rewrites when changing how a command runs (e.g. force --format json).
@@ -30,11 +31,12 @@ items:
   - crates/crs/src/main.rs
   - crates/core/src/rewrite.rs
   extra: []
+  completed: 2026-04-06
 
 - id: coursers-3
   name: crs-filters-toml-schema
   priority: P1
-  status: open
+  status: done
   title: Define crs-filters.toml schema and config loader
   description: |
     TOML schema for filter and rewrite rules. Config hierarchy:
@@ -46,6 +48,7 @@ items:
   - crates/core/src/filters.rs
   - crates/core/src/config.rs
   extra: []
+  completed: 2026-04-06
 
 - id: coursers-4
   name: crs-discover
@@ -91,6 +94,15 @@ items:
   completed: 2026-04-06
 
 log:
+- date: 2026-04-06
+  summary: >-
+    Implemented all P1 items: crs-filters-toml-schema (FiltersConfig + RewriteConfig in
+    crs-core with TOML loader, config hierarchy, find_rule), crs-filter-posttooluse
+    (crs filter subcommand, FilterResult enum, apply_filter logic), crs-rewrite-pretooluse
+    (crs rewrite subcommand, PreToolUse response with updatedInput). 46 tests passing,
+    clippy clean. P2 remaining: wire hooks into settings.json, crs discover.
+  commits:
+  - f151666
 - date: 2026-04-06
   summary: >-
     Converted to workspace (crates/core, crates/coursers, crates/crs). Wired coursers pre/post
