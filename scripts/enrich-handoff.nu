@@ -54,7 +54,7 @@ def write_tools_yaml [ctx: string, data: record, since: int] {
         | each {|r| {
             base_command: $r.base_command,
             count: $r.count,
-            example: $r.example
+            example: ($r.example | lines | first | str substring 0..80)
         }}
     )
 
