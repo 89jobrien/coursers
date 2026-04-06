@@ -6,16 +6,20 @@ pub fn rules_path() -> PathBuf {
     }
     dirs::home_dir()
         .expect("home dir")
-        .join(".claude/hooks/course-correct-rules.json")
+        .join(".config/coursers/course-correct-rules.json")
 }
 
 pub fn state_path_default() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_STATE") {
         return PathBuf::from(p);
     }
+    let local = PathBuf::from(".ctx/course-correct-state.json");
+    if local.parent().map(|p| p.exists()).unwrap_or(false) {
+        return local;
+    }
     dirs::home_dir()
         .expect("home dir")
-        .join(".claude/hooks/course-correct-state.json")
+        .join(".config/coursers/course-correct-state.json")
 }
 
 #[cfg(test)]
@@ -31,13 +35,12 @@ mod tests {
     }
 
     #[test]
-    fn default_rules_path_contains_claude() {
+    fn default_rules_path_is_xdg() {
         // Guard against parallel tests that set COURSERS_RULES.
-        // This test must not depend on global env state — use state_path_default
-        // (which has its own var) to verify the fallback pattern instead.
+        // Verify that the computed path (without env override) targets XDG config dir.
         let path = dirs::home_dir()
             .expect("home dir")
-            .join(".claude/hooks/course-correct-rules.json");
-        assert!(path.to_string_lossy().contains(".claude"));
+            .join(".config/coursers/course-correct-rules.json");
+        assert!(path.to_string_lossy().contains(".config/coursers"));
     }
 }

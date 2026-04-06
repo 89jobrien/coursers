@@ -78,7 +78,10 @@ items:
     Update coursers-companion agent to reflect full hook chain.
   files:
   - ~/.claude/settings.json
-  extra: []
+  extra:
+  - date: 2026-04-06
+    type: note
+    note: "captured in doob — todo id wnbhcyx6ja246jxgpf0w"
 
 - id: coursers-6
   name: coursers-companion-plugin
@@ -129,7 +132,8 @@ items:
 - id: coursers-9
   name: xdg-config-migration
   priority: P1
-  status: open
+  status: done
+  completed: 2026-04-06
   title: Migrate config defaults from ~/.claude/hooks/ to ~/.config/coursers/
   description: |
     Move rules and state file defaults to XDG-compliant ~/.config/coursers/.
@@ -139,12 +143,16 @@ items:
   files:
   - crates/core/src/config.rs
   - CLAUDE.md
-  extra: []
+  extra:
+  - date: 2026-04-06
+    type: note
+    note: "captured in doob — todo id c0junr1duundhi08ri9n"
 
 - id: coursers-10
   name: rtk-adapter
   priority: P1
-  status: open
+  status: done
+  completed: 2026-04-06
   title: RTK integration — RtkAnalysis/RtkRewrite ports + ProcessRtkClient adapter
   description: |
     Two-trait capability split (ISP group B): RtkAnalysis (discover, gain, session,
@@ -175,6 +183,11 @@ items:
   extra: []
 
 log:
+- date: 2026-04-06
+  summary: >-
+    XDG migration (coursers-9): rules_path() now defaults to ~/.config/coursers/course-correct-rules.json.
+    Copied existing rules from ~/.claude/hooks/. Updated CLAUDE.md config table. Marked coursers-10 done
+    (completed prior session). All 48 tests pass.
 - date: 2026-04-06
   summary: >-
     Built RTK port/adapter layer (coursers-10): RtkAnalysis + RtkRewrite traits in crs-core,
