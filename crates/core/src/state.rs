@@ -8,14 +8,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::config::state_path_default;
 use crate::rules::FailureLearning;
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FailureEntry {
     pub command_preview: String,
     pub timestamps: Vec<u64>,
     pub last_seen: f64,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct State {
     #[serde(default)]
     pub failures: HashMap<String, FailureEntry>,
