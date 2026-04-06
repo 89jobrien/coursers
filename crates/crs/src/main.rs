@@ -32,6 +32,8 @@ enum Command {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
+    /// Validate rules: check patterns compile, examples fire, exceptions work, alternatives on PATH
+    Validate,
 }
 
 /// Minimal PostToolUse hook payload.
@@ -55,6 +57,7 @@ fn main() {
         Command::Discover { all, limit, since, format } => {
             cmd_discover(all, limit, since, &format);
         }
+        Command::Validate => cmd_validate(),
     }
 }
 
@@ -178,6 +181,133 @@ fn emit_rewrite(command: &str) {
     let mut handle = stdout.lock();
     writeln!(handle, "{}", msg).ok();
     handle.flush().ok();
+}
+
+fn cmd_validate() {
+    use crs_core::rules::load as load_rules;
+    use regex::Regex;
+
+    // Map rule id → (commands that should trigger, commands that should NOT trigger via exceptions)
+    let known: &[(&str, &[&str], &[&str], &[&str])] = &[
+        (
+            "no-grep-use-tool",
+            &["grep foo .", "rg pattern src/"],              // must trigger
+            &["cmd | grep foo", "cmd | rg foo", "grep -A3"], // must be excepted
+            &[],                                              // alternative binaries to check on PATH
+        ),
+        (
+            "no-cat-use-read",
+            &["cat file.txt", "cat /etc/hosts"],
+            &["cat << EOF", "cmd | cat", "cat /dev/stdin"],
+            &[],
+        ),
+        (
+            "no-head-tail-use-read",
+            &["head -20 file.txt", "tail -5 log.txt"],
+            &["cmd | head", "tail -f log.txt"],
+            &[],
+        ),
+        (
+            "no-find-use-glob",
+            &["find . -name '*.rs'", "find /home -type f"],
+            &["find . -exec rm {} \\;", "find . -delete", "find . -mtime 1"],
+            &[],
+        ),
+        (
+            "no-npm-use-bun",
+            &["npm install", "npx tsc"],
+            &["npm publish", "npm pack", "npx create-react-app"],
+            &["bun", "bunx"],
+        ),
+        (
+            "no-pip-use-uv",
+            &["pip install requests", "pip3 upgrade pip"],
+            &["pip install --target /tmp/x"],
+            &["uv"],
+        ),
+    ];
+
+    let config = load_rules();
+    let mut any_fail = false;
+
+    println!("CRS Validate — Rule Health Check");
+    println!("{}", "=".repeat(60));
+
+    for rule in &config.rules {
+        let mut issues: Vec<String> = vec![];
+
+        // 1. Pattern compiles
+        let pat_str = if rule.pattern_flags.contains('i') {
+            format!("(?i){}", rule.pattern)
+        } else {
+            rule.pattern.clone()
+        };
+        let re = match Regex::new(&pat_str) {
+            Ok(r) => r,
+            Err(e) => {
+                println!("FAIL  [{}]  pattern does not compile: {}", rule.id, e);
+                any_fail = true;
+                continue;
+            }
+        };
+
+        // 2. All exception patterns compile
+        for exc in &rule.exceptions {
+            if Regex::new(exc).is_err() {
+                issues.push(format!("exception pattern does not compile: {exc}"));
+            }
+        }
+
+        // 3. Known-good trigger examples actually trigger (after exceptions)
+        if let Some((_, triggers, excepts, alts)) = known.iter().find(|(id, ..)| *id == rule.id) {
+            for &cmd in *triggers {
+                let excepted = rule.exceptions.iter().any(|exc| {
+                    Regex::new(exc).map(|r| r.is_match(cmd)).unwrap_or(false)
+                });
+                if !re.is_match(cmd) || excepted {
+                    issues.push(format!("should trigger but does not: `{cmd}`"));
+                }
+            }
+            // 4. Known exception examples are correctly excepted
+            for &cmd in *excepts {
+                let excepted = rule.exceptions.iter().any(|exc| {
+                    Regex::new(exc).map(|r| r.is_match(cmd)).unwrap_or(false)
+                });
+                if re.is_match(cmd) && !excepted {
+                    issues.push(format!("should be excepted but triggers: `{cmd}`"));
+                }
+            }
+            // 5. Alternative tools on PATH
+            for &alt in *alts {
+                if std::process::Command::new("sh")
+                    .args(["-c", &format!("type -P {alt}")])
+                    .output()
+                    .map(|o| !o.status.success())
+                    .unwrap_or(true)
+                {
+                    issues.push(format!("alternative `{alt}` not found on PATH"));
+                }
+            }
+        }
+
+        if issues.is_empty() {
+            println!("OK    [{}]", rule.id);
+        } else {
+            any_fail = true;
+            println!("FAIL  [{}]", rule.id);
+            for issue in &issues {
+                println!("        - {issue}");
+            }
+        }
+    }
+
+    println!("{}", "=".repeat(60));
+    if any_fail {
+        println!("Some rules have issues.");
+        std::process::exit(1);
+    } else {
+        println!("All rules OK.");
+    }
 }
 
 fn cmd_discover(all: bool, limit: usize, since: u32, format: &str) {

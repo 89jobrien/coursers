@@ -1,7 +1,6 @@
 use crs_core::history::{CommandRecord, CommandSource};
 use serde_json::Value;
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 

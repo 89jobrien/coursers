@@ -162,6 +162,7 @@ dependencies = [
  "clap",
  "crs-core",
  "dirs",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
