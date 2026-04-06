@@ -70,7 +70,8 @@ items:
 - id: coursers-5
   name: wire-crs-hooks
   priority: P2
-  status: open
+  status: done
+  completed: 2026-04-06
   title: Wire `crs rewrite` and `crs filter` into settings.json
   description: |
     Add crs rewrite to PreToolUse/Bash chain (after coursers pre).
@@ -183,6 +184,11 @@ items:
   extra: []
 
 log:
+- date: 2026-04-06
+  summary: >-
+    coursers-5 already wired (crs rewrite in PreToolUse, crs filter in PostToolUse).
+    Updated coursers-companion.md: XDG paths, full hook chain in validation board.
+    coursers-5 marked done.
 - date: 2026-04-06
   summary: >-
     XDG migration (coursers-9): rules_path() now defaults to ~/.config/coursers/course-correct-rules.json.

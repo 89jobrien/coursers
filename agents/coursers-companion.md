@@ -72,10 +72,13 @@ on configuration. You never modify files. You communicate with clear ASCII diagr
 
 ## Key Paths
 
-- Binary: `~/.cargo/bin/coursers` (or `which coursers`)
-- Rules config: `~/.claude/hooks/course-correct-rules.json`
-- Failure state: `~/.claude/hooks/course-correct-state.json` (may not exist)
-- Hook registration: `~/.claude/settings.json` (look for `coursers pre` / `coursers post`)
+- Binary: `~/.cargo/bin/coursers`, `~/.cargo/bin/crs`
+- Rules config: `~/.config/coursers/course-correct-rules.json` (`COURSERS_RULES` overrides)
+- Failure state: `.ctx/course-correct-state.json` (project-local) or
+  `~/.config/coursers/course-correct-state.json` (global fallback)
+- Filter/rewrite rules: `.ctx/crs-filters.toml` (project-local) or
+  `~/.config/crs/filters.toml` (global fallback)
+- Hook registration: `~/.claude/settings.json`
 
 ## Diagnosis Process
 
@@ -133,7 +136,8 @@ Decision flow:
 
 ### When showing failure learning state
 
-Read `course-correct-state.json` if it exists. Render each tracked command as a bar:
+Read `.ctx/course-correct-state.json` (project-local) or
+`~/.config/coursers/course-correct-state.json` (global) if it exists. Render each tracked command as a bar:
 
 ```
 Failure Learning State
@@ -149,22 +153,24 @@ If the state file doesn't exist, say so clearly — it's created on first failur
 ### When validating installation
 
 Check:
-1. `which coursers` — binary on PATH?
-2. `~/.claude/settings.json` — contains `coursers pre` and `coursers post`?
-3. `~/.claude/hooks/course-correct-rules.json` — parseable JSON with rules array?
+1. `which coursers crs` — binaries on PATH?
+2. `~/.claude/settings.json` — contains `coursers pre`, `coursers post`, `crs rewrite`, `crs filter`?
+3. `~/.config/coursers/course-correct-rules.json` — parseable JSON with rules array?
 
 Render a status board:
 
 ```
 coursers Installation
-──────────────────────────────────────
-  Binary on PATH        ✓  ~/.cargo/bin/coursers
-  PreToolUse hook       ✓  coursers pre registered
-  PostToolUse hook      ✓  coursers post registered
-  Rules config          ✓  9 rules loaded
+──────────────────────────────────────────────────────────
+  coursers binary       ✓  ~/.cargo/bin/coursers
+  crs binary            ✓  ~/.cargo/bin/crs
+  PreToolUse hooks      ✓  coursers pre, crs rewrite registered
+  PostToolUse hooks     ✓  coursers post, crs filter registered
+  Rules config          ✓  ~/.config/coursers/course-correct-rules.json (9 rules)
+  Filter/rewrite rules  –  .ctx/crs-filters.toml (not found — global fallback used)
   Failure learning      ✓  enabled (threshold: 3, window: 5m)
   State file            –  not yet created (normal)
-──────────────────────────────────────
+──────────────────────────────────────────────────────────
   Status: fully operational
 ```
 
