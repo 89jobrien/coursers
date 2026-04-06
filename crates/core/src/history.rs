@@ -33,6 +33,55 @@ pub fn stem_of(command: &str) -> String {
     base.to_string()
 }
 
+use std::path::PathBuf;
+use crate::rules::Rule;
+
+pub struct CommandRecord {
+    pub command: String,
+    pub session_id: String,
+    pub cwd: String,
+    pub timestamp: Option<String>,
+}
+
+pub trait CommandSource {
+    fn commands(&self) -> impl Iterator<Item = CommandRecord>;
+}
+
+pub struct DiscoverOpts {
+    pub limit: usize,
+    pub since_days: Option<u32>,
+    pub all_projects: bool,
+    pub current_dir: Option<PathBuf>,
+}
+
+impl Default for DiscoverOpts {
+    fn default() -> Self {
+        Self {
+            limit: 15,
+            since_days: Some(30),
+            all_projects: false,
+            current_dir: None,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CommandFreq {
+    pub stem: String,
+    pub count: u64,
+    pub example: String,
+    pub est_tokens: u64,
+    pub rule_id: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct DiscoverReport {
+    pub intercepted: Vec<CommandFreq>,
+    pub unhandled: Vec<CommandFreq>,
+    pub scanned_sessions: usize,
+    pub scanned_commands: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
