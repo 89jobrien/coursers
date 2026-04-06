@@ -141,7 +141,49 @@ items:
   - CLAUDE.md
   extra: []
 
+- id: coursers-10
+  name: rtk-adapter
+  priority: P1
+  status: open
+  title: RTK integration — RtkAnalysis/RtkRewrite ports + ProcessRtkClient adapter
+  description: |
+    Two-trait capability split (ISP group B): RtkAnalysis (discover, gain, session,
+    verify, hook_audit, version) and RtkRewrite (rewrite, probe, check, list_proxies, flush).
+    ProcessRtkClient shells out to rtk binary; NullRtkClient no-ops when rtk absent.
+    crs discover enriches HANDOFF.tools.yaml with rtk_equivalent + savings figures from
+    rtk discover --format json. obfsck_audit pipes YAML through obfsck --audit before write.
+  files:
+  - crates/core/src/rtk.rs
+  - crates/crs/src/rtk/mod.rs
+  - crates/crs/src/rtk/process.rs
+  - crates/crs/src/main.rs
+  extra: []
+
+- id: coursers-11
+  name: obfsck-mcp-server
+  priority: P2
+  status: open
+  title: Build obfsck MCP server + mcpipe integration for custom filter generation
+  description: |
+    Add server mode to obfsck exposing two MCP tools: audit (pipe content, return hits)
+    and generate-filters (given examples, suggest .ctx/obfsck-filters.yaml patterns).
+    mcpipe maps the server automatically. crs discover calls mcpipe -> obfsck MCP to
+    generate project-local obfsck filters saved to .ctx/obfsck-filters.yaml.
+    obfsck_audit picks up --config .ctx/obfsck-filters.yaml when present.
+  files:
+  - crates/crs/src/main.rs
+  extra: []
+
 log:
+- date: 2026-04-06
+  summary: >-
+    Built RTK port/adapter layer (coursers-10): RtkAnalysis + RtkRewrite traits in crs-core,
+    ProcessRtkClient + NullRtkClient adapters, detect() factory. crs discover auto-enriches
+    HANDOFF.tools.yaml with rtk_equivalent from rtk discover --format json. Added obfsck_audit
+    pipe for secret detection before YAML write. Added chrono dep for date stamping.
+    Scoped state path to .ctx/ project-local. Cleaned .gitignore. Added coursers-11
+    (obfsck MCP server + mcpipe integration).
+  commits: []
 - date: 2026-04-06
   summary: >-
     Scoped state file to .ctx/course-correct-state.json (project-local) with ~/.claude/hooks/
@@ -195,9 +237,3 @@ log:
   - dbcee96
   - 56cc3cf
   - fffa120
-- date: 2026-04-06
-  summary: >-
-    Implemented all P1 items: crs-filters-toml-schema, crs-filter-posttooluse,
-    crs-rewrite-pretooluse. 46 tests passing, clippy clean.
-  commits:
-  - f151666
