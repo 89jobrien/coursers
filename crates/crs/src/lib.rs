@@ -1,3 +1,5 @@
+pub mod jsonl_source;
+
 use crs_core::filters::{FiltersConfig, FilterMode, FilterRule, find_rule};
 use crs_core::rewrite::RewriteConfig;
 #[cfg(test)]
