@@ -54,7 +54,7 @@ items:
 - id: coursers-4
   name: crs-discover
   priority: P2
-  status: open
+  status: done
   title: Implement `crs discover` — scan Claude Code history for missed savings
   description: |
     Read ~/.claude/projects/**/*.jsonl, extract Bash tool calls, identify commands
@@ -65,6 +65,7 @@ items:
   - crates/crs/src/main.rs
   - crates/core/src/history.rs
   extra: []
+  completed: 2026-04-06
 
 - id: coursers-5
   name: wire-crs-hooks
@@ -95,6 +96,22 @@ items:
   completed: 2026-04-06
 
 log:
+- date: 2026-04-06
+  summary: >-
+    Implemented crs discover (coursers-4): hexagonal architecture with CommandSource trait in
+    crs-core, JsonlCommandSource adapter in crs binary, stem_of() frequency grouping, savings
+    report (text + json). Removed 3 speculative version-manager rules from course-correct-rules.json
+    (nvm, pyenv, rustup-pin) — discover will surface real usage instead. Fixed test isolation
+    race in config::tests. 80 tests passing.
+  commits:
+  - 457e9e1
+  - b36548e
+  - e9ea857
+  - 3e4e007
+  - bc1d705
+  - ef213f7
+  - bc9a0a6
+  - 628efb8
 - date: 2026-04-06
   summary: >-
     Built full test harness: extracted RulesLoader/StateStore traits into crs-core, added
