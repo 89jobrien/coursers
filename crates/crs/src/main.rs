@@ -34,6 +34,8 @@ enum Command {
     },
     /// Validate rules: check patterns compile, examples fire, exceptions work, alternatives on PATH
     Validate,
+    /// Probe a command against all rules and show what would fire — reads command from stdin
+    Probe,
 }
 
 /// Minimal PostToolUse hook payload.
@@ -58,6 +60,7 @@ fn main() {
             cmd_discover(all, limit, since, &format);
         }
         Command::Validate => cmd_validate(),
+        Command::Probe => cmd_probe(),
     }
 }
 
@@ -307,6 +310,103 @@ fn cmd_validate() {
         std::process::exit(1);
     } else {
         println!("All rules OK.");
+    }
+}
+
+fn cmd_probe() {
+    use crs_core::rules::load as load_rules;
+    use regex::Regex;
+    use std::io::Read as _;
+
+    let mut raw = String::new();
+    std::io::stdin().read_to_string(&mut raw).unwrap_or(0);
+    let raw = raw.trim();
+
+    // Accept: raw command string, JSON object with "command" key, or hook-style
+    // {"tool_input":{"command":"..."}} / {"tool_name":"Bash","tool_input":...}
+    let command: String = if let Ok(v) = serde_json::from_str::<Value>(raw) {
+        v.get("command")
+            .or_else(|| v.get("tool_input").and_then(|ti| ti.get("command")))
+            .and_then(|c| c.as_str())
+            .unwrap_or(raw)
+            .to_string()
+    } else {
+        raw.to_string()
+    };
+
+    if command.is_empty() {
+        eprintln!("crs probe: no command on stdin");
+        std::process::exit(1);
+    }
+
+    let config = load_rules();
+
+    println!("Command: {command}");
+    println!("{}", "─".repeat(60));
+
+    let mut any_match = false;
+
+    for rule in &config.rules {
+        if !rule.enabled {
+            continue;
+        }
+        let pat_str = if rule.pattern_flags.contains('i') {
+            format!("(?i){}", rule.pattern)
+        } else {
+            rule.pattern.clone()
+        };
+        let Ok(re) = Regex::new(&pat_str) else { continue };
+        if !re.is_match(&command) {
+            continue;
+        }
+        any_match = true;
+
+        // Find the first matching exception, if any
+        let matched_exc: Option<&str> = rule.exceptions.iter().find_map(|exc| {
+            Regex::new(exc)
+                .map(|r| if r.is_match(&command) { Some(exc.as_str()) } else { None })
+                .unwrap_or(None)
+        });
+
+        if let Some(exc) = matched_exc {
+            println!("ALLOW  [{}]", rule.id);
+            println!("       pattern `{}` matched", rule.pattern);
+            println!("       exception `{exc}` overrides → passthrough");
+        } else {
+            println!("BLOCK  [{}]", rule.id);
+            println!("       pattern `{}` matched", rule.pattern);
+            if let Some(ref msg) = rule.message {
+                // Wrap message at 72 cols with 7-space indent
+                let indent = "       ";
+                let words = msg.split_whitespace();
+                let mut line = format!("{indent}message: ");
+                let prefix_len = line.len();
+                for word in words {
+                    if line.len() + word.len() + 1 > 79 && line.len() > prefix_len {
+                        println!("{line}");
+                        line = format!("{indent}         {word} ");
+                    } else {
+                        line.push_str(word);
+                        line.push(' ');
+                    }
+                }
+                if line.trim_end() != indent.trim_end() {
+                    println!("{}", line.trim_end());
+                }
+            }
+            // List exceptions that did NOT match (so user knows what would save them)
+            if !rule.exceptions.is_empty() {
+                println!("       would allow if any of:");
+                for exc in &rule.exceptions {
+                    println!("         - {exc}");
+                }
+            }
+        }
+        println!();
+    }
+
+    if !any_match {
+        println!("PASS   no rule matched");
     }
 }
 
