@@ -6,6 +6,9 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[features]
+testing = []
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }

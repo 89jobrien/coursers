@@ -4,7 +4,7 @@ use std::fs;
 
 use crate::config::rules_path;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Rule {
     pub id: String,
     #[serde(default = "default_true")]
@@ -17,7 +17,7 @@ pub struct Rule {
     pub message: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct FailureLearning {
     #[serde(default = "default_true")]
     pub enabled: bool,
@@ -47,7 +47,7 @@ impl Default for FailureLearning {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct RulesConfig {
     #[serde(default)]
     pub rules: Vec<Rule>,
