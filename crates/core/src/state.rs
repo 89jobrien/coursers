@@ -115,7 +115,7 @@ fn prune(mut state: State, fl: &FailureLearning, now: u64) -> State {
     state
 }
 
-/// Returns deny message if command has failed >= threshold times in window.
+/// Returns deny message if command has failed `threshold` or more times in window.
 pub fn check_learned(command: &str, state: &State, fl: &FailureLearning) -> Option<String> {
     if !fl.enabled {
         return None;
@@ -145,4 +145,141 @@ pub fn check_learned(command: &str, state: &State, fl: &FailureLearning) -> Opti
             .replace("{window}", &window_minutes.to_string())
             .replace("{preview}", preview),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rules::FailureLearning;
+
+    fn fl(threshold: usize, window: u64) -> FailureLearning {
+        FailureLearning {
+            enabled: true,
+            block_threshold: threshold,
+            window_seconds: window,
+            state_file: None,
+            max_tracked_commands: 200,
+            cleanup_after_seconds: 3600,
+            message_template: None,
+        }
+    }
+
+    #[test]
+    fn record_failure_creates_entry() {
+        let st = record_failure(State::default(), "grep foo .", &fl(3, 300));
+        assert_eq!(st.failures.len(), 1);
+        let entry = st.failures.values().next().unwrap();
+        assert_eq!(entry.timestamps.len(), 1);
+    }
+
+    #[test]
+    fn record_failure_appends() {
+        let st = record_failure(State::default(), "grep foo .", &fl(3, 300));
+        let st = record_failure(st, "grep foo .", &fl(3, 300));
+        let entry = st.failures.values().next().unwrap();
+        assert_eq!(entry.timestamps.len(), 2);
+    }
+
+    #[test]
+    fn prune_removes_old_timestamps() {
+        let mut st = State::default();
+        let key = command_key("grep foo .");
+        st.failures.insert(key, FailureEntry {
+            command_preview: "grep foo .".to_string(),
+            timestamps: vec![0],
+            last_seen: now_secs() as f64,
+        });
+        let st = record_failure(st, "grep foo .", &fl(3, 300));
+        let entry = st.failures.values().next().unwrap();
+        assert_eq!(entry.timestamps.len(), 1);
+    }
+
+    #[test]
+    fn prune_evicts_over_max() {
+        let mut st = State::default();
+        let now = now_secs();
+        let fl_cfg = FailureLearning {
+            enabled: true,
+            block_threshold: 3,
+            window_seconds: 300,
+            state_file: None,
+            max_tracked_commands: 5,
+            cleanup_after_seconds: 3600,
+            message_template: None,
+        };
+        for i in 0..5u64 {
+            let cmd = format!("cmd-{i}");
+            let key = command_key(&cmd);
+            st.failures.insert(key, FailureEntry {
+                command_preview: cmd,
+                timestamps: vec![now - i],
+                last_seen: (now - i) as f64,
+            });
+        }
+        let st = record_failure(st, "cmd-new", &fl_cfg);
+        assert!(st.failures.len() <= 5);
+    }
+
+    #[test]
+    fn check_learned_below_threshold() {
+        let mut st = State::default();
+        let now = now_secs();
+        let key = command_key("grep foo .");
+        st.failures.insert(key, FailureEntry {
+            command_preview: "grep foo .".to_string(),
+            timestamps: vec![now, now],
+            last_seen: now as f64,
+        });
+        assert!(check_learned("grep foo .", &st, &fl(3, 300)).is_none());
+    }
+
+    #[test]
+    fn check_learned_at_threshold() {
+        let mut st = State::default();
+        let now = now_secs();
+        let key = command_key("grep foo .");
+        st.failures.insert(key, FailureEntry {
+            command_preview: "grep foo .".to_string(),
+            timestamps: vec![now, now, now],
+            last_seen: now as f64,
+        });
+        assert!(check_learned("grep foo .", &st, &fl(3, 300)).is_some());
+    }
+
+    #[test]
+    fn check_learned_disabled() {
+        let mut st = State::default();
+        let now = now_secs();
+        let key = command_key("grep foo .");
+        st.failures.insert(key, FailureEntry {
+            command_preview: "grep foo .".to_string(),
+            timestamps: vec![now, now, now],
+            last_seen: now as f64,
+        });
+        let mut fl_cfg = fl(3, 300);
+        fl_cfg.enabled = false;
+        assert!(check_learned("grep foo .", &st, &fl_cfg).is_none());
+    }
+
+    #[test]
+    fn cleanup_removes_stale_entries() {
+        let mut st = State::default();
+        let key = command_key("grep foo .");
+        st.failures.insert(key, FailureEntry {
+            command_preview: "grep foo .".to_string(),
+            timestamps: vec![],
+            last_seen: 0.0,
+        });
+        let fl_cfg = FailureLearning {
+            enabled: true,
+            block_threshold: 3,
+            window_seconds: 300,
+            state_file: None,
+            max_tracked_commands: 200,
+            cleanup_after_seconds: 1,
+            message_template: None,
+        };
+        let st = record_failure(st, "other-cmd", &fl_cfg);
+        assert!(!st.failures.contains_key(&command_key("grep foo .")));
+    }
 }
