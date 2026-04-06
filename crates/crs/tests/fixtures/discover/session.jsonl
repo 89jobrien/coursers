@@ -1,0 +1,4 @@
+{"type":"assistant","sessionId":"test-sess","cwd":"/test/project","timestamp":"2099-01-01T00:00:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"cargo nextest run -p crs-core"}}]}}
+{"type":"assistant","sessionId":"test-sess","cwd":"/test/project","timestamp":"2099-01-01T00:00:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"doob todo list --project coursers"}}]}}
+{"type":"assistant","sessionId":"test-sess","cwd":"/test/project","timestamp":"2099-01-01T00:00:00Z","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash","input":{"command":"doob todo list --project minibox"}}]}}
+{"type":"user","sessionId":"test-sess","cwd":"/test/project","message":{"role":"user","content":[]}}
