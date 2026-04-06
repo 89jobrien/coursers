@@ -122,3 +122,72 @@ pub fn check(command: &str, rules: &[Rule]) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_rule(id: &str, pattern: &str) -> Rule {
+        Rule {
+            id: id.to_string(),
+            enabled: true,
+            pattern: pattern.to_string(),
+            pattern_flags: String::new(),
+            exceptions: vec![],
+            message: None,
+        }
+    }
+
+    #[test]
+    fn rule_matches_pattern() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        let result = check("grep foo .", &rules);
+        assert!(result.is_some());
+        assert!(result.unwrap().contains("no-grep"));
+    }
+
+    #[test]
+    fn rule_no_match() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        assert!(check("ls -la", &rules).is_none());
+    }
+
+    #[test]
+    fn rule_case_insensitive_flag() {
+        let mut rule = make_rule("no-grep", r"\bgrep\b");
+        rule.pattern_flags = "i".to_string();
+        assert!(check("GREP foo .", &[rule]).is_some());
+    }
+
+    #[test]
+    fn rule_exception_bypasses_block() {
+        let mut rule = make_rule("no-grep", r"\bgrep\b");
+        rule.exceptions = vec![r"\| grep".to_string()];
+        assert!(check("cmd | grep foo", &[rule]).is_none());
+    }
+
+    #[test]
+    fn rule_disabled_skipped() {
+        let mut rule = make_rule("no-grep", r"\bgrep\b");
+        rule.enabled = false;
+        assert!(check("grep foo .", &[rule]).is_none());
+    }
+
+    #[test]
+    fn rule_bad_regex_skipped() {
+        let rule = make_rule("bad", r"[invalid");
+        assert!(check("anything", &[rule]).is_none());
+    }
+
+    #[test]
+    fn no_rules_allows_all() {
+        assert!(check("grep foo .", &[]).is_none());
+    }
+
+    #[test]
+    fn rule_custom_message_returned() {
+        let mut rule = make_rule("no-grep", r"\bgrep\b");
+        rule.message = Some("Use the Grep tool.".to_string());
+        assert_eq!(check("grep foo .", &[rule]).unwrap(), "Use the Grep tool.");
+    }
+}
