@@ -17,3 +17,23 @@ pub fn state_path_default() -> PathBuf {
         .expect("home dir")
         .join(".claude/hooks/course-correct-state.json")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn env_var_overrides_default_rules_path() {
+        unsafe { std::env::set_var("COURSERS_RULES", "/tmp/test-rules.json") };
+        let path = rules_path();
+        unsafe { std::env::remove_var("COURSERS_RULES") };
+        assert_eq!(path.to_str().unwrap(), "/tmp/test-rules.json");
+    }
+
+    #[test]
+    fn default_rules_path_contains_claude() {
+        unsafe { std::env::remove_var("COURSERS_RULES") };
+        let path = rules_path();
+        assert!(path.to_string_lossy().contains(".claude"));
+    }
+}
