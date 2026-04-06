@@ -126,7 +126,29 @@ items:
   extra: []
   completed: 2026-04-06
 
+- id: coursers-9
+  name: xdg-config-migration
+  priority: P1
+  status: open
+  title: Migrate config defaults from ~/.claude/hooks/ to ~/.config/coursers/
+  description: |
+    Move rules and state file defaults to XDG-compliant ~/.config/coursers/.
+    State path: .ctx/course-correct-state.json (project-local) -> ~/.config/coursers/
+    (no ~/.claude/hooks/ fallback). Rules path: ~/.config/coursers/course-correct-rules.json.
+    Create ~/.config/coursers/ dir. Migrate existing files. Update CLAUDE.md docs.
+  files:
+  - crates/core/src/config.rs
+  - CLAUDE.md
+  extra: []
+
 log:
+- date: 2026-04-06
+  summary: >-
+    Scoped state file to .ctx/course-correct-state.json (project-local) with ~/.claude/hooks/
+    fallback. Cleaned .gitignore (removed dead course-correct-state.json entry, scoped .ctx/
+    ignore to state file only). Identified coursers-9: migrate all config defaults to
+    ~/.config/coursers/.
+  commits: []
 - date: 2026-04-06
   summary: >-
     Added crs validate (rule health check with known trigger/exception examples, PATH check for
@@ -179,10 +201,3 @@ log:
     crs-rewrite-pretooluse. 46 tests passing, clippy clean.
   commits:
   - f151666
-- date: 2026-04-06
-  summary: >-
-    Converted to workspace (crates/core, crates/coursers, crates/crs). Wired coursers pre/post
-    directly in settings.json replacing nu wrappers. Uninstalled RTK. Created coursers plugin
-    with companion agent. Designed crs hybrid filter architecture.
-  commits:
-  - ca7ffdc
