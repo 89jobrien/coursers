@@ -6,6 +6,10 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[lib]
+name = "crs_lib"
+path = "src/lib.rs"
+
 [[bin]]
 name = "crs"
 path = "src/main.rs"
@@ -15,3 +19,4 @@ crs-core = { path = "../core" }
 clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+toml = { workspace = true }

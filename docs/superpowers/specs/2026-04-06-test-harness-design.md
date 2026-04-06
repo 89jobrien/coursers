@@ -78,58 +78,58 @@ testing = []
 
 ### `crates/core/src/rules.rs`
 
-| Test | Assertion |
-|------|-----------|
-| `rule_matches_pattern` | matching command → `Some(message)` |
-| `rule_no_match` | non-matching command → `None` |
-| `rule_case_insensitive_flag` | `pattern_flags = "i"` matches mixed case |
-| `rule_exception_bypasses_block` | exception regex present → `None` |
-| `rule_disabled_skipped` | `enabled: false` → `None` |
-| `rule_bad_regex_skipped` | invalid pattern → `None` (no panic) |
-| `no_rules_allows_all` | empty rules vec → `None` |
+| Test                            | Assertion                                |
+| ------------------------------- | ---------------------------------------- |
+| `rule_matches_pattern`          | matching command → `Some(message)`       |
+| `rule_no_match`                 | non-matching command → `None`            |
+| `rule_case_insensitive_flag`    | `pattern_flags = "i"` matches mixed case |
+| `rule_exception_bypasses_block` | exception regex present → `None`         |
+| `rule_disabled_skipped`         | `enabled: false` → `None`                |
+| `rule_bad_regex_skipped`        | invalid pattern → `None` (no panic)      |
+| `no_rules_allows_all`           | empty rules vec → `None`                 |
 
 ### `crates/core/src/state.rs`
 
-| Test | Assertion |
-|------|-----------|
-| `record_failure_creates_entry` | new command → entry with 1 timestamp |
-| `record_failure_appends` | same command twice → 2 timestamps |
-| `prune_removes_old_timestamps` | timestamp outside window → pruned |
-| `prune_evicts_over_max` | 201 entries → oldest evicted |
-| `check_learned_below_threshold` | 2 failures, threshold 3 → `None` |
-| `check_learned_at_threshold` | 3 failures → `Some(message)` |
-| `check_learned_disabled` | `enabled: false` → `None` |
-| `cleanup_removes_stale_entries` | last_seen > cleanup_after → removed |
+| Test                            | Assertion                            |
+| ------------------------------- | ------------------------------------ |
+| `record_failure_creates_entry`  | new command → entry with 1 timestamp |
+| `record_failure_appends`        | same command twice → 2 timestamps    |
+| `prune_removes_old_timestamps`  | timestamp outside window → pruned    |
+| `prune_evicts_over_max`         | 201 entries → oldest evicted         |
+| `check_learned_below_threshold` | 2 failures, threshold 3 → `None`     |
+| `check_learned_at_threshold`    | 3 failures → `Some(message)`         |
+| `check_learned_disabled`        | `enabled: false` → `None`            |
+| `cleanup_removes_stale_entries` | last_seen > cleanup_after → removed  |
 
 ### `crates/core/src/config.rs`
 
-| Test | Assertion |
-|------|-----------|
+| Test                                   | Assertion                                  |
+| -------------------------------------- | ------------------------------------------ |
 | `env_var_overrides_default_rules_path` | `COURSERS_RULES=/tmp/x` → path is `/tmp/x` |
-| `default_rules_path_contains_claude` | no env var → path contains `.claude` |
+| `default_rules_path_contains_claude`   | no env var → path contains `.claude`       |
 
 ### `crates/coursers/src/hook/pre.rs`
 
 Uses `InMemoryRulesLoader` + `InMemoryStateStore`.
 
-| Test | Assertion |
-|------|-----------|
-| `non_bash_tool_passthrough` | `tool_name = "Read"` → no deny |
-| `rule_match_denies` | command matches rule → deny response |
-| `exception_allows` | command matches exception → allow |
-| `learned_failure_at_threshold_denies` | state has N failures → deny |
-| `empty_command_passthrough` | blank command → no deny |
-| `failure_learning_disabled_allows` | `fl.enabled = false` → allow even at threshold |
+| Test                                  | Assertion                                      |
+| ------------------------------------- | ---------------------------------------------- |
+| `non_bash_tool_passthrough`           | `tool_name = "Read"` → no deny                 |
+| `rule_match_denies`                   | command matches rule → deny response           |
+| `exception_allows`                    | command matches exception → allow              |
+| `learned_failure_at_threshold_denies` | state has N failures → deny                    |
+| `empty_command_passthrough`           | blank command → no deny                        |
+| `failure_learning_disabled_allows`    | `fl.enabled = false` → allow even at threshold |
 
 ### `crates/coursers/src/hook/post.rs`
 
-| Test | Assertion |
-|------|-----------|
-| `exit_zero_no_record` | exit_code 0 → state unchanged |
-| `signal_exit_no_record` | exit_code 130 → state unchanged |
-| `excluded_pattern_no_record` | `2>/dev/null` suffix → not recorded |
-| `real_failure_recorded` | exit_code 1, plain command → entry in state |
-| `failure_learning_disabled_no_record` | `fl.enabled = false` → not recorded |
+| Test                                  | Assertion                                   |
+| ------------------------------------- | ------------------------------------------- |
+| `exit_zero_no_record`                 | exit_code 0 → state unchanged               |
+| `signal_exit_no_record`               | exit_code 130 → state unchanged             |
+| `excluded_pattern_no_record`          | `2>/dev/null` suffix → not recorded         |
+| `real_failure_recorded`               | exit_code 1, plain command → entry in state |
+| `failure_learning_disabled_no_record` | `fl.enabled = false` → not recorded         |
 
 ---
 
@@ -172,21 +172,21 @@ path via `.env("COURSERS_RULES", ...)` on `Command`.
 
 ### `tests/integration/pre_hook.rs`
 
-| Test | Setup | Assertion |
-|------|-------|-----------|
-| `blocked_command_exits_nonzero` | rules_basic + payload_bash_grep | exit non-zero, stdout contains `block` |
-| `allowed_command_exits_zero` | rules_basic + payload_bash_ls | exit 0 |
-| `non_bash_passthrough` | rules_basic + payload_non_bash | exit 0 |
-| `learned_failure_blocks_after_threshold` | empty rules, post failure N times then pre | pre exits non-zero |
+| Test                                     | Setup                                      | Assertion                              |
+| ---------------------------------------- | ------------------------------------------ | -------------------------------------- |
+| `blocked_command_exits_nonzero`          | rules_basic + payload_bash_grep            | exit non-zero, stdout contains `block` |
+| `allowed_command_exits_zero`             | rules_basic + payload_bash_ls              | exit 0                                 |
+| `non_bash_passthrough`                   | rules_basic + payload_non_bash             | exit 0                                 |
+| `learned_failure_blocks_after_threshold` | empty rules, post failure N times then pre | pre exits non-zero                     |
 
 ### `tests/integration/post_hook.rs`
 
-| Test | Setup | Assertion |
-|------|-------|-----------|
-| `failure_recorded_in_state` | payload_post_fail | state file exists, contains entry |
-| `success_not_recorded` | payload_post_ok | state file empty or absent |
-| `signal_not_recorded` | payload_post_signal | state file empty or absent |
-| `excluded_pattern_not_recorded` | post payload with `cmd 2>/dev/null` | not recorded |
+| Test                            | Setup                               | Assertion                         |
+| ------------------------------- | ----------------------------------- | --------------------------------- |
+| `failure_recorded_in_state`     | payload_post_fail                   | state file exists, contains entry |
+| `success_not_recorded`          | payload_post_ok                     | state file empty or absent        |
+| `signal_not_recorded`           | payload_post_signal                 | state file empty or absent        |
+| `excluded_pattern_not_recorded` | post payload with `cmd 2>/dev/null` | not recorded                      |
 
 ---
 
@@ -214,24 +214,24 @@ Behavior:
 
 ## File Map
 
-| File | Action |
-|------|--------|
-| `crates/core/src/loader.rs` | new — `RulesLoader` trait + `FsRulesLoader` |
-| `crates/core/src/store.rs` | new — `StateStore` trait + `FsStateStore` |
-| `crates/core/src/testing.rs` | new — `InMemoryRulesLoader`, `InMemoryStateStore` (feature-gated) |
-| `crates/core/src/lib.rs` | add `pub mod loader`, `pub mod store`, `pub mod testing` |
-| `crates/core/src/rules.rs` | unit tests added |
-| `crates/core/src/state.rs` | unit tests added |
-| `crates/core/src/config.rs` | unit tests added |
-| `crates/core/Cargo.toml` | add `testing` feature |
-| `crates/coursers/src/hook/pre.rs` | refactor to `run_with`, unit tests added |
-| `crates/coursers/src/hook/post.rs` | refactor to `run_with`, unit tests added |
-| `crates/coursers/src/main.rs` | wire `FsRulesLoader` + `FsStateStore` |
-| `crates/coursers/Cargo.toml` | add `crs_core/testing` to dev-dependencies |
-| `tests/integration/pre_hook.rs` | new |
-| `tests/integration/post_hook.rs` | new |
-| `tests/integration/fixtures/*.json` | new |
-| `Cargo.toml` (workspace) | add `tempfile` to workspace dev-dependencies |
-| `scripts/smoke.nu` | new |
-| `hooks/` | deleted |
-| `src/` | staged deletion committed |
+| File                                | Action                                                            |
+| ----------------------------------- | ----------------------------------------------------------------- |
+| `crates/core/src/loader.rs`         | new — `RulesLoader` trait + `FsRulesLoader`                       |
+| `crates/core/src/store.rs`          | new — `StateStore` trait + `FsStateStore`                         |
+| `crates/core/src/testing.rs`        | new — `InMemoryRulesLoader`, `InMemoryStateStore` (feature-gated) |
+| `crates/core/src/lib.rs`            | add `pub mod loader`, `pub mod store`, `pub mod testing`          |
+| `crates/core/src/rules.rs`          | unit tests added                                                  |
+| `crates/core/src/state.rs`          | unit tests added                                                  |
+| `crates/core/src/config.rs`         | unit tests added                                                  |
+| `crates/core/Cargo.toml`            | add `testing` feature                                             |
+| `crates/coursers/src/hook/pre.rs`   | refactor to `run_with`, unit tests added                          |
+| `crates/coursers/src/hook/post.rs`  | refactor to `run_with`, unit tests added                          |
+| `crates/coursers/src/main.rs`       | wire `FsRulesLoader` + `FsStateStore`                             |
+| `crates/coursers/Cargo.toml`        | add `crs_core/testing` to dev-dependencies                        |
+| `tests/integration/pre_hook.rs`     | new                                                               |
+| `tests/integration/post_hook.rs`    | new                                                               |
+| `tests/integration/fixtures/*.json` | new                                                               |
+| `Cargo.toml` (workspace)            | add `tempfile` to workspace dev-dependencies                      |
+| `scripts/smoke.nu`                  | new                                                               |
+| `hooks/`                            | deleted                                                           |
+| `src/`                              | staged deletion committed                                         |

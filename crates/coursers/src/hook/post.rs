@@ -71,6 +71,92 @@ pub fn run() {
     run_with(&loader, &store, &payload);
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crs_core::loader::InMemoryRulesLoader;
+    use crs_core::rules::{FailureLearning, RulesConfig};
+    use crs_core::store::InMemoryStateStore;
+    use super::super::{HookPayload, ToolInput};
+    use serde_json::json;
+
+    fn config_fl(enabled: bool) -> RulesConfig {
+        RulesConfig {
+            rules: vec![],
+            failure_learning: FailureLearning {
+                enabled,
+                block_threshold: 3,
+                window_seconds: 300,
+                state_file: None,
+                max_tracked_commands: 200,
+                cleanup_after_seconds: 3600,
+                message_template: None,
+            },
+        }
+    }
+
+    fn post_payload(cmd: &str, exit_code: i64) -> HookPayload {
+        HookPayload {
+            tool_name: Some("Bash".to_string()),
+            tool_input: Some(ToolInput { command: Some(cmd.to_string()) }),
+            tool_response: Some(json!({ "exit_code": exit_code })),
+        }
+    }
+
+    #[test]
+    fn exit_zero_no_record() {
+        let loader = InMemoryRulesLoader(config_fl(true));
+        let store = InMemoryStateStore::new();
+        run_with(&loader, &store, &post_payload("grep foo .", 0));
+        assert!(store.get_state().failures.is_empty());
+    }
+
+    #[test]
+    fn signal_exit_no_record() {
+        let loader = InMemoryRulesLoader(config_fl(true));
+        let store = InMemoryStateStore::new();
+        run_with(&loader, &store, &post_payload("grep foo .", 130));
+        assert!(store.get_state().failures.is_empty());
+    }
+
+    #[test]
+    fn excluded_pattern_no_record() {
+        let loader = InMemoryRulesLoader(config_fl(true));
+        let store = InMemoryStateStore::new();
+        run_with(&loader, &store, &post_payload("cmd 2>/dev/null", 1));
+        assert!(store.get_state().failures.is_empty());
+    }
+
+    #[test]
+    fn real_failure_recorded() {
+        let loader = InMemoryRulesLoader(config_fl(true));
+        let store = InMemoryStateStore::new();
+        run_with(&loader, &store, &post_payload("grep foo .", 1));
+        assert!(!store.get_state().failures.is_empty());
+    }
+
+    #[test]
+    fn failure_learning_disabled_no_record() {
+        let loader = InMemoryRulesLoader(config_fl(false));
+        let store = InMemoryStateStore::new();
+        run_with(&loader, &store, &post_payload("grep foo .", 1));
+        assert!(store.get_state().failures.is_empty());
+    }
+
+    #[test]
+    fn non_bash_tool_no_record() {
+        let loader = InMemoryRulesLoader(config_fl(true));
+        let store = InMemoryStateStore::new();
+        let payload = HookPayload {
+            tool_name: Some("Read".to_string()),
+            tool_input: Some(ToolInput { command: Some("grep foo .".to_string()) }),
+            tool_response: Some(json!({ "exit_code": 1 })),
+        };
+        run_with(&loader, &store, &payload);
+        assert!(store.get_state().failures.is_empty());
+    }
+}
+
 fn is_excluded(command: &str) -> bool {
     EXCLUDE_PATTERNS.iter().any(|pat| {
         regex::Regex::new(pat)
