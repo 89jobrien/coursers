@@ -222,16 +222,29 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
     if !report.intercepted.is_empty() {
         println!("INTERCEPTED — commands with matching rules");
         println!("{}", "-".repeat(72));
-        println!("{:<24} {:>6}   {:<24} {:>12}", "Command", "Count", "Rule", "Est. Savings");
+        let has_tokens = report.intercepted.iter().any(|f| f.est_tokens > 0);
+        if has_tokens {
+            println!("{:<24} {:>6}   {:<24} {:>12}", "Command", "Count", "Rule", "Output tokens");
+        } else {
+            println!("{:<24} {:>6}   {}", "Command", "Count", "Rule");
+        }
         for f in &report.intercepted {
             let rule = f.rule_id.as_deref().unwrap_or("-");
-            let savings = format_tokens(f.est_tokens);
-            println!("{:<24} {:>6}   {:<24} {:>12}", f.stem, f.count, rule, savings);
+            if has_tokens {
+                let savings = format_tokens(f.est_tokens);
+                println!("{:<24} {:>6}   {:<24} {:>12}", f.stem, f.count, rule, savings);
+            } else {
+                println!("{:<24} {:>6}   {}", f.stem, f.count, rule);
+            }
         }
         let total_tokens: u64 = report.intercepted.iter().map(|f| f.est_tokens).sum();
         let total_cmds: u64 = report.intercepted.iter().map(|f| f.count).sum();
         println!("{}", "-".repeat(72));
-        println!("Total: {} commands → {}", total_cmds, format_tokens(total_tokens));
+        if has_tokens {
+            println!("Total: {} commands → {} output tokens", total_cmds, total_tokens);
+        } else {
+            println!("Total: {} commands (no output data in sessions)", total_cmds);
+        }
     }
 
     if !report.unhandled.is_empty() {
@@ -249,7 +262,6 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
         println!("{}", "-".repeat(52));
     }
 
-    println!("~estimated at 150 tokens/intercept");
 }
 
 fn print_discover_json(report: &crs_core::history::DiscoverReport) {

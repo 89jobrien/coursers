@@ -43,6 +43,8 @@ pub struct CommandRecord {
     pub session_id: String,
     pub cwd: String,
     pub timestamp: Option<String>,
+    /// Actual output byte count from the tool_result record, if available.
+    pub output_bytes: Option<usize>,
 }
 
 pub trait CommandSource {
@@ -142,7 +144,11 @@ pub fn discover(
             rule_id: rule_id.clone(),
         });
         entry.count += 1;
-        entry.est_tokens = entry.count * 150;
+        // Use real output length when available: bytes / 4 ≈ tokens.
+        // Never fabricate a number — if output_bytes is absent, leave est_tokens at 0.
+        if let Some(bytes) = rec.output_bytes {
+            entry.est_tokens += (bytes / 4) as u64;
+        }
     }
 
     // Sort by count desc, truncate to limit
@@ -246,6 +252,7 @@ mod tests {
                 session_id: r.session_id.clone(),
                 cwd: r.cwd.clone(),
                 timestamp: r.timestamp.clone(),
+                output_bytes: r.output_bytes,
             })
         }
     }
@@ -256,6 +263,7 @@ mod tests {
             session_id: "sess-1".to_string(),
             cwd: cwd.to_string(),
             timestamp: None,
+            output_bytes: None,
         }
     }
 
@@ -301,7 +309,7 @@ mod tests {
         assert_eq!(report.intercepted.len(), 1);
         assert_eq!(report.intercepted[0].stem, "cargo nextest");
         assert_eq!(report.intercepted[0].count, 2);
-        assert_eq!(report.intercepted[0].est_tokens, 300); // 2 * 150
+        assert_eq!(report.intercepted[0].est_tokens, 0); // no output_bytes set
     }
 
     #[test]
