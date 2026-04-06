@@ -1,0 +1,20 @@
+{
+  "rules": [
+    {
+      "id": "no-grep",
+      "pattern": "\\bgrep\\b",
+      "exceptions": ["\\| grep"],
+      "message": "Use the Grep tool instead of shell grep."
+    },
+    {
+      "id": "no-cat",
+      "pattern": "\\bcat\\s+[^|<]",
+      "message": "Use the Read tool instead of cat."
+    }
+  ],
+  "failure_learning": {
+    "enabled": true,
+    "block_threshold": 3,
+    "window_seconds": 300
+  }
+}

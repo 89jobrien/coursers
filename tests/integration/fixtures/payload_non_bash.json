@@ -1,0 +1,4 @@
+{
+  "tool_name": "Read",
+  "tool_input": { "command": "grep foo ." }
+}
