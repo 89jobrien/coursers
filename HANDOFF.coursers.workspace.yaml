@@ -95,7 +95,50 @@ items:
   extra: []
   completed: 2026-04-06
 
+- id: coursers-7
+  name: crs-validate
+  priority: P2
+  status: done
+  title: Add `crs validate` — rule health check against available commands
+  description: |
+    Checks each rule: pattern compiles, known trigger examples fire, known exception
+    examples are correctly bypassed, alternative tools (bun, uv) are on PATH.
+    Found and fixed: no-grep-use-tool -A/-B/-C exceptions used \b which did not
+    match -A3 (no space). Changed to [0-9 ].
+  files:
+  - crates/crs/src/main.rs
+  - ~/.claude/hooks/course-correct-rules.json
+  extra: []
+  completed: 2026-04-06
+
+- id: coursers-8
+  name: crs-probe
+  priority: P2
+  status: done
+  title: Add `crs probe` — interactive rule inspection
+  description: |
+    Reads a command from stdin (raw string, {"command":"..."}, or hook-style
+    {"tool_input":{"command":"..."}}). Shows per-rule verdict: BLOCK, ALLOW
+    (pattern matched but exception overrides), or PASS. BLOCK output lists the
+    message and all exceptions so the user knows what form would be allowed.
+  files:
+  - crates/crs/src/main.rs
+  extra: []
+  completed: 2026-04-06
+
 log:
+- date: 2026-04-06
+  summary: >-
+    Added crs validate (rule health check with known trigger/exception examples, PATH check for
+    alternatives), fixed no-grep-use-tool -A/-B/-C exception pattern, added crs probe
+    (interactive rule inspector accepting raw string or JSON), fixed discover rule attribution
+    to respect exceptions via matched_rule_id(), switched discover token counts to real
+    output_bytes/4 from session tool_result records.
+  commits:
+  - 032973b
+  - 1948e1e
+  - b33548a
+  - 65a49da
 - date: 2026-04-06
   summary: >-
     Implemented crs discover (coursers-4): hexagonal architecture with CommandSource trait in
@@ -132,11 +175,8 @@ log:
   - fffa120
 - date: 2026-04-06
   summary: >-
-    Implemented all P1 items: crs-filters-toml-schema (FiltersConfig + RewriteConfig in
-    crs-core with TOML loader, config hierarchy, find_rule), crs-filter-posttooluse
-    (crs filter subcommand, FilterResult enum, apply_filter logic), crs-rewrite-pretooluse
-    (crs rewrite subcommand, PreToolUse response with updatedInput). 46 tests passing,
-    clippy clean. P2 remaining: wire hooks into settings.json, crs discover.
+    Implemented all P1 items: crs-filters-toml-schema, crs-filter-posttooluse,
+    crs-rewrite-pretooluse. 46 tests passing, clippy clean.
   commits:
   - f151666
 - date: 2026-04-06
