@@ -10,6 +10,9 @@ pub fn rules_path() -> PathBuf {
 }
 
 pub fn state_path_default() -> PathBuf {
+    if let Ok(p) = std::env::var("COURSERS_STATE") {
+        return PathBuf::from(p);
+    }
     dirs::home_dir()
         .expect("home dir")
         .join(".claude/hooks/course-correct-state.json")

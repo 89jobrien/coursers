@@ -16,3 +16,8 @@ clap = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }
+
+[dev-dependencies]
+crs-core = { path = "../core", features = ["testing"] }
+tempfile = { workspace = true }
+serde_json = { workspace = true }
