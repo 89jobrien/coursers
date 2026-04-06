@@ -5,7 +5,7 @@ Claude Code hook pipeline for course-correcting AI-generated Bash commands.
 Two tools:
 
 - **`coursers`** — PreToolUse/PostToolUse hooks that block bad commands and learn from failures
-- **`crs`** — output filter and command rewriter _(in progress)_
+- **`crs`** — output filter and command rewriter
 
 ---
 
@@ -46,14 +46,29 @@ Wire into `~/.claude/settings.json`:
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "coursers pre" }] }
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "coursers pre" },
+          { "type": "command", "command": "crs rewrite" }
+        ]
+      }
     ],
     "PostToolUse": [
-      { "matcher": "Bash", "hooks": [{ "type": "command", "command": "coursers post" }] }
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "coursers post" },
+          { "type": "command", "command": "crs filter" }
+        ]
+      }
     ]
   }
 }
 ```
+
+`crs rewrite` and `crs filter` are optional — run `coursers` alone if you only want blocking
+and failure learning.
 
 ---
 
@@ -107,29 +122,80 @@ Rules file: `~/.claude/hooks/course-correct-rules.json`
 
 ---
 
+## crs
+
+`crs` extends the pipeline with output compression and command rewriting.
+
+### `crs filter` (PostToolUse)
+
+Reads PostToolUse output and suppresses or compresses it based on rules in
+`.ctx/crs-filters.toml` (project-local) or `~/.config/crs/filters.toml` (global).
+
+Filter modes per rule:
+
+| Mode            | Behaviour                                              |
+|-----------------|--------------------------------------------------------|
+| `passthrough`   | Output unchanged (default)                             |
+| `failures-only` | Suppress output on exit 0; pass through on failure     |
+| `errors-only`   | Only pass lines containing "error" (case-insensitive)  |
+| `truncate`      | Keep first N lines (`max_lines`, default 50)           |
+
+Example `.ctx/crs-filters.toml`:
+
+```toml
+[[filters]]
+pattern = "cargo (build|check|clippy)"
+mode = "errors-only"
+
+[[filters]]
+pattern = "cargo nextest"
+mode = "failures-only"
+```
+
+Wire into `settings.json`:
+
+```json
+{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "crs filter" }] }
+```
+
+### `crs rewrite` (PreToolUse)
+
+Rewrites commands before they run using regex replace rules. Exit 0 + JSON response means
+rewritten; exit 1 means passthrough unchanged.
+
+```toml
+[[rewrites]]
+pattern = "^cargo build$"
+replace = "cargo build --message-format json"
+```
+
+Wire into `settings.json`:
+
+```json
+{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "crs rewrite" }] }
+```
+
+### `crs discover` _(not yet implemented)_
+
+Will scan Claude Code session history (`~/.claude/projects/**/*.jsonl`) to surface Bash
+commands that match filter/rewrite rules but weren't intercepted.
+
+---
+
 ## Workspace Structure
 
 ```
 crates/
-  core/        # shared library — rules, state, config
+  core/        # shared library — rules, state, config, filters, rewrite
   coursers/    # `coursers` binary — pre/post hook handlers
-  crs/         # `crs` binary — filter/rewrite (in progress)
+  crs/         # `crs` binary — filter, rewrite, discover
 agents/
   coursers-companion.md  # Claude Code agent for diagnostics
+scripts/
+  smoke.nu     # end-to-end smoke test (nu scripts/smoke.nu)
+tests/
+  integration/ # binary integration test fixtures
 ```
-
----
-
-## crs (in progress)
-
-`crs` will extend the pipeline with output compression and command rewriting:
-
-- **`crs filter`** — PostToolUse hook; strips noise from command output (failures-only,
-  errors-only, truncate modes) using rules in `.ctx/crs-filters.toml`
-- **`crs rewrite`** — PreToolUse hook; rewrites commands to better forms (e.g. forces
-  `--format json`) before they run
-- **`crs discover`** — scans Claude Code session history to surface commands that match
-  filter/rewrite rules but weren't intercepted
 
 ---
 
