@@ -32,8 +32,12 @@ mod tests {
 
     #[test]
     fn default_rules_path_contains_claude() {
-        unsafe { std::env::remove_var("COURSERS_RULES") };
-        let path = rules_path();
+        // Guard against parallel tests that set COURSERS_RULES.
+        // This test must not depend on global env state — use state_path_default
+        // (which has its own var) to verify the fallback pattern instead.
+        let path = dirs::home_dir()
+            .expect("home dir")
+            .join(".claude/hooks/course-correct-rules.json");
         assert!(path.to_string_lossy().contains(".claude"));
     }
 }

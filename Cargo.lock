@@ -161,8 +161,10 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "crs-core",
+ "dirs",
  "serde",
  "serde_json",
+ "tempfile",
  "toml",
  "walkdir",
 ]

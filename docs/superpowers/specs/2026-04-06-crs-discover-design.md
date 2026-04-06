@@ -75,6 +75,7 @@ pub fn discover(
 ```
 
 Steps:
+
 1. Filter records by `since_days` (compare timestamp prefix) and project cwd if `!all_projects`.
 2. For each command: compute stem (first 1–2 whitespace-delimited tokens, strip leading env
    assignments and path prefixes).
@@ -87,6 +88,7 @@ Steps:
 ## Infrastructure: `JsonlCommandSource`
 
 Walks `<root>/<project>/*.jsonl` (or all projects with `--all`). For each line:
+
 - Parse as JSON.
 - Skip unless `type == "assistant"`.
 - Iterate `message.content[]` for `{ type: "tool_use", name: "Bash" }` blocks.
@@ -125,7 +127,12 @@ python3                  2   python3 /tmp/validate...
   "scanned_sessions": 15,
   "scanned_commands": 199,
   "intercepted": [
-    { "stem": "cargo nextest", "count": 32, "example": "...", "est_tokens": 4800 }
+    {
+      "stem": "cargo nextest",
+      "count": 32,
+      "example": "...",
+      "est_tokens": 4800
+    }
   ],
   "unhandled": [
     { "stem": "op account", "count": 9, "example": "op account list 2>&1" }
