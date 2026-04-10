@@ -36,6 +36,7 @@ mkdir -p "$CTX"
 TOOLS_FILE="$CTX/HANDOFF.tools.yaml"
 STATE_FILE="$CTX/HANDOFF.state.yaml"
 TODAY=$(date +%Y-%m-%d)
+JQ_LIB=$(cd "$(dirname "$0")" && pwd)
 
 TMP=$(mktemp)
 trap 'rm -f "$TMP" "$TMP_TOOLS" "$TMP_STATE"' EXIT
@@ -54,57 +55,29 @@ if ! jq empty "$TMP" 2>/dev/null; then
     exit 1
 fi
 
+jqf() { jq -r -L "$JQ_LIB" "include \"enrich-handoff\"; $1" "$TMP"; }
+
 # --- write HANDOFF.tools.yaml (atomic via tmp file) ---
 
 {
     echo "generated: $TODAY"
     echo "since_days: $SINCE"
-    jq -r '"sessions_scanned: \(.sessions_scanned)"' "$TMP"
-    jq -r '"total_commands: \(.total_commands)"' "$TMP"
-
+    jqf 'sessions_scanned'
+    jqf 'total_commands'
     echo "top_supported:"
-    jq -r '
-      (.supported // [])[:10][] |
-      "  - command: \(.command)\n    count: \(.count)\n    rtk_equivalent: \(.rtk_equivalent)\n    est_savings_tokens: \(.estimated_savings_tokens)\n    est_savings_pct: \(.estimated_savings_pct)"
-    ' "$TMP"
-
+    jqf 'top_supported'
     echo "top_unhandled:"
-    jq -r '
-      (.unsupported // [])[:10][] |
-      (.example // "") |
-      split("\n")[0] |
-      if length > 80 then .[:80] else . end
-    ' "$TMP" | while IFS= read -r example; do
-        base=$(jq -r --arg ex "$example" '
-          (.unsupported // [])[] | select((.example // "") | split("\n")[0] | startswith($ex))
-          | .base_command' "$TMP" | head -1)
-        count=$(jq -r --arg ex "$example" '
-          (.unsupported // [])[] | select((.example // "") | split("\n")[0] | startswith($ex))
-          | .count' "$TMP" | head -1)
-        printf '  - base_command: %s\n    count: %s\n    example: %s\n' \
-            "$base" "$count" "$(printf '%s' "$example" | jq -Rs .)"
-    done
+    jqf 'top_unhandled'
 } >"$TMP_TOOLS"
 mv "$TMP_TOOLS" "$TOOLS_FILE"
 
 # --- merge tool_usage block into HANDOFF.state.yaml (atomic) ---
 
-TOP_CMD=$(jq -r '
-  (.supported // [])[0] |
-  if . then "\(.command) (\(.count))" else "" end
-' "$TMP")
-
-TOTAL_SAVINGS=$(jq -r '
-  [(.supported // [])[].estimated_savings_tokens] | add // 0
-' "$TMP")
-
-UNHANDLED_TOP=$(jq -r '
-  (.unsupported // [])[0] |
-  if . then "\(.base_command) (\(.count))" else "" end
-' "$TMP")
-
-SESSIONS=$(jq -r '.sessions_scanned' "$TMP")
-TOTAL=$(jq -r '.total_commands' "$TMP")
+TOP_CMD=$(jqf 'top_cmd')
+TOTAL_SAVINGS=$(jqf 'total_savings')
+UNHANDLED_TOP=$(jqf 'unhandled_top')
+SESSIONS=$(jqf '.sessions_scanned')
+TOTAL=$(jqf '.total_commands')
 
 BLOCK=$(printf 'tool_usage:\n  sessions_scanned: %s\n  total_commands: %s\n  top_command: %s\n  est_savings_tokens: %s\n  unhandled_top: %s' \
     "$SESSIONS" "$TOTAL" \
