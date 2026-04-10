@@ -23,6 +23,7 @@ dirs = "5"
 tempfile = "3"
 toml = "0.8"
 walkdir = "2"
+chrono = "0.4"
 
 [profile.release]
 strip = true

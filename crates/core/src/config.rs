@@ -14,7 +14,7 @@ pub fn state_path_default() -> PathBuf {
         return PathBuf::from(p);
     }
     let local = PathBuf::from(".ctx/course-correct-state.json");
-    if local.parent().map(|p| p.exists()).unwrap_or(false) {
+    if local.exists() {
         return local;
     }
     dirs::home_dir()
@@ -36,11 +36,13 @@ mod tests {
 
     #[test]
     fn default_rules_path_is_xdg() {
-        // Guard against parallel tests that set COURSERS_RULES.
-        // Verify that the computed path (without env override) targets XDG config dir.
-        let path = dirs::home_dir()
-            .expect("home dir")
-            .join(".config/coursers/course-correct-rules.json");
-        assert!(path.to_string_lossy().contains(".config/coursers"));
+        // Ensure COURSERS_RULES is unset so we exercise the default branch.
+        unsafe { std::env::remove_var("COURSERS_RULES") };
+        let path = rules_path();
+        assert!(
+            path.to_string_lossy().contains(".config/coursers"),
+            "expected XDG path, got: {}",
+            path.display()
+        );
     }
 }

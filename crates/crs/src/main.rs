@@ -412,7 +412,9 @@ fn cmd_probe() {
 
 fn cmd_discover(all: bool, limit: usize, since: u32, format: &str) {
     use crs_core::history::{DiscoverOpts, discover};
+    use crs_core::rtk::RtkAnalysis as _;
     use crs_core::rules::load as load_rules;
+    use std::collections::HashMap;
 
     let root = std::env::var("CLAUDE_PROJECTS_DIR")
         .map(std::path::PathBuf::from)
@@ -435,10 +437,105 @@ fn cmd_discover(all: bool, limit: usize, since: u32, format: &str) {
 
     let report = discover(&src, &rules_cfg.rules, &opts);
 
+    // Enrich with RTK data if rtk is on PATH.
+    // Build stem -> (rtk_equivalent, est_savings_tokens, est_savings_pct) lookup.
+    let rtk_map: HashMap<String, (String, u64, f64)> =
+        crs_lib::rtk::detect()
+            .and_then(|c| c.discover(since))
+            .map(|r| {
+                r.supported
+                    .into_iter()
+                    .map(|e| (e.command.clone(), (e.rtk_equivalent, e.est_savings_tokens, e.est_savings_pct)))
+                    .collect()
+            })
+            .unwrap_or_default();
+
     match format {
         "json" => print_discover_json(&report),
         _ => print_discover_text(&report),
     }
+
+    let ctx = std::path::Path::new(".ctx");
+    if ctx.is_dir() {
+        write_tools_yaml(&report, since, &rtk_map, ctx.join("HANDOFF.tools.yaml"));
+    }
+}
+
+fn write_tools_yaml(
+    report: &crs_core::history::DiscoverReport,
+    since_days: u32,
+    rtk_map: &std::collections::HashMap<String, (String, u64, f64)>,
+    path: std::path::PathBuf,
+) {
+    use std::io::Write as _;
+
+    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+
+    let mut out = String::new();
+    out.push_str(&format!("generated: {today}\n"));
+    out.push_str(&format!("since_days: {since_days}\n"));
+    out.push_str(&format!("sessions_scanned: {}\n", report.scanned_sessions));
+    out.push_str(&format!("total_commands: {}\n", report.scanned_commands));
+
+    if !report.intercepted.is_empty() {
+        out.push_str("top_supported:\n");
+        for f in &report.intercepted {
+            out.push_str(&format!("  - command: {}\n", f.stem));
+            out.push_str(&format!("    count: {}\n", f.count));
+            if let Some(ref rule) = f.rule_id {
+                out.push_str(&format!("    rule: {rule}\n"));
+            }
+            if let Some((rtk_eq, rtk_tokens, rtk_pct)) = rtk_map.get(&f.stem) {
+                out.push_str(&format!("    rtk_equivalent: {rtk_eq}\n"));
+                out.push_str(&format!("    est_savings_tokens: {rtk_tokens}\n"));
+                out.push_str(&format!("    est_savings_pct: {rtk_pct}\n"));
+            } else if f.est_tokens > 0 {
+                out.push_str(&format!("    est_savings_tokens: {}\n", f.est_tokens));
+            }
+        }
+    }
+
+    if !report.unhandled.is_empty() {
+        out.push_str("top_unhandled:\n");
+        for f in &report.unhandled {
+            let ex = if f.example.len() > 80 {
+                format!("{}...", &f.example[..80])
+            } else {
+                f.example.clone()
+            };
+            out.push_str(&format!("  - base_command: {}\n", f.stem));
+            out.push_str(&format!("    count: {}\n", f.count));
+            out.push_str(&format!("    example: {:?}\n", ex));
+        }
+    }
+
+    // Run obfsck --audit over the YAML before writing — surfaces secret hits to stderr.
+    obfsck_audit(&out);
+
+    match std::fs::File::create(&path).and_then(|mut f| f.write_all(out.as_bytes())) {
+        Ok(()) => eprintln!("wrote {}", path.display()),
+        Err(e) => eprintln!("warn: could not write {}: {e}", path.display()),
+    }
+}
+
+fn obfsck_audit(content: &str) {
+    use std::io::Write as _;
+    use std::process::{Command, Stdio};
+
+    let Ok(mut child) = Command::new("obfsck")
+        .args(["--audit", "--level", "minimal", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()
+    else {
+        return; // obfsck not on PATH — skip silently
+    };
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(content.as_bytes());
+    }
+    let _ = child.wait();
 }
 
 fn print_discover_text(report: &crs_core::history::DiscoverReport) {

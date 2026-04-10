@@ -1,4 +1,5 @@
 pub mod config;
+pub mod rtk;
 pub mod filters;
 pub mod history;
 pub mod rewrite;

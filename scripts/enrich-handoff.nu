@@ -3,9 +3,9 @@
 # Usage: nu scripts/enrich-handoff.nu [--since <int>]
 
 def main [--since: int = 1] {
-    # Verify rtk is on PATH
-    let rtk_path = (which rtk | get path | first | default "")
-    if $rtk_path == "" {
+    # Verify rtk is on PATH — first? returns null on empty list rather than crashing
+    let rtk_path = (which rtk | get path | first?)
+    if $rtk_path == null {
         exit 0
     }
 
@@ -54,7 +54,7 @@ def write_tools_yaml [ctx: string, data: record, since: int] {
         | each {|r| {
             base_command: $r.base_command,
             count: $r.count,
-            example: ($r.example | lines | first | str substring 0..80)
+            example: ($r.example | lines | first | str substring 0..<80)
         }}
     )
 
@@ -95,11 +95,8 @@ def merge_state_yaml [ctx: string, data: record] {
         $data.supported? | default [] | first | default null
         | if $in != null { $"($in.command) \(($in.count)\)" } else { "" }
     )
-    let total_savings = (
-        $data.supported? | default []
-        | get estimated_savings_tokens
-        | math sum
-    )
+    let savings_list = ($data.supported? | default [] | get estimated_savings_tokens)
+    let total_savings = if ($savings_list | length) > 0 { $savings_list | math sum } else { 0 }
     let top_unhandled = (
         $data.unsupported? | default [] | first | default null
         | if $in != null { $"($in.base_command) \(($in.count)\)" } else { "" }
