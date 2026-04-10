@@ -1,6 +1,6 @@
 project: coursers
 id: coursers
-updated: 2026-04-06
+updated: 2026-04-10
 notes: null
 items:
 - id: coursers-1
@@ -153,7 +153,7 @@ items:
   name: rtk-adapter
   priority: P1
   status: done
-  completed: 2026-04-06
+  completed: 2026-04-10
   title: RTK integration — RtkAnalysis/RtkRewrite ports + ProcessRtkClient adapter
   description: |
     Two-trait capability split (ISP group B): RtkAnalysis (discover, gain, session,
@@ -183,7 +183,61 @@ items:
   - crates/crs/src/main.rs
   extra: []
 
+- id: coursers-12
+  name: rule-block-records-failure
+  priority: P1
+  status: done
+  completed: 2026-04-10
+  title: Record rule-blocked commands in failure state
+  description: |
+    pre.rs run_with now records a failure entry in state whenever a predefined rule
+    blocks a command (before calling deny). Previously only post-exec non-zero exits
+    were recorded. This enables the learned-failure block to trigger on repeated
+    rule violations regardless of the time window.
+  files:
+  - crates/coursers/src/hook/pre.rs
+  extra: []
+
+- id: coursers-13
+  name: failure-threshold-total-not-windowed
+  priority: P1
+  status: done
+  completed: 2026-04-10
+  title: Block on total failure count, not windowed count
+  description: |
+    check_learned now uses entry.timestamps.len() instead of filtering to recent
+    window. Block triggers after N total failures regardless of when they occurred.
+    Prune/cleanup logic retained for state hygiene but no longer gates the block.
+  files:
+  - crates/core/src/state.rs
+  extra: []
+
+- id: coursers-14
+  name: hook-diagnostics-skill-fix
+  priority: P2
+  status: done
+  completed: 2026-04-10
+  title: Fix hook-diagnostics skill — correct failure log path and hook names
+  description: |
+    hooks-registry.md referenced stale failures.jsonl path and post-tool-track-failures.py.
+    Updated to point to ~/.claude/hooks/course-correct-state.json with correct schema.
+    SKILL.md updated: Reading Failure Logs section rewritten, coursers pre replaces
+    pre-tool-course-correct.py in common issues table.
+  files:
+  - ~/.claude/plugins/cache/local/atelier/*/skills/hook-diagnostics/SKILL.md
+  - ~/.claude/plugins/cache/local/atelier/*/skills/hook-diagnostics/references/hooks-registry.md
+  extra: []
+
 log:
+- date: 2026-04-10
+  summary: >-
+    Fixed hook-diagnostics skill (coursers-14): corrected failure log path to
+    course-correct-state.json, updated hook names. Rule-blocked commands now recorded
+    in failure state (coursers-12): pre.rs records before deny so repeated violations
+    accumulate. Failure threshold changed to total count not windowed (coursers-13):
+    check_learned uses timestamps.len() directly. Marked coursers-10 done. 75 tests pass.
+  commits:
+  - 9b5a2ca
 - date: 2026-04-06
   summary: >-
     coursers-5 already wired (crs rewrite in PreToolUse, crs filter in PostToolUse).
