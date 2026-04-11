@@ -110,3 +110,16 @@ file system directly.
 
 Wire `crs rewrite` and `crs filter` into `~/.claude/settings.json` and update
 `agents/coursers-companion.md` to reflect the full hook chain.
+
+## Council Analysis
+
+```sh
+op run --account=my.1password.com --env-file=/Users/joe/.secrets -- devkit council
+# Run from repo root. No --repo flag. Output: ~/.dev-agents/coursers/ai-logs/
+```
+
+## HANDOFF Dependency Fields
+
+Use structured fields, not free-text notes, for dependency tracking:
+- `blocked_by: [id1, id2]` on the blocked item
+- `unblocks: [id1]` on each blocker
