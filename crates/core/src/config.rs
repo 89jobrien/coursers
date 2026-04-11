@@ -25,9 +25,14 @@ pub fn state_path_default() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // Serialize env-mutation tests to avoid races between parallel test threads.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn env_var_overrides_default_rules_path() {
+        let _guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::set_var("COURSERS_RULES", "/tmp/test-rules.json") };
         let path = rules_path();
         unsafe { std::env::remove_var("COURSERS_RULES") };
@@ -36,7 +41,7 @@ mod tests {
 
     #[test]
     fn default_rules_path_is_xdg() {
-        // Ensure COURSERS_RULES is unset so we exercise the default branch.
+        let _guard = ENV_LOCK.lock().unwrap();
         unsafe { std::env::remove_var("COURSERS_RULES") };
         let path = rules_path();
         assert!(
