@@ -171,7 +171,7 @@ items:
 - id: coursers-11
   name: obfsck-mcp-server
   priority: P2
-  status: open
+  status: blocked
   title: Build obfsck MCP server + mcpipe integration for custom filter generation
   description: |
     Add server mode to obfsck exposing two MCP tools: audit (pipe content, return hits)
@@ -181,7 +181,10 @@ items:
     obfsck_audit picks up --config .ctx/obfsck-filters.yaml when present.
   files:
   - crates/crs/src/main.rs
-  extra: []
+  extra:
+  - date: 2026-04-11
+    type: note
+    note: "blocked on obfsck-11 (obfsck MCP server mode) and mcpipe-21 (auto-map integration)"
 
 - id: coursers-12
   name: rule-block-records-failure
