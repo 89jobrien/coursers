@@ -15,14 +15,19 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
     };
 
     let config = loader.load();
+    let fl = &config.failure_learning;
 
     // 1. Predefined rules
     if let Some(msg) = rules::check(command, &config.rules) {
+        if fl.enabled {
+            let st = store.load();
+            let st = state::record_failure(st, command, fl);
+            store.save(&st);
+        }
         deny(&msg);
     }
 
     // 2. Learned failures
-    let fl = &config.failure_learning;
     if fl.enabled {
         let st = store.load();
         if let Some(msg) = state::check_learned(command, &st, fl) {
@@ -111,6 +116,47 @@ mod tests {
         let loader = InMemoryRulesLoader(config_with_rule(r"\bgrep\b"));
         let store = InMemoryStateStore::new();
         run_with(&loader, &store, &bash_payload("ls -la"));
+    }
+
+    #[test]
+    fn rule_block_records_failure_in_state() {
+        use crs_core::rules::{FailureLearning, Rule, RulesConfig};
+        use crs_core::state;
+
+        let config = RulesConfig {
+            rules: vec![Rule {
+                id: "test-rule".to_string(),
+                enabled: true,
+                pattern: r"\bgrep\b".to_string(),
+                pattern_flags: String::new(),
+                exceptions: vec![],
+                message: Some("blocked".to_string()),
+            }],
+            failure_learning: FailureLearning {
+                enabled: true,
+                block_threshold: 3,
+                window_seconds: 300,
+                state_file: None,
+                max_tracked_commands: 200,
+                cleanup_after_seconds: 3600,
+                message_template: None,
+            },
+        };
+        let store = InMemoryStateStore::new();
+        let fl = &config.failure_learning;
+        let command = "grep foo .";
+
+        // Simulate what run_with does on a rule match — record before deny
+        for _ in 0..2 {
+            let st = store.load();
+            let st = state::record_failure(st, command, fl);
+            store.save(&st);
+        }
+
+        assert_eq!(
+            store.get_state().failures.values().next().unwrap().timestamps.len(),
+            2
+        );
     }
 
     #[test]

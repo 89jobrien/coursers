@@ -120,15 +120,10 @@ pub fn check_learned(command: &str, state: &State, fl: &FailureLearning) -> Opti
     if !fl.enabled {
         return None;
     }
-    let now = now_secs();
     let key = command_key(command);
     let entry = state.failures.get(&key)?;
 
-    let recent: Vec<_> = entry.timestamps.iter()
-        .filter(|&&t| now.saturating_sub(t) <= fl.window_seconds)
-        .collect();
-
-    if recent.len() < fl.block_threshold {
+    if entry.timestamps.len() < fl.block_threshold {
         return None;
     }
 
@@ -141,7 +136,7 @@ pub fn check_learned(command: &str, state: &State, fl: &FailureLearning) -> Opti
 
     Some(
         template
-            .replace("{count}", &recent.len().to_string())
+            .replace("{count}", &entry.timestamps.len().to_string())
             .replace("{window}", &window_minutes.to_string())
             .replace("{preview}", preview),
     )
