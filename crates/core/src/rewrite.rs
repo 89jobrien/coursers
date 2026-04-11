@@ -18,18 +18,32 @@ pub struct RewriteConfig {
 
 /// Try to rewrite `command` using the first matching rule.
 ///
-/// Returns `Some(rewritten)` if a rule matched, `None` for passthrough.
+/// The command is first passed through [`crate::expand::expand_vars`] to resolve
+/// shell env references (`$HOME`, `${VAR}`, `$env.VAR`, `~`) before rule matching.
+/// If a rule matches, the *expanded* form is rewritten and returned.
+/// If no rule matches but expansion changed the command, the expanded form is returned
+/// (so that env refs are always resolved even without an explicit rewrite rule).
+///
+/// Returns `Some(rewritten_or_expanded)` if the command changed, `None` if unchanged.
 pub fn apply(command: &str, config: &RewriteConfig) -> Option<String> {
+    let expanded = crate::expand::expand_vars(command);
+
     for rule in &config.rewrites {
         let Ok(re) = regex::Regex::new(&rule.pattern) else {
             continue;
         };
-        if re.is_match(command) {
-            let result = re.replace(command, rule.replace.as_str()).into_owned();
+        if re.is_match(&expanded) {
+            let result = re.replace(&expanded, rule.replace.as_str()).into_owned();
             return Some(result);
         }
     }
-    None
+
+    // No rule matched. Return expanded form if it differs from the original.
+    if expanded != command {
+        Some(expanded)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

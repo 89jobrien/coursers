@@ -68,12 +68,11 @@ fn parse_file(
         match v.get("type").and_then(|t| t.as_str()) {
             Some("assistant") => {
                 let cwd = v.get("cwd").and_then(|s| s.as_str()).unwrap_or("").to_string();
-                if !all_projects {
-                    if let Some(ref cd) = current_dir {
-                        if cwd != cd.to_string_lossy().as_ref() {
-                            continue;
-                        }
-                    }
+                if !all_projects
+                    && let Some(ref cd) = current_dir
+                    && cwd != cd.to_string_lossy().as_ref()
+                {
+                    continue;
                 }
                 let session_id = v.get("sessionId")
                     .or_else(|| v.get("session_id"))

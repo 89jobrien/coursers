@@ -22,12 +22,11 @@ pub fn stem_of(command: &str) -> String {
     let base = tokens[0].rsplit('/').next().unwrap_or(tokens[0]);
 
     // Append token 1 if it exists, is not a flag, AND token 2 exists
-    if tokens.len() > 2 {
-        if let Some(t1) = tokens.get(1) {
-            if !t1.starts_with('-') {
-                return format!("{base} {t1}");
-            }
-        }
+    if tokens.len() > 2
+        && let Some(t1) = tokens.get(1)
+        && !t1.starts_with('-')
+    {
+        return format!("{base} {t1}");
     }
 
     base.to_string()
@@ -90,7 +89,7 @@ pub fn discover(
     rules: &[Rule],
     opts: &DiscoverOpts,
 ) -> DiscoverReport {
-    let cutoff: Option<String> = opts.since_days.map(|d| days_ago(d));
+    let cutoff: Option<String> = opts.since_days.map(days_ago);
 
     let mut intercepted: HashMap<String, CommandFreq> = HashMap::new();
     let mut unhandled: HashMap<String, CommandFreq> = HashMap::new();
@@ -99,12 +98,11 @@ pub fn discover(
 
     for rec in source.commands() {
         // Project filter
-        if !opts.all_projects {
-            if let Some(ref cwd) = opts.current_dir {
-                if rec.cwd != cwd.to_string_lossy().as_ref() {
-                    continue;
-                }
-            }
+        if !opts.all_projects
+            && let Some(ref cwd) = opts.current_dir
+            && rec.cwd != cwd.to_string_lossy().as_ref()
+        {
+            continue;
         }
 
         // Since filter — compare date prefix (first 10 chars of ISO 8601)

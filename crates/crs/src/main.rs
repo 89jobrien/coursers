@@ -191,7 +191,8 @@ fn cmd_validate() {
     use regex::Regex;
 
     // Map rule id → (commands that should trigger, commands that should NOT trigger via exceptions)
-    let known: &[(&str, &[&str], &[&str], &[&str])] = &[
+    type KnownRule<'a> = (&'a str, &'a [&'a str], &'a [&'a str], &'a [&'a str]);
+    let known: &[KnownRule<'_>] = &[
         (
             "no-grep-use-tool",
             &["grep foo .", "rg pattern src/"],              // must trigger
@@ -553,7 +554,7 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
         if has_tokens {
             println!("{:<24} {:>6}   {:<24} {:>12}", "Command", "Count", "Rule", "Output tokens");
         } else {
-            println!("{:<24} {:>6}   {}", "Command", "Count", "Rule");
+            println!("{:<24} {:>6}   Rule", "Command", "Count");
         }
         for f in &report.intercepted {
             let rule = f.rule_id.as_deref().unwrap_or("-");
@@ -577,7 +578,7 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
     if !report.unhandled.is_empty() {
         println!("\nTOP UNHANDLED — no matching rule");
         println!("{}", "-".repeat(52));
-        println!("{:<24} {:>6}   {}", "Command", "Count", "Example");
+        println!("{:<24} {:>6}   Example", "Command", "Count");
         for f in &report.unhandled {
             let ex = if f.example.len() > 36 {
                 format!("{}...", &f.example[..36])

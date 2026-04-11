@@ -93,10 +93,7 @@ impl RtkAnalysis for ProcessRtkClient {
     }
 
     fn hook_audit(&self) -> Option<RtkHookAudit> {
-        let v = self.run_json(&["hook-audit", "--format", "json"]).or_else(|| {
-            // hook-audit may not support --format json; return empty if unavailable
-            None
-        })?;
+        let v = self.run_json(&["hook-audit", "--format", "json"])?;
         let rewrites = v["rewrites"]
             .as_array()
             .map(|arr| {
