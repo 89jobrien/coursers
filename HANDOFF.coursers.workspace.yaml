@@ -170,8 +170,9 @@ items:
 
 - id: coursers-11
   name: obfsck-mcp-server
-  priority: P2
+  priority: P3
   status: blocked
+  blocked_by: [obfsck-11, mcpipe-21]
   title: Build obfsck MCP server + mcpipe integration for custom filter generation
   description: |
     Add server mode to obfsck exposing two MCP tools: audit (pipe content, return hits)
