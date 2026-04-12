@@ -1,4 +1,5 @@
 pub mod ast;
+pub mod obfsck;
 pub mod config;
 pub mod expand;
 pub mod rtk;

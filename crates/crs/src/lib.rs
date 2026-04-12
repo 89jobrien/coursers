@@ -1,4 +1,5 @@
 pub mod jsonl_source;
+pub mod obfsck;
 pub mod rtk;
 
 use crs_core::filters::{FiltersConfig, FilterMode, FilterRule, find_rule};
