@@ -103,16 +103,25 @@ fn cmd_filter() {
         .unwrap_or(0);
 
     let config = crs_core::filters::load();
-    let fp = FilterPayload { command, output, exit_code };
+    let fp = FilterPayload { command, output: output.clone(), exit_code };
 
-    match run_filter(&fp, &config) {
-        FilterResult::Passthrough => {}
+    // Apply compression rules first.
+    let filtered_output = match run_filter(&fp, &config) {
+        FilterResult::Passthrough => output.clone(),
         FilterResult::Suppress => {
             emit_message("");
+            return;
         }
-        FilterResult::Replace(text) => {
-            emit_message(&text);
-        }
+        FilterResult::Replace(text) => text,
+    };
+
+    // Apply obfsck redaction patterns if .ctx/obfsck-filters.yaml exists.
+    let obfsck = crs_core::filters::load_obfsck_filters();
+    let final_output = crs_core::filters::apply_redaction(&filtered_output, &obfsck);
+
+    // Only emit a hook message if output changed (avoids noise on passthrough).
+    if final_output != output {
+        emit_message(&final_output);
     }
 }
 
@@ -759,5 +768,22 @@ mod cli_tests {
             .filter(|l| l.trim() == "- label: existing")
             .count();
         assert_eq!(label_count, 1, "duplicate label must not be written twice");
+    }
+
+    #[test]
+    fn filter_redacts_output_matching_obfsck_patterns() {
+        use crs_core::filters::{ObfsckFilters, RedactRule, apply_redaction};
+
+        let filters = ObfsckFilters {
+            filters: vec![RedactRule {
+                label: "api-key".to_string(),
+                pattern: r"sk-[A-Za-z0-9]{10,}".to_string(),
+            }],
+        };
+        let output = "normal line\nsk-abc1234567890 leaked\nclean";
+        let result = apply_redaction(output, &filters);
+        assert!(result.contains("[REDACTED]"));
+        assert!(!result.contains("sk-abc1234567890"));
+        assert!(result.contains("normal line"));
     }
 }
