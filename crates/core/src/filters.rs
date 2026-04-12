@@ -219,3 +219,128 @@ mode = "errors-only"
         assert_eq!(path.unwrap(), f.path());
     }
 }
+
+// ---------------------------------------------------------------------------
+// Obfsck redaction filters
+// ---------------------------------------------------------------------------
+
+/// A single redaction rule: lines matching `pattern` are replaced with `[REDACTED]`.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct RedactRule {
+    pub label: String,
+    pub pattern: String,
+}
+
+/// Root of `.ctx/obfsck-filters.yaml`.
+#[derive(Debug, Clone, serde::Deserialize, Default)]
+pub struct ObfsckFilters {
+    #[serde(default)]
+    pub filters: Vec<RedactRule>,
+}
+
+impl ObfsckFilters {
+    /// Load from a specific path. Returns empty on missing or malformed file.
+    pub fn load_from(path: &std::path::Path) -> Self {
+        let Ok(content) = std::fs::read_to_string(path) else {
+            return Self::default();
+        };
+        serde_yaml::from_str(&content).unwrap_or_default()
+    }
+}
+
+/// Load `.ctx/obfsck-filters.yaml` if it exists, otherwise return empty.
+pub fn load_obfsck_filters() -> ObfsckFilters {
+    let path = std::path::Path::new(".ctx/obfsck-filters.yaml");
+    ObfsckFilters::load_from(path)
+}
+
+/// Apply redaction rules to `output`. Lines matching any pattern are replaced with `[REDACTED]`.
+pub fn apply_redaction(output: &str, filters: &ObfsckFilters) -> String {
+    if filters.filters.is_empty() {
+        return output.to_string();
+    }
+
+    // Compile patterns once; skip invalid regex.
+    let compiled: Vec<regex::Regex> = filters
+        .filters
+        .iter()
+        .filter_map(|r| regex::Regex::new(&r.pattern).ok())
+        .collect();
+
+    if compiled.is_empty() {
+        return output.to_string();
+    }
+
+    output
+        .lines()
+        .map(|line| {
+            if compiled.iter().any(|re| re.is_match(line)) {
+                "[REDACTED]"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[cfg(test)]
+mod redaction_tests {
+    use super::*;
+
+    fn make_obfsck_filters(patterns: &[(&str, &str)]) -> ObfsckFilters {
+        ObfsckFilters {
+            filters: patterns
+                .iter()
+                .map(|(label, pattern)| RedactRule {
+                    label: label.to_string(),
+                    pattern: pattern.to_string(),
+                })
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn apply_redaction_replaces_matching_line() {
+        let filters = make_obfsck_filters(&[("api-key", r"sk-[A-Za-z0-9]{10,}")]);
+        let output = "some output\nsk-abc1234567890 is a secret\nclean line";
+        let result = apply_redaction(output, &filters);
+        assert!(result.contains("[REDACTED]"), "matching line must be redacted");
+        assert!(result.contains("some output"), "non-matching lines must be preserved");
+        assert!(result.contains("clean line"), "non-matching lines must be preserved");
+        assert!(!result.contains("sk-abc1234567890"), "secret must not appear in output");
+    }
+
+    #[test]
+    fn apply_redaction_empty_filters_passthrough() {
+        let filters = make_obfsck_filters(&[]);
+        let output = "sk-abc1234567890 is a secret";
+        let result = apply_redaction(output, &filters);
+        assert_eq!(result, output);
+    }
+
+    #[test]
+    fn apply_redaction_no_match_passthrough() {
+        let filters = make_obfsck_filters(&[("api-key", r"sk-[A-Za-z0-9]{10,}")]);
+        let output = "no secrets here";
+        let result = apply_redaction(output, &filters);
+        assert_eq!(result, output);
+    }
+
+    #[test]
+    fn load_obfsck_filters_missing_file_returns_empty() {
+        let filters = ObfsckFilters::load_from(std::path::Path::new("/nonexistent/path.yaml"));
+        assert!(filters.filters.is_empty());
+    }
+
+    #[test]
+    fn load_obfsck_filters_parses_yaml() {
+        use std::io::Write as _;
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        write!(f, "filters:\n  - label: test\n    pattern: \"secret-[0-9]+\"\n").unwrap();
+        let filters = ObfsckFilters::load_from(f.path());
+        assert_eq!(filters.filters.len(), 1);
+        assert_eq!(filters.filters[0].label, "test");
+        assert_eq!(filters.filters[0].pattern, "secret-[0-9]+");
+    }
+}
