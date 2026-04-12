@@ -31,6 +31,9 @@ enum Command {
         /// Output format: text or json
         #[arg(short, long, default_value = "text")]
         format: String,
+        /// Generate .ctx/obfsck-filters.yaml from unhandled command examples
+        #[arg(long)]
+        generate_filters: bool,
     },
     /// Validate rules: check patterns compile, examples fire, exceptions work, alternatives on PATH
     Validate,
@@ -56,8 +59,8 @@ fn main() {
     match cli.command {
         Command::Filter => cmd_filter(),
         Command::Rewrite => cmd_rewrite(),
-        Command::Discover { all, limit, since, format } => {
-            cmd_discover(all, limit, since, &format);
+        Command::Discover { all, limit, since, format, generate_filters } => {
+            cmd_discover(all, limit, since, &format, generate_filters);
         }
         Command::Validate => cmd_validate(),
         Command::Probe => cmd_probe(),
@@ -420,7 +423,7 @@ fn cmd_probe() {
     }
 }
 
-fn cmd_discover(all: bool, limit: usize, since: u32, format: &str) {
+fn cmd_discover(all: bool, limit: usize, since: u32, format: &str, generate_filters: bool) {
     use crs_core::history::{DiscoverOpts, discover};
     use crs_core::obfsck::ObfsckMcp as _;
     use crs_core::rtk::RtkAnalysis as _;
@@ -471,16 +474,18 @@ fn cmd_discover(all: bool, limit: usize, since: u32, format: &str) {
         write_tools_yaml(&report, since, &rtk_map, ctx.join("HANDOFF.tools.yaml"));
 
         // Generate project-local obfsck filters from unhandled command examples.
-        if let Some(client) = crs_lib::obfsck::detect() {
-            let examples: Vec<String> = report
-                .unhandled
-                .iter()
-                .map(|f| f.example.clone())
-                .collect();
-            if !examples.is_empty() {
-                let suggestions = client.generate_filters(&examples);
-                if !suggestions.is_empty() {
-                    write_obfsck_filters(&suggestions, ctx.join("obfsck-filters.yaml"));
+        if generate_filters {
+            if let Some(client) = crs_lib::obfsck::detect() {
+                let examples: Vec<String> = report
+                    .unhandled
+                    .iter()
+                    .map(|f| f.example.clone())
+                    .collect();
+                if !examples.is_empty() {
+                    let suggestions = client.generate_filters(&examples);
+                    if !suggestions.is_empty() {
+                        write_obfsck_filters(&suggestions, ctx.join("obfsck-filters.yaml"));
+                    }
                 }
             }
         }
@@ -659,5 +664,33 @@ fn format_tokens(n: u64) -> String {
         format!("~{:.1}K tokens", n as f64 / 1000.0)
     } else {
         format!("~{n} tokens")
+    }
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+    use clap::Parser;
+
+    #[test]
+    fn discover_default_no_generate_filters() {
+        let cli = Cli::try_parse_from(["crs", "discover"]).unwrap();
+        match cli.command {
+            Command::Discover { generate_filters, .. } => {
+                assert!(!generate_filters);
+            }
+            _ => panic!("expected Discover"),
+        }
+    }
+
+    #[test]
+    fn discover_generate_filters_flag() {
+        let cli = Cli::try_parse_from(["crs", "discover", "--generate-filters"]).unwrap();
+        match cli.command {
+            Command::Discover { generate_filters, .. } => {
+                assert!(generate_filters);
+            }
+            _ => panic!("expected Discover"),
+        }
     }
 }
