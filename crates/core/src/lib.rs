@@ -1,3 +1,4 @@
+pub mod ast;
 pub mod config;
 pub mod expand;
 pub mod rtk;
@@ -8,3 +9,4 @@ pub mod loader;
 pub mod rules;
 pub mod state;
 pub mod store;
+pub mod tool_swap;

@@ -36,6 +36,8 @@ fn default_max_lines() -> usize {
 pub struct FiltersConfig {
     #[serde(default)]
     pub filters: Vec<FilterRule>,
+    #[serde(default)]
+    pub tool_swap: crate::tool_swap::ToolSwapConfig,
 }
 
 impl FiltersConfig {
@@ -179,6 +181,7 @@ mode = "truncate"
                     max_lines: 50,
                 },
             ],
+            ..Default::default()
         };
         let rule = find_rule("cargo nextest run", &cfg).unwrap();
         assert_eq!(rule.mode, FilterMode::FailuresOnly);
@@ -192,6 +195,7 @@ mode = "truncate"
                 mode: FilterMode::Passthrough,
                 max_lines: 50,
             }],
+            ..Default::default()
         };
         assert!(find_rule("doob todo list", &cfg).is_none());
     }

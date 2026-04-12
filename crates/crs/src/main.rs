@@ -127,6 +127,15 @@ fn cmd_rewrite() {
         _ => std::process::exit(1),
     };
 
+    // 1. Try AST tool swap first
+    let filters_cfg = crs_core::filters::load();
+    let swap = crs_core::tool_swap::apply(command, &filters_cfg.tool_swap);
+    if let crs_core::tool_swap::ToolAction::SwapTool { tool_name, tool_input } = swap {
+        emit_tool_swap(&tool_name, tool_input);
+        return;
+    }
+
+    // 2. Fall through to regex rewrite
     let config = load_rewrite_config();
     match run_rewrite(command, &config) {
         Some(rewritten) => {
@@ -138,6 +147,24 @@ fn cmd_rewrite() {
             std::process::exit(1);
         }
     }
+}
+
+fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
+    let msg = serde_json::json!({
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "allow",
+            "permissionDecisionReason": format!("crs tool-swap: Bash → {tool_name}"),
+            "updatedInput": {
+                "tool_name": tool_name,
+                "tool_input": tool_input,
+            }
+        }
+    });
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+    writeln!(handle, "{}", msg).ok();
+    handle.flush().ok();
 }
 
 fn load_rewrite_config() -> crs_core::rewrite::RewriteConfig {
@@ -198,24 +225,6 @@ fn cmd_validate() {
             &["grep foo .", "rg pattern src/"],              // must trigger
             &["cmd | grep foo", "cmd | rg foo", "grep -A3"], // must be excepted
             &[],                                              // alternative binaries to check on PATH
-        ),
-        (
-            "no-cat-use-read",
-            &["cat file.txt", "cat /etc/hosts"],
-            &["cat << EOF", "cmd | cat", "cat /dev/stdin"],
-            &[],
-        ),
-        (
-            "no-head-tail-use-read",
-            &["head -20 file.txt", "tail -5 log.txt"],
-            &["cmd | head", "tail -f log.txt"],
-            &[],
-        ),
-        (
-            "no-find-use-glob",
-            &["find . -name '*.rs'", "find /home -type f"],
-            &["find . -exec rm {} \\;", "find . -delete", "find . -mtime 1"],
-            &[],
         ),
         (
             "no-npm-use-bun",

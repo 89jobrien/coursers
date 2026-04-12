@@ -102,6 +102,7 @@ mod tests {
                 mode,
                 max_lines: 3,
             }],
+            ..Default::default()
         }
     }
 
