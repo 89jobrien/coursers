@@ -484,17 +484,20 @@ fn cmd_discover(all: bool, limit: usize, since: u32, format: &str, generate_filt
 
         // Generate project-local obfsck filters from unhandled command examples.
         if generate_filters {
-            if let Some(client) = crs_lib::obfsck::detect() {
+            let client = crs_lib::obfsck::detect();
+            if let Some(client) = client {
                 let examples: Vec<String> = report
                     .unhandled
                     .iter()
                     .map(|f| f.example.clone())
                     .collect();
-                if !examples.is_empty() {
-                    let suggestions = client.generate_filters(&examples);
-                    if !suggestions.is_empty() {
-                        write_obfsck_filters(&suggestions, ctx.join("obfsck-filters.yaml"));
-                    }
+                let suggestions = if examples.is_empty() {
+                    vec![]
+                } else {
+                    client.generate_filters(&examples)
+                };
+                if !suggestions.is_empty() {
+                    write_obfsck_filters(&suggestions, ctx.join("obfsck-filters.yaml"));
                 }
             }
         }

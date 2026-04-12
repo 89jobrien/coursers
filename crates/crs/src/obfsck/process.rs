@@ -36,7 +36,7 @@ impl ProcessObfsckMcpClient {
         stdout
             .lines()
             .filter(|l| !l.trim().is_empty())
-            .last()
+            .next_back()
             .and_then(|l| serde_json::from_str(l).ok())
     }
 }
