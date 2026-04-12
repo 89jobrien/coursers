@@ -595,7 +595,7 @@ fn write_obfsck_filters(
         .filter(|s| !existing_labels.contains(&s.label))
         .collect();
 
-    if new_suggestions.is_empty() && !existing_content.is_empty() {
+    if new_suggestions.is_empty() {
         // Nothing to add; leave file untouched.
         return;
     }

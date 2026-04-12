@@ -271,7 +271,7 @@ pub fn apply_redaction(output: &str, filters: &ObfsckFilters) -> String {
         return output.to_string();
     }
 
-    output
+    let mut result = output
         .lines()
         .map(|line| {
             if compiled.iter().any(|re| re.is_match(line)) {
@@ -281,7 +281,14 @@ pub fn apply_redaction(output: &str, filters: &ObfsckFilters) -> String {
             }
         })
         .collect::<Vec<_>>()
-        .join("\n")
+        .join("\n");
+
+    // Preserve trailing newline if original had one.
+    if output.ends_with('\n') {
+        result.push('\n');
+    }
+
+    result
 }
 
 #[cfg(test)]
@@ -342,5 +349,14 @@ mod redaction_tests {
         assert_eq!(filters.filters.len(), 1);
         assert_eq!(filters.filters[0].label, "test");
         assert_eq!(filters.filters[0].pattern, "secret-[0-9]+");
+    }
+
+    #[test]
+    fn apply_redaction_preserves_trailing_newline() {
+        let filters = make_obfsck_filters(&[("key", r"secret")]);
+        let output = "clean\nsecret line\n";
+        let result = apply_redaction(output, &filters);
+        assert!(result.ends_with('\n'), "trailing newline must be preserved");
+        assert!(result.contains("[REDACTED]"));
     }
 }
