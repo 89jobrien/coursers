@@ -1,6 +1,6 @@
 project: coursers
 id: coursers
-updated: 2026-04-10
+updated: 2026-04-11
 notes: null
 items:
 - id: coursers-1
@@ -171,8 +171,7 @@ items:
 - id: coursers-11
   name: obfsck-mcp-server
   priority: P3
-  status: blocked
-  blocked_by: [obfsck-11, mcpipe-21]
+  status: open
   title: Build obfsck MCP server + mcpipe integration for custom filter generation
   description: |
     Add server mode to obfsck exposing two MCP tools: audit (pipe content, return hits)
@@ -233,6 +232,10 @@ items:
   extra: []
 
 log:
+- date: 2026-04-11
+  summary: Unblocked coursers-11 — obfsck-11 (MCP server, obfsck-mcp binary) and mcpipe-21
+    (PathBinaryScanner) both completed. coursers-11 status changed from blocked to open.
+  commits: []
 - date: 2026-04-10
   summary: >-
     Fixed hook-diagnostics skill (coursers-14): corrected failure log path to
