@@ -171,7 +171,8 @@ items:
 - id: coursers-11
   name: obfsck-mcp-server
   priority: P3
-  status: open
+  status: done
+  completed: 2026-04-12
   title: Build obfsck MCP server + mcpipe integration for custom filter generation
   description: |
     Add server mode to obfsck exposing two MCP tools: audit (pipe content, return hits)
@@ -232,6 +233,14 @@ items:
   extra: []
 
 log:
+- date: 2026-04-12
+  summary: >-
+    coursers-11 (obfsck MCP port/adapter): ObfsckMcp trait + NullObfsckMcpClient in crs-core,
+    ProcessObfsckMcpClient adapter in crs (JSON-RPC stdio to obfsck-mcp). obfsck_audit_mcp
+    replaces old shell-out in write_tools_yaml. crs discover generates .ctx/obfsck-filters.yaml
+    from unhandled command examples via generate-filters MCP tool. 79 tests pass.
+  commits:
+  - 09f9f2d
 - date: 2026-04-11
   summary: Unblocked coursers-11 — obfsck-11 (MCP server, obfsck-mcp binary) and mcpipe-21
     (PathBinaryScanner) both completed. coursers-11 status changed from blocked to open.
