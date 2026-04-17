@@ -39,6 +39,12 @@ enum Command {
     Validate,
     /// Probe a command against all rules and show what would fire — reads command from stdin
     Probe,
+    /// Show rx prefix learning state: confirmed mappings and pending probes
+    Audit {
+        /// Remove a confirmed mapping by key
+        #[arg(long)]
+        remove: Option<String>,
+    },
 }
 
 /// Minimal PostToolUse hook payload.
@@ -64,6 +70,7 @@ fn main() {
         }
         Command::Validate => cmd_validate(),
         Command::Probe => cmd_probe(),
+        Command::Audit { remove } => cmd_audit(remove),
     }
 }
 
@@ -758,6 +765,52 @@ fn format_tokens(n: u64) -> String {
     }
 }
 
+fn cmd_audit(remove: Option<String>) {
+    use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, audit_state};
+
+    let prefix_store = FilePrefixStore { path: FilePrefixStore::default_path() };
+    let probe_store = FileProbeStore { path: FileProbeStore::default_path() };
+
+    if let Some(ref key) = remove {
+        if prefix_store.remove_mapping(key) {
+            println!("Removed mapping: {key}");
+        } else {
+            println!("Key not found: {key}");
+        }
+        return;
+    }
+
+    let state = audit_state(&prefix_store, &probe_store);
+
+    println!("RX Prefix Audit");
+    println!("{}", "=".repeat(60));
+
+    println!("\nConfirmed mappings ({})", state.mappings.len());
+    println!("{}", "-".repeat(40));
+    if state.mappings.is_empty() {
+        println!("No confirmed mappings.");
+    } else {
+        for (key, prefix) in &state.mappings {
+            println!("  {key} → {}", prefix.join(" "));
+        }
+    }
+
+    println!("\nPending probes ({})", state.probes.len());
+    println!("{}", "-".repeat(40));
+    if state.probes.is_empty() {
+        println!("No pending probes.");
+    } else {
+        for probe in &state.probes {
+            println!(
+                "  key={} prefix={} cmd={:?}",
+                probe.key,
+                probe.prefix.join(" "),
+                probe.original_command
+            );
+        }
+    }
+}
+
 #[cfg(test)]
 mod cli_tests {
     use super::*;
@@ -903,6 +956,91 @@ mod cli_tests {
 
         assert!(probe_store.load().is_empty());
         assert!(prefix_store.load().mappings.is_empty());
+    }
+
+    #[test]
+    fn audit_subcommand_parses() {
+        let cli = Cli::try_parse_from(["crs", "audit"]).unwrap();
+        assert!(matches!(cli.command, Command::Audit { remove: None }));
+    }
+
+    #[test]
+    fn audit_remove_flag_parses() {
+        let cli = Cli::try_parse_from(["crs", "audit", "--remove", "gh"]).unwrap();
+        assert!(matches!(cli.command, Command::Audit { remove: Some(ref k) } if k == "gh"));
+    }
+
+    #[test]
+    fn audit_state_empty_stores_returns_empty() {
+        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, audit_state};
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let prefix_store = FilePrefixStore { path: dir.path().join("prefixes.toml") };
+        let probe_store = FileProbeStore { path: dir.path().join("rx-candidates.toml") };
+
+        let state = audit_state(&prefix_store, &probe_store);
+        assert!(state.mappings.is_empty());
+        assert!(state.probes.is_empty());
+    }
+
+    #[test]
+    fn audit_state_returns_sorted_mappings_and_probes() {
+        use crs_core::rx_prefix::{
+            FileProbeStore, FilePrefixStore, ProbeEntry, PrefixStore as _, ProbeStore as _,
+            audit_state,
+        };
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let prefix_store = FilePrefixStore { path: dir.path().join("prefixes.toml") };
+        let probe_store = FileProbeStore { path: dir.path().join("rx-candidates.toml") };
+
+        prefix_store.confirm_mapping(
+            "gh",
+            &["op".to_string(), "plugin".to_string(), "run".to_string(), "--".to_string()],
+        );
+        prefix_store.confirm_mapping(
+            "cargo",
+            &["dotenvx".to_string(), "run".to_string(), "--".to_string()],
+        );
+        probe_store.write(&[ProbeEntry {
+            key: "gh".to_string(),
+            prefix: vec!["op".to_string()],
+            original_command: "gh issue list".to_string(),
+        }]);
+
+        let state = audit_state(&prefix_store, &probe_store);
+        // Sorted: cargo before gh
+        assert_eq!(state.mappings[0].0, "cargo");
+        assert_eq!(state.mappings[1].0, "gh");
+        assert_eq!(state.probes.len(), 1);
+        assert_eq!(state.probes[0].key, "gh");
+    }
+
+    #[test]
+    fn remove_mapping_returns_true_on_hit() {
+        use crs_core::rx_prefix::{FilePrefixStore, PrefixStore as _};
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("prefixes.toml");
+        let store = FilePrefixStore { path: path.clone() };
+        store.confirm_mapping("gh", &["op".to_string(), "plugin".to_string(), "run".to_string(), "--".to_string()]);
+
+        assert!(store.remove_mapping("gh"));
+        assert!(store.load().mappings.is_empty());
+    }
+
+    #[test]
+    fn remove_mapping_returns_false_on_miss() {
+        use crs_core::rx_prefix::FilePrefixStore;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("prefixes.toml");
+        let store = FilePrefixStore { path };
+        assert!(!store.remove_mapping("nonexistent"));
     }
 
     #[test]

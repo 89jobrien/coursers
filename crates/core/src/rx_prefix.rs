@@ -355,6 +355,52 @@ impl ProbeStore for FileProbeStore {
     fn remove_matching(&self, cmd: &str) { self.remove_matching(cmd); }
 }
 
+/// Snapshot of rx prefix learning state for display / operator tooling.
+#[derive(Debug, Clone, Default)]
+pub struct AuditState {
+    /// Confirmed key → prefix mappings from `~/.config/rx/prefixes.toml`.
+    pub mappings: Vec<(String, Vec<String>)>,
+    /// Pending candidate probes from `.ctx/rx-candidates.toml`.
+    pub probes: Vec<ProbeEntry>,
+}
+
+/// Assemble the current rx-prefix learning state from both stores.
+///
+/// Mappings are returned sorted by key for stable output. This is a pure
+/// domain function — no I/O, fully testable via the store traits.
+pub fn audit_state(prefix_store: &dyn PrefixStore, probe_store: &dyn ProbeStore) -> AuditState {
+    let config = prefix_store.load();
+    let mut mappings: Vec<(String, Vec<String>)> = config.mappings.into_iter().collect();
+    mappings.sort_by(|a, b| a.0.cmp(&b.0));
+    let probes = probe_store.load();
+    AuditState { mappings, probes }
+}
+
+impl FilePrefixStore {
+    /// Remove a confirmed mapping by key. No-op if the key does not exist.
+    /// Returns `true` if a mapping was removed, `false` if the key was not found.
+    pub fn remove_mapping(&self, key: &str) -> bool {
+        let mut config = self.load();
+        if config.mappings.remove(key).is_none() {
+            return false;
+        }
+        match toml::to_string_pretty(&config) {
+            Ok(serialized) => {
+                if let Err(e) = std::fs::write(&self.path, &serialized) {
+                    eprintln!(
+                        "crs: warn: could not write rx prefixes to {}: {e}",
+                        self.path.display()
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("crs: warn: could not serialize rx prefixes: {e}");
+            }
+        }
+        true
+    }
+}
+
 /// Test double for `ProbeStore`.
 #[cfg(test)]
 pub struct FakeProbeStore {
