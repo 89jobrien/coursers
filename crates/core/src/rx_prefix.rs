@@ -253,6 +253,83 @@ pub fn rewrite_command(cmd: &str, config: &RxPrefixConfig) -> RewriteResult {
     RewriteResult { rewritten: rejoin(&segs), probes }
 }
 
+/// TOML-serializable wrapper for a list of probe entries.
+#[derive(Debug, serde::Serialize, serde::Deserialize, Default)]
+struct ProbeFile {
+    #[serde(default)]
+    probes: Vec<ProbeEntryToml>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ProbeEntryToml {
+    key: String,
+    prefix: Vec<String>,
+    original_command: String,
+}
+
+impl From<&ProbeEntry> for ProbeEntryToml {
+    fn from(e: &ProbeEntry) -> Self {
+        Self {
+            key: e.key.clone(),
+            prefix: e.prefix.clone(),
+            original_command: e.original_command.clone(),
+        }
+    }
+}
+
+impl From<ProbeEntryToml> for ProbeEntry {
+    fn from(t: ProbeEntryToml) -> Self {
+        Self { key: t.key, prefix: t.prefix, original_command: t.original_command }
+    }
+}
+
+/// File-backed probe store at `.ctx/rx-candidates.toml`.
+pub struct FileProbeStore {
+    pub path: std::path::PathBuf,
+}
+
+impl FileProbeStore {
+    pub fn default_path() -> std::path::PathBuf {
+        std::path::Path::new(".ctx").join("rx-candidates.toml")
+    }
+
+    pub fn load(&self) -> Vec<ProbeEntry> {
+        let Ok(content) = std::fs::read_to_string(&self.path) else {
+            return Vec::new();
+        };
+        toml::from_str::<ProbeFile>(&content)
+            .unwrap_or_default()
+            .probes
+            .into_iter()
+            .map(ProbeEntry::from)
+            .collect()
+    }
+
+    pub fn write(&self, entries: &[ProbeEntry]) {
+        let file = ProbeFile { probes: entries.iter().map(ProbeEntryToml::from).collect() };
+        match toml::to_string_pretty(&file) {
+            Ok(serialized) => {
+                if let Err(e) = std::fs::write(&self.path, &serialized) {
+                    eprintln!(
+                        "crs: warn: could not write rx candidates to {}: {e}",
+                        self.path.display()
+                    );
+                }
+            }
+            Err(e) => {
+                eprintln!("crs: warn: could not serialize rx candidates: {e}");
+            }
+        }
+    }
+
+    /// Remove all probe entries whose `original_command` matches `cmd`.
+    pub fn remove_matching(&self, cmd: &str) {
+        let mut entries = self.load();
+        entries.retain(|e| e.original_command != cmd);
+        self.write(&entries);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -559,5 +636,61 @@ cargo = ["op", "plugin", "run", "--"]
         };
         let loaded = store.load();
         assert_eq!(loaded.mappings.get("gh"), config.mappings.get("gh"));
+    }
+
+    #[test]
+    fn probe_store_round_trips_entries() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("rx-candidates.toml");
+        let store = FileProbeStore { path: path.clone() };
+
+        let entries = vec![ProbeEntry {
+            key: "gh".to_string(),
+            prefix: vec![
+                "op".to_string(),
+                "plugin".to_string(),
+                "run".to_string(),
+                "--".to_string(),
+            ],
+            original_command: "gh issue list".to_string(),
+        }];
+        store.write(&entries);
+        let loaded = store.load();
+        assert_eq!(loaded.len(), 1);
+        assert_eq!(loaded[0].key, "gh");
+        assert_eq!(loaded[0].original_command, "gh issue list");
+    }
+
+    #[test]
+    fn probe_store_load_missing_file_returns_empty() {
+        let store = FileProbeStore {
+            path: std::path::PathBuf::from("/nonexistent/rx-candidates.toml"),
+        };
+        assert!(store.load().is_empty());
+    }
+
+    #[test]
+    fn probe_store_remove_matching_removes_only_that_entry() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("rx-candidates.toml");
+        let store = FileProbeStore { path: path.clone() };
+
+        let entries = vec![
+            ProbeEntry {
+                key: "gh".to_string(),
+                prefix: vec!["op".to_string()],
+                original_command: "gh issue list".to_string(),
+            },
+            ProbeEntry {
+                key: "cargo".to_string(),
+                prefix: vec!["op".to_string()],
+                original_command: "cargo build".to_string(),
+            },
+        ];
+        store.write(&entries);
+        store.remove_matching("gh issue list");
+        let remaining = store.load();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].key, "cargo");
     }
 }
