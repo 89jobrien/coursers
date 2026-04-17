@@ -342,7 +342,7 @@ cargo = ["op", "plugin", "run", "--"]
                     .iter()
                     .map(|c| c.iter().map(|s| s.to_string()).collect())
                     .collect(),
-                learn_on_successful_fallback: true,
+                learn_on_successful_fallback: false,
             },
             written: std::cell::RefCell::new(None),
         }
