@@ -22,10 +22,10 @@ pub fn split_segments(cmd: &str) -> Vec<Segment> {
         // Find the earliest separator in remaining.
         let mut earliest: Option<(usize, &str)> = None;
         for sep in &seps {
-            if let Some(pos) = remaining.find(sep) {
-                if earliest.is_none() || pos < earliest.unwrap().0 {
-                    earliest = Some((pos, sep));
-                }
+            if let Some(pos) = remaining.find(sep)
+                && earliest.is_none_or(|(e, _)| pos < e)
+            {
+                earliest = Some((pos, sep));
             }
         }
         match earliest {
@@ -112,6 +112,30 @@ mod tests {
             Segment { text: " tail -5".to_string(), sep: None },
         ];
         assert_eq!(rejoin(&segs), "cargo build | tail -5");
+    }
+
+    #[test]
+    fn split_empty_string_returns_single_empty_segment() {
+        let segs = split_segments("");
+        assert_eq!(segs, vec![Segment { text: "".to_string(), sep: None }]);
+    }
+
+    #[test]
+    fn split_separator_only_returns_two_segments() {
+        let segs = split_segments("&&");
+        assert_eq!(segs, vec![
+            Segment { text: "".to_string(), sep: Some("&&".to_string()) },
+            Segment { text: "".to_string(), sep: None },
+        ]);
+    }
+
+    #[test]
+    fn split_trailing_separator_produces_empty_last_segment() {
+        let segs = split_segments("echo a; ");
+        assert_eq!(segs, vec![
+            Segment { text: "echo a".to_string(), sep: Some(";".to_string()) },
+            Segment { text: " ".to_string(), sep: None },
+        ]);
     }
 
     #[test]
