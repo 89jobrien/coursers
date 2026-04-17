@@ -147,18 +147,37 @@ fn cmd_rewrite() {
         return;
     }
 
-    // 2. Fall through to regex rewrite
+    // 2. Regex rewrite rules from crs-filters.toml
     let config = load_rewrite_config();
-    match run_rewrite(command, &config) {
-        Some(rewritten) => {
-            // Emit PreToolUse response with modified command
-            emit_rewrite(&rewritten);
-        }
-        None => {
-            // Passthrough — exit 1 signals no rewrite
-            std::process::exit(1);
-        }
+    if let Some(rewritten) = run_rewrite(command, &config) {
+        emit_rewrite(&rewritten);
+        return;
     }
+
+    // 3. rx prefix injection
+    let rx_config = {
+        use crs_core::rx_prefix::PrefixStore as _;
+        crs_core::rx_prefix::FilePrefixStore {
+            path: crs_core::rx_prefix::FilePrefixStore::default_path(),
+        }
+        .load()
+    };
+    let result = crs_core::rx_prefix::rewrite_command(command, &rx_config);
+    if result.rewritten != command {
+        if !result.probes.is_empty() {
+            let probe_store = crs_core::rx_prefix::FileProbeStore {
+                path: crs_core::rx_prefix::FileProbeStore::default_path(),
+            };
+            let mut existing = probe_store.load();
+            existing.extend(result.probes.clone());
+            probe_store.write(&existing);
+        }
+        emit_rewrite(&result.rewritten);
+        return;
+    }
+
+    // No rewrite matched.
+    std::process::exit(1);
 }
 
 fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
@@ -771,6 +790,28 @@ mod cli_tests {
             .filter(|l| l.trim() == "- label: existing")
             .count();
         assert_eq!(label_count, 1, "duplicate label must not be written twice");
+    }
+
+    #[test]
+    fn rewrite_applies_rx_prefix_when_prefixes_toml_present() {
+        use crs_core::rx_prefix::{RxPrefixConfig, rewrite_command};
+        use std::collections::HashMap;
+
+        let config = RxPrefixConfig {
+            mappings: HashMap::from([
+                ("gh".to_string(), vec![
+                    "op".to_string(),
+                    "plugin".to_string(),
+                    "run".to_string(),
+                    "--".to_string(),
+                ]),
+            ]),
+            candidate_prefixes: vec![],
+            learn_on_successful_fallback: false,
+        };
+        let result = rewrite_command("gh issue list", &config);
+        assert_eq!(result.rewritten, "op plugin run -- gh issue list");
+        assert!(result.probes.is_empty());
     }
 
     #[test]
