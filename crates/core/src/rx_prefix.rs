@@ -53,8 +53,15 @@ impl PrefixStore for FilePrefixStore {
     fn confirm_mapping(&self, key: &str, prefix: &[String]) {
         let mut config = self.load();
         config.mappings.insert(key.to_string(), prefix.to_vec());
-        if let Ok(serialized) = toml::to_string_pretty(&config) {
-            let _ = std::fs::write(&self.path, serialized);
+        match toml::to_string_pretty(&config) {
+            Ok(serialized) => {
+                if let Err(e) = std::fs::write(&self.path, &serialized) {
+                    eprintln!("crs: warn: could not write rx prefixes to {}: {e}", self.path.display());
+                }
+            }
+            Err(e) => {
+                eprintln!("crs: warn: could not serialize rx prefixes: {e}");
+            }
         }
     }
 }
@@ -271,6 +278,7 @@ cargo = ["op", "plugin", "run", "--"]
         let config: RxPrefixConfig = toml::from_str("").unwrap();
         assert!(config.mappings.is_empty());
         assert!(config.candidate_prefixes.is_empty());
+        assert!(!config.learn_on_successful_fallback);
     }
 
     #[test]
