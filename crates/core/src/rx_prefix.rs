@@ -235,9 +235,9 @@ pub fn rewrite_command(cmd: &str, config: &RxPrefixConfig) -> RewriteResult {
         };
         // Preserve leading and trailing whitespace from the original segment.
         let leading_len = seg.text.len() - seg.text.trim_start().len();
-        let trailing_len = seg.text.len() - seg.text.trim_end().len();
         let leading = &seg.text[..leading_len];
-        let trailing = &seg.text[seg.text.len() - trailing_len..];
+        let trailing_start = leading_len + trimmed.len();
+        let trailing = &seg.text[trailing_start..];
         let prefix_str = prefix.join(" ");
         seg.text = format!("{leading}{prefix_str} {trimmed}{trailing}");
 
