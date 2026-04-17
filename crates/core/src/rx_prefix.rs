@@ -142,6 +142,56 @@ pub fn rejoin(segs: &[Segment]) -> String {
     out
 }
 
+/// Result of a prefix lookup for a single segment's base command.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PrefixMatch {
+    /// A definite mapping exists in `mappings`.
+    Confirmed { key: String, prefix: Vec<String> },
+    /// No mapping; a candidate prefix is being tried speculatively.
+    Candidate { key: String, prefix: Vec<String> },
+}
+
+/// Look up the prefix for the leading command word(s) of `segment`.
+///
+/// Returns `None` if:
+/// - `segment` contains `$(` or a backtick (subshell — unsafe to rewrite blindly)
+/// - no mapping or candidate applies
+///
+/// Two-word key check happens before single-word.
+pub fn lookup_prefix(segment: &str, config: &RxPrefixConfig) -> Option<PrefixMatch> {
+    let trimmed = segment.trim();
+    if trimmed.contains("$(") || trimmed.contains('`') {
+        return None;
+    }
+
+    let tokens = shell_words::split(trimmed).ok()?;
+    let first = tokens.first()?.as_str();
+    let second = tokens.get(1).map(|s| s.as_str());
+
+    // Two-word key check (wins over single-word).
+    if let Some(second) = second {
+        let two_word = format!("{first} {second}");
+        if let Some(prefix) = config.mappings.get(&two_word) {
+            return Some(PrefixMatch::Confirmed { key: two_word, prefix: prefix.clone() });
+        }
+    }
+
+    // Single-word key check.
+    if let Some(prefix) = config.mappings.get(first) {
+        return Some(PrefixMatch::Confirmed { key: first.to_string(), prefix: prefix.clone() });
+    }
+
+    // Candidate fallback — use the first candidate prefix.
+    if let Some(candidate) = config.candidate_prefixes.first() {
+        return Some(PrefixMatch::Candidate {
+            key: first.to_string(),
+            prefix: candidate.clone(),
+        });
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,6 +329,99 @@ cargo = ["op", "plugin", "run", "--"]
         assert!(config.mappings.is_empty());
         assert!(config.candidate_prefixes.is_empty());
         assert!(!config.learn_on_successful_fallback);
+    }
+
+    fn make_store(mappings: &[(&str, &[&str])], candidates: &[&[&str]]) -> FakePrefixStore {
+        FakePrefixStore {
+            config: RxPrefixConfig {
+                mappings: mappings
+                    .iter()
+                    .map(|(k, v)| (k.to_string(), v.iter().map(|s| s.to_string()).collect()))
+                    .collect(),
+                candidate_prefixes: candidates
+                    .iter()
+                    .map(|c| c.iter().map(|s| s.to_string()).collect())
+                    .collect(),
+                learn_on_successful_fallback: true,
+            },
+            written: std::cell::RefCell::new(None),
+        }
+    }
+
+    #[test]
+    fn lookup_single_word_key_matches() {
+        let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
+        let result = lookup_prefix("gh issue list", &store.load());
+        assert_eq!(
+            result,
+            Some(PrefixMatch::Confirmed {
+                key: "gh".to_string(),
+                prefix: vec![
+                    "op".to_string(),
+                    "plugin".to_string(),
+                    "run".to_string(),
+                    "--".to_string()
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn lookup_two_word_key_wins_over_single() {
+        let store = make_store(
+            &[
+                ("cargo", &["op", "plugin", "run", "--"]),
+                ("cargo test", &["dotenvx", "run", "--"]),
+            ],
+            &[],
+        );
+        let result = lookup_prefix("cargo test --workspace", &store.load());
+        assert_eq!(
+            result,
+            Some(PrefixMatch::Confirmed {
+                key: "cargo test".to_string(),
+                prefix: vec!["dotenvx".to_string(), "run".to_string(), "--".to_string()],
+            })
+        );
+    }
+
+    #[test]
+    fn lookup_no_match_no_candidates_returns_none() {
+        let store = make_store(&[], &[]);
+        let result = lookup_prefix("echo hello", &store.load());
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn lookup_no_match_with_candidate_returns_candidate() {
+        let store = make_store(&[], &[&["op", "plugin", "run", "--"]]);
+        let result = lookup_prefix("gh issue list", &store.load());
+        assert_eq!(
+            result,
+            Some(PrefixMatch::Candidate {
+                key: "gh".to_string(),
+                prefix: vec![
+                    "op".to_string(),
+                    "plugin".to_string(),
+                    "run".to_string(),
+                    "--".to_string()
+                ],
+            })
+        );
+    }
+
+    #[test]
+    fn lookup_skips_command_with_subshell() {
+        let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
+        let result = lookup_prefix("$(gh issue list)", &store.load());
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn lookup_skips_command_with_backtick() {
+        let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
+        let result = lookup_prefix("`gh issue list`", &store.load());
+        assert_eq!(result, None);
     }
 
     #[test]
