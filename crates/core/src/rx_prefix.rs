@@ -192,6 +192,67 @@ pub fn lookup_prefix(segment: &str, config: &RxPrefixConfig) -> Option<PrefixMat
     None
 }
 
+/// A pending candidate probe: we applied a speculative prefix and need post-hook
+/// learning to confirm or discard it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProbeEntry {
+    /// The command key (first word or two-word key) that was matched.
+    pub key: String,
+    /// The candidate prefix that was applied.
+    pub prefix: Vec<String>,
+    /// The original command before prefix was prepended (for matching in post-hook).
+    pub original_command: String,
+}
+
+/// Result of rewriting a full command string.
+#[derive(Debug, Clone)]
+pub struct RewriteResult {
+    /// The rewritten command (may be identical to input if nothing matched).
+    pub rewritten: String,
+    /// Candidate probes that need post-hook learning.
+    pub probes: Vec<ProbeEntry>,
+}
+
+/// Rewrite `cmd` by prepending learned rx prefixes to each shell segment.
+///
+/// Segments containing `$(` or backticks are passed through unchanged.
+/// Returns the rewritten command and any speculative candidate probes recorded.
+pub fn rewrite_command(cmd: &str, config: &RxPrefixConfig) -> RewriteResult {
+    let mut segs = split_segments(cmd);
+    let mut probes = Vec::new();
+
+    for seg in &mut segs {
+        let trimmed = seg.text.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        let Some(m) = lookup_prefix(trimmed, config) else {
+            continue;
+        };
+        let (key, prefix, is_candidate) = match m {
+            PrefixMatch::Confirmed { key, prefix } => (key, prefix, false),
+            PrefixMatch::Candidate { key, prefix } => (key, prefix, true),
+        };
+        // Preserve leading and trailing whitespace from the original segment.
+        let leading_len = seg.text.len() - seg.text.trim_start().len();
+        let trailing_len = seg.text.len() - seg.text.trim_end().len();
+        let leading = &seg.text[..leading_len];
+        let trailing = &seg.text[seg.text.len() - trailing_len..];
+        let prefix_str = prefix.join(" ");
+        seg.text = format!("{leading}{prefix_str} {trimmed}{trailing}");
+
+        if is_candidate {
+            probes.push(ProbeEntry {
+                key,
+                prefix,
+                original_command: cmd.to_string(),
+            });
+        }
+    }
+
+    RewriteResult { rewritten: rejoin(&segs), probes }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,6 +483,59 @@ cargo = ["op", "plugin", "run", "--"]
         let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
         let result = lookup_prefix("`gh issue list`", &store.load());
         assert_eq!(result, None);
+    }
+
+    #[test]
+    fn rewrite_simple_command_with_confirmed_prefix() {
+        let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
+        let result = rewrite_command("gh issue list", &store.load());
+        assert_eq!(result.rewritten, "op plugin run -- gh issue list");
+        assert!(result.probes.is_empty());
+    }
+
+    #[test]
+    fn rewrite_pipeline_rewrites_first_segment_only() {
+        let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
+        let result = rewrite_command("gh issue list | tail -5", &store.load());
+        assert_eq!(result.rewritten, "op plugin run -- gh issue list | tail -5");
+        assert!(result.probes.is_empty());
+    }
+
+    #[test]
+    fn rewrite_compound_rewrites_each_segment_independently() {
+        let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
+        let result = rewrite_command("gh issue list && gh pr list", &store.load());
+        assert_eq!(
+            result.rewritten,
+            "op plugin run -- gh issue list && op plugin run -- gh pr list"
+        );
+    }
+
+    #[test]
+    fn rewrite_candidate_records_probe() {
+        let store = make_store(&[], &[&["op", "plugin", "run", "--"]]);
+        let result = rewrite_command("gh issue list", &store.load());
+        assert_eq!(result.rewritten, "op plugin run -- gh issue list");
+        assert_eq!(result.probes.len(), 1);
+        assert_eq!(result.probes[0].key, "gh");
+        assert_eq!(result.probes[0].prefix, vec!["op", "plugin", "run", "--"]);
+        assert_eq!(result.probes[0].original_command, "gh issue list");
+    }
+
+    #[test]
+    fn rewrite_no_match_returns_unchanged() {
+        let store = make_store(&[], &[]);
+        let result = rewrite_command("echo hello", &store.load());
+        assert_eq!(result.rewritten, "echo hello");
+        assert!(result.probes.is_empty());
+    }
+
+    #[test]
+    fn rewrite_unchanged_when_already_prefixed() {
+        // "op" has no mapping, so the command passes through unchanged.
+        let store = make_store(&[("gh", &["op", "plugin", "run", "--"])], &[]);
+        let result = rewrite_command("op plugin run -- gh issue list", &store.load());
+        assert_eq!(result.rewritten, "op plugin run -- gh issue list");
     }
 
     #[test]
