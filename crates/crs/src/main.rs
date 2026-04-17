@@ -169,7 +169,7 @@ fn cmd_rewrite() {
                 path: crs_core::rx_prefix::FileProbeStore::default_path(),
             };
             let mut existing = probe_store.load();
-            existing.extend(result.probes.clone());
+            existing.extend(result.probes);
             probe_store.write(&existing);
         }
         emit_rewrite(&result.rewritten);
