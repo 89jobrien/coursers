@@ -73,6 +73,26 @@ fn read_stdin_payload() -> Option<HookPayload> {
     serde_json::from_str(&buf).ok()
 }
 
+fn apply_rx_learning(
+    command: &str,
+    exit_code: i64,
+    probe_store: &crs_core::rx_prefix::FileProbeStore,
+    prefix_store: &crs_core::rx_prefix::FilePrefixStore,
+) {
+    use crs_core::rx_prefix::PrefixStore as _;
+    let probes = probe_store.load();
+    let matching: Vec<_> = probes.iter().filter(|p| p.original_command == command).collect();
+    if matching.is_empty() {
+        return;
+    }
+    if exit_code == 0 {
+        for probe in &matching {
+            prefix_store.confirm_mapping(&probe.key, &probe.prefix);
+        }
+    }
+    probe_store.remove_matching(command);
+}
+
 fn cmd_filter() {
     let Some(payload) = read_stdin_payload() else {
         return;
@@ -103,7 +123,7 @@ fn cmd_filter() {
         .unwrap_or(0);
 
     let config = crs_core::filters::load();
-    let fp = FilterPayload { command, output: output.clone(), exit_code };
+    let fp = FilterPayload { command: command.clone(), output: output.clone(), exit_code };
 
     // Apply compression rules first.
     let filtered_output = match run_filter(&fp, &config) {
@@ -118,6 +138,17 @@ fn cmd_filter() {
     // Apply obfsck redaction patterns if .ctx/obfsck-filters.yaml exists.
     let obfsck = crs_core::filters::load_obfsck_filters();
     let final_output = crs_core::filters::apply_redaction(&filtered_output, &obfsck);
+
+    // Post-hook rx learning: confirm or discard candidate prefix probes.
+    {
+        let probe_store = crs_core::rx_prefix::FileProbeStore {
+            path: crs_core::rx_prefix::FileProbeStore::default_path(),
+        };
+        let prefix_store = crs_core::rx_prefix::FilePrefixStore {
+            path: crs_core::rx_prefix::FilePrefixStore::default_path(),
+        };
+        apply_rx_learning(&command, exit_code, &probe_store, &prefix_store);
+    }
 
     // Only emit a hook message if output changed (avoids noise on passthrough).
     if final_output != output {
@@ -812,6 +843,68 @@ mod cli_tests {
         let result = rewrite_command("gh issue list", &config);
         assert_eq!(result.rewritten, "op plugin run -- gh issue list");
         assert!(result.probes.is_empty());
+    }
+
+    #[test]
+    fn rx_learning_confirms_mapping_on_success() {
+        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, ProbeEntry};
+        use crs_core::rx_prefix::PrefixStore as _;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let probe_path = dir.path().join("rx-candidates.toml");
+        let prefixes_path = dir.path().join("prefixes.toml");
+
+        let probe_store = FileProbeStore { path: probe_path.clone() };
+        probe_store.write(&[ProbeEntry {
+            key: "gh".to_string(),
+            prefix: vec![
+                "op".to_string(),
+                "plugin".to_string(),
+                "run".to_string(),
+                "--".to_string(),
+            ],
+            original_command: "gh issue list".to_string(),
+        }]);
+
+        let prefix_store = FilePrefixStore { path: prefixes_path.clone() };
+        apply_rx_learning("gh issue list", 0, &probe_store, &prefix_store);
+
+        let config = prefix_store.load();
+        assert_eq!(
+            config.mappings.get("gh"),
+            Some(&vec![
+                "op".to_string(),
+                "plugin".to_string(),
+                "run".to_string(),
+                "--".to_string(),
+            ])
+        );
+        assert!(probe_store.load().is_empty());
+    }
+
+    #[test]
+    fn rx_learning_removes_probe_on_failure() {
+        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, ProbeEntry};
+        use crs_core::rx_prefix::PrefixStore as _;
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let probe_path = dir.path().join("rx-candidates.toml");
+        let prefixes_path = dir.path().join("prefixes.toml");
+
+        let probe_store = FileProbeStore { path: probe_path.clone() };
+        probe_store.write(&[ProbeEntry {
+            key: "gh".to_string(),
+            prefix: vec!["op".to_string()],
+            original_command: "gh issue list".to_string(),
+        }]);
+
+        let prefix_store = FilePrefixStore { path: prefixes_path.clone() };
+        apply_rx_learning("gh issue list", 1, &probe_store, &prefix_store);
+
+        assert!(probe_store.load().is_empty());
+        assert!(prefix_store.load().mappings.is_empty());
     }
 
     #[test]
