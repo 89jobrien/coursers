@@ -306,6 +306,12 @@ impl FileProbeStore {
     }
 
     pub fn write(&self, entries: &[ProbeEntry]) {
+        if let Some(parent) = self.path.parent()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            eprintln!("crs: warn: could not create directory {}: {e}", parent.display());
+            return;
+        }
         let file = ProbeFile { probes: entries.iter().map(ProbeEntryToml::from).collect() };
         match toml::to_string_pretty(&file) {
             Ok(serialized) => {
@@ -325,8 +331,11 @@ impl FileProbeStore {
     /// Remove all probe entries whose `original_command` matches `cmd`.
     pub fn remove_matching(&self, cmd: &str) {
         let mut entries = self.load();
+        let before = entries.len();
         entries.retain(|e| e.original_command != cmd);
-        self.write(&entries);
+        if entries.len() < before {
+            self.write(&entries);
+        }
     }
 }
 
@@ -659,6 +668,7 @@ cargo = ["op", "plugin", "run", "--"]
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].key, "gh");
         assert_eq!(loaded[0].original_command, "gh issue list");
+        assert_eq!(loaded[0].prefix, vec!["op".to_string(), "plugin".to_string(), "run".to_string(), "--".to_string()]);
     }
 
     #[test]
