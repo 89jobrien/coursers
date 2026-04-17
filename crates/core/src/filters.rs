@@ -244,7 +244,7 @@ impl ObfsckFilters {
         let Ok(content) = std::fs::read_to_string(path) else {
             return Self::default();
         };
-        serde_yaml::from_str(&content).unwrap_or_default()
+        serde_saphyr::from_str(&content).unwrap_or_default()
     }
 }
 

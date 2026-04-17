@@ -283,6 +283,13 @@ impl From<ProbeEntryToml> for ProbeEntry {
     }
 }
 
+/// Port for reading and writing candidate probes.
+pub trait ProbeStore {
+    fn load(&self) -> Vec<ProbeEntry>;
+    fn write(&self, entries: &[ProbeEntry]);
+    fn remove_matching(&self, cmd: &str);
+}
+
 /// File-backed probe store at `.ctx/rx-candidates.toml`.
 pub struct FileProbeStore {
     pub path: std::path::PathBuf,
@@ -290,7 +297,10 @@ pub struct FileProbeStore {
 
 impl FileProbeStore {
     pub fn default_path() -> std::path::PathBuf {
-        std::path::Path::new(".ctx").join("rx-candidates.toml")
+        std::env::var_os("CRS_CTX_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| std::path::Path::new(".ctx").to_path_buf())
+            .join("rx-candidates.toml")
     }
 
     pub fn load(&self) -> Vec<ProbeEntry> {
@@ -339,6 +349,29 @@ impl FileProbeStore {
     }
 }
 
+impl ProbeStore for FileProbeStore {
+    fn load(&self) -> Vec<ProbeEntry> { self.load() }
+    fn write(&self, entries: &[ProbeEntry]) { self.write(entries); }
+    fn remove_matching(&self, cmd: &str) { self.remove_matching(cmd); }
+}
+
+/// Test double for `ProbeStore`.
+#[cfg(test)]
+pub struct FakeProbeStore {
+    pub entries: std::cell::RefCell<Vec<ProbeEntry>>,
+}
+
+#[cfg(test)]
+impl ProbeStore for FakeProbeStore {
+    fn load(&self) -> Vec<ProbeEntry> { self.entries.borrow().clone() }
+    fn write(&self, entries: &[ProbeEntry]) {
+        *self.entries.borrow_mut() = entries.to_vec();
+    }
+    fn remove_matching(&self, cmd: &str) {
+        self.entries.borrow_mut().retain(|e| e.original_command != cmd);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -376,6 +409,27 @@ mod tests {
         assert_eq!(segs, vec![
             Segment { text: "cargo check ".to_string(), sep: Some("||".to_string()) },
             Segment { text: " echo failed".to_string(), sep: None },
+        ]);
+    }
+
+    #[test]
+    fn split_or_or_beats_single_pipe_at_same_position() {
+        // "a || b" — `||` and `|` both match at position 2; `||` must win (longest).
+        let segs = split_segments("a || b");
+        assert_eq!(segs, vec![
+            Segment { text: "a ".to_string(), sep: Some("||".to_string()) },
+            Segment { text: " b".to_string(), sep: None },
+        ]);
+    }
+
+    #[test]
+    fn split_mixed_or_or_and_pipe() {
+        // Both operators present; each should split at the right place.
+        let segs = split_segments("a || b | c");
+        assert_eq!(segs, vec![
+            Segment { text: "a ".to_string(), sep: Some("||".to_string()) },
+            Segment { text: " b ".to_string(), sep: Some("|".to_string()) },
+            Segment { text: " c".to_string(), sep: None },
         ]);
     }
 

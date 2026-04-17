@@ -76,10 +76,9 @@ fn read_stdin_payload() -> Option<HookPayload> {
 fn apply_rx_learning(
     command: &str,
     exit_code: i64,
-    probe_store: &crs_core::rx_prefix::FileProbeStore,
-    prefix_store: &crs_core::rx_prefix::FilePrefixStore,
+    probe_store: &dyn crs_core::rx_prefix::ProbeStore,
+    prefix_store: &dyn crs_core::rx_prefix::PrefixStore,
 ) {
-    use crs_core::rx_prefix::PrefixStore as _;
     let probes = probe_store.load();
     let matching: Vec<_> = probes.iter().filter(|p| p.original_command == command).collect();
     if matching.is_empty() {
@@ -847,8 +846,7 @@ mod cli_tests {
 
     #[test]
     fn rx_learning_confirms_mapping_on_success() {
-        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, ProbeEntry};
-        use crs_core::rx_prefix::PrefixStore as _;
+        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, ProbeEntry, PrefixStore as _};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
