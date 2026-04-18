@@ -7,6 +7,12 @@ items: []
 log:
 - date: 2026-04-18
   summary: >-
+    handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues (2×P1, 3×P2),
+    0 local TODOs. VarExpander trait + with_env! macro refactor committed (5d8cfa2).
+    Backlog sweep closed 7 stale issues across devkit/slash/dotfiles. mcpipe CRLF fix
+    and harvestrs PathBuf fix shipped.
+- date: 2026-04-18
+  summary: >-
     Add crs insights subcommand: loads session facets from ~/.claude/usage-data/facets/,
     enriches each with git branch/repo/timestamp by correlating session IDs to .jsonl
     files, aggregates into outcome/friction/repo/branch summary. FacetRecord, GitContext,
