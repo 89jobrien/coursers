@@ -39,6 +39,8 @@ enum Command {
     Validate,
     /// Probe a command against all rules and show what would fire — reads command from stdin
     Probe,
+    /// Show cumulative block counts by rule
+    Stats,
     /// Show rx prefix learning state: confirmed mappings and pending probes
     Audit {
         /// Remove a confirmed mapping by key
@@ -70,6 +72,7 @@ fn main() {
         }
         Command::Validate => cmd_validate(),
         Command::Probe => cmd_probe(),
+        Command::Stats => cmd_stats(),
         Command::Audit { remove } => cmd_audit(remove),
     }
 }
@@ -763,6 +766,30 @@ fn format_tokens(n: u64) -> String {
     } else {
         format!("~{n} tokens")
     }
+}
+
+fn cmd_stats() {
+    use crs_core::stats::{load, sorted_blocks, stats_path};
+
+    let path = stats_path();
+    let stats = load(&path);
+
+    println!("CRS Block Stats — {}", path.display());
+    println!("{}", "=".repeat(52));
+
+    if stats.blocks.is_empty() {
+        println!("No blocks recorded yet.");
+        return;
+    }
+
+    let total: u64 = stats.blocks.values().sum();
+    println!("{:<32} {:>8}", "Rule", "Blocks");
+    println!("{}", "-".repeat(42));
+    for (rule_id, count) in sorted_blocks(&stats) {
+        println!("{:<32} {:>8}", rule_id, count);
+    }
+    println!("{}", "-".repeat(42));
+    println!("{:<32} {:>8}", "Total", total);
 }
 
 fn cmd_audit(remove: Option<String>) {

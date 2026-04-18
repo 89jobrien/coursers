@@ -81,6 +81,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
             let st = state::record_failure(st, command, fl);
             store.save(&st);
         }
+        crs_core::stats::record_block(&crs_core::stats::stats_path(), &rule_id);
         let full_msg = enrich_message(&rule_id, command, &msg);
         deny(&full_msg);
     }

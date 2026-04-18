@@ -12,3 +12,4 @@ pub mod state;
 pub mod store;
 pub mod tool_swap;
 pub mod rx_prefix;
+pub mod stats;
