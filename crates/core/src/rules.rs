@@ -112,8 +112,8 @@ pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
     None
 }
 
-/// Returns the deny message if any rule matches, None otherwise.
-pub fn check(command: &str, rules: &[Rule]) -> Option<String> {
+/// Returns `(rule_id, deny_message)` if any rule matches, None otherwise.
+pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
     for rule in rules {
         if !rule.enabled {
             continue;
@@ -145,7 +145,7 @@ pub fn check(command: &str, rules: &[Rule]) -> Option<String> {
         let msg = rule.message.clone().unwrap_or_else(|| {
             format!("Blocked by rule '{}'.", rule.id)
         });
-        return Some(msg);
+        return Some((rule.id.clone(), msg));
     }
     None
 }
@@ -170,7 +170,7 @@ mod tests {
         let rules = vec![make_rule("no-grep", r"\bgrep\b")];
         let result = check("grep foo .", &rules);
         assert!(result.is_some());
-        assert!(result.unwrap().contains("no-grep"));
+        assert!(result.unwrap().0.contains("no-grep"));
     }
 
     #[test]
@@ -215,6 +215,6 @@ mod tests {
     fn rule_custom_message_returned() {
         let mut rule = make_rule("no-grep", r"\bgrep\b");
         rule.message = Some("Use the Grep tool.".to_string());
-        assert_eq!(check("grep foo .", &[rule]).unwrap(), "Use the Grep tool.");
+        assert_eq!(check("grep foo .", &[rule]).unwrap().1, "Use the Grep tool.");
     }
 }

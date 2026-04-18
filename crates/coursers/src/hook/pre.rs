@@ -4,6 +4,63 @@ use crs_core::{rules, state};
 
 use super::{deny, HookPayload};
 
+/// For the `no-ls-use-glob` rule, extract the target path from the `ls` command and append
+/// a file-tree listing so Claude gets useful context without needing to retry.
+fn enrich_message(rule_id: &str, command: &str, base_msg: &str) -> String {
+    if rule_id != "no-ls-use-glob" {
+        return base_msg.to_string();
+    }
+
+    // Extract path: take the last whitespace-delimited token that doesn't start with `-`.
+    // Falls back to `.` when none is found (bare `ls`).
+    let path = command
+        .split_whitespace()
+        .skip(1) // skip "ls"
+        .filter(|t| !t.starts_with('-'))
+        .last()
+        .unwrap_or(".");
+
+    let tree = file_tree(path);
+    format!("{}\n\nDirectory listing for `{}`:\n{}", base_msg, path, tree)
+}
+
+/// Run `eza --tree --level 2 <path>`, falling back to a manual two-level walk.
+fn file_tree(path: &str) -> String {
+    use std::process::Command;
+
+    // Try eza first
+    let eza = Command::new("eza")
+        .args(["--tree", "--level", "2", "--color=never", path])
+        .output();
+
+    if let Ok(out) = eza {
+        if out.status.success() {
+            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            if !s.is_empty() {
+                return s;
+            }
+        }
+    }
+
+    // Fallback: find -maxdepth 2
+    let find = Command::new("find")
+        .args([path, "-maxdepth", "2", "-not", "-name", ".*"])
+        .output();
+
+    if let Ok(out) = find {
+        if out.status.success() {
+            let mut lines: Vec<_> = String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .map(str::to_string)
+                .collect();
+            lines.sort();
+            return lines.join("\n");
+        }
+    }
+
+    "(could not list directory)".to_string()
+}
+
 pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &HookPayload) {
     if payload.tool_name.as_deref() != Some("Bash") {
         return;
@@ -18,13 +75,14 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
     let fl = &config.failure_learning;
 
     // 1. Predefined rules
-    if let Some(msg) = rules::check(command, &config.rules) {
+    if let Some((rule_id, msg)) = rules::check(command, &config.rules) {
         if fl.enabled {
             let st = store.load();
             let st = state::record_failure(st, command, fl);
             store.save(&st);
         }
-        deny(&msg);
+        let full_msg = enrich_message(&rule_id, command, &msg);
+        deny(&full_msg);
     }
 
     // 2. Learned failures
