@@ -7,6 +7,16 @@ items: []
 log:
 - date: 2026-04-18
   summary: >-
+    Add crs insights subcommand: loads session facets from ~/.claude/usage-data/facets/,
+    enriches each with git branch/repo/timestamp by correlating session IDs to .jsonl
+    files, aggregates into outcome/friction/repo/branch summary. FacetRecord, GitContext,
+    EnrichedFacet, InsightsReport in crs-core::insights. Flags: --format, --since, --repo.
+    167 tests pass.
+  commits:
+  - 6298261
+  - da03901
+- date: 2026-04-18
+  summary: >-
     Add no-ls-use-glob block rule: ls commands blocked with Glob redirect message + live eza
     --tree output (fallback: find -maxdepth 2) embedded in deny reason. rules::check return type
     changed from Option<String> to Option<(rule_id, msg)> to enable per-rule enrichment in
@@ -35,8 +45,3 @@ log:
     check_learned uses timestamps.len() directly. Marked coursers-10 done. 75 tests pass.
   commits:
   - 9b5a2ca
-- date: 2026-04-06
-  summary: >-
-    coursers-5 already wired (crs rewrite in PreToolUse, crs filter in PostToolUse).
-    Updated coursers-companion.md: XDG paths, full hook chain in validation board.
-    coursers-5 marked done.
