@@ -65,7 +65,7 @@ pub fn run_filter(payload: &FilterPayload, config: &FiltersConfig) -> FilterResu
 
 /// Run the `crs rewrite` hook logic. Returns `Some(rewritten)` or `None`.
 pub fn run_rewrite(command: &str, config: &RewriteConfig) -> Option<String> {
-    crs_core::rewrite::apply(command, config)
+    crs_core::rewrite::apply(command, config, &crs_core::expand::EnvExpander)
 }
 
 #[derive(Debug, PartialEq)]

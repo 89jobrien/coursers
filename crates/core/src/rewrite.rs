@@ -18,15 +18,17 @@ pub struct RewriteConfig {
 
 /// Try to rewrite `command` using the first matching rule.
 ///
-/// The command is first passed through [`crate::expand::expand_vars`] to resolve
-/// shell env references (`$HOME`, `${VAR}`, `$env.VAR`, `~`) before rule matching.
-/// If a rule matches, the *expanded* form is rewritten and returned.
+/// The command is first passed through `expander` to resolve shell env references
+/// (`$HOME`, `${VAR}`, `$env.VAR`, `~`) before rule matching. Pass [`crate::expand::EnvExpander`]
+/// for production use or [`crate::expand::NoopExpander`] to skip expansion.
+///
+/// If a rule matches, the expanded form is rewritten and returned.
 /// If no rule matches but expansion changed the command, the expanded form is returned
 /// (so that env refs are always resolved even without an explicit rewrite rule).
 ///
 /// Returns `Some(rewritten_or_expanded)` if the command changed, `None` if unchanged.
-pub fn apply(command: &str, config: &RewriteConfig) -> Option<String> {
-    let expanded = crate::expand::expand_vars(command);
+pub fn apply(command: &str, config: &RewriteConfig, expander: &impl crate::expand::VarExpander) -> Option<String> {
+    let expanded = expander.expand(command);
 
     for rule in &config.rewrites {
         let Ok(re) = regex::Regex::new(&rule.pattern) else {
@@ -49,6 +51,7 @@ pub fn apply(command: &str, config: &RewriteConfig) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::expand::NoopExpander;
 
     fn cfg(rules: &[(&str, &str)]) -> RewriteConfig {
         RewriteConfig {
@@ -65,13 +68,13 @@ mod tests {
     #[test]
     fn returns_none_on_no_match() {
         let c = cfg(&[("cargo nextest", "cargo nextest run")]);
-        assert!(apply("doob todo list", &c).is_none());
+        assert!(apply("doob todo list", &c, &NoopExpander).is_none());
     }
 
     #[test]
     fn rewrites_matching_command() {
         let c = cfg(&[("^git status$", "git status --short")]);
-        assert_eq!(apply("git status", &c).unwrap(), "git status --short");
+        assert_eq!(apply("git status", &c, &NoopExpander).unwrap(), "git status --short");
     }
 
     #[test]
@@ -81,7 +84,7 @@ mod tests {
             ("^cargo.*", "cargo --color always"),
         ]);
         assert_eq!(
-            apply("cargo nextest run", &c).unwrap(),
+            apply("cargo nextest run", &c, &NoopExpander).unwrap(),
             "cargo nextest run --no-fail-fast"
         );
     }
@@ -90,7 +93,7 @@ mod tests {
     fn supports_capture_groups() {
         let c = cfg(&[("^(cargo test)(.*)", "cargo nextest run$2")]);
         assert_eq!(
-            apply("cargo test --release", &c).unwrap(),
+            apply("cargo test --release", &c, &NoopExpander).unwrap(),
             "cargo nextest run --release"
         );
     }
@@ -98,12 +101,12 @@ mod tests {
     #[test]
     fn passthrough_on_empty_rules() {
         let c = RewriteConfig::default();
-        assert!(apply("anything", &c).is_none());
+        assert!(apply("anything", &c, &NoopExpander).is_none());
     }
 
     #[test]
     fn invalid_regex_skipped() {
         let c = cfg(&[("[(invalid", "replace"), ("^cargo build$", "cargo --color always build")]);
-        assert_eq!(apply("cargo build", &c).unwrap(), "cargo --color always build");
+        assert_eq!(apply("cargo build", &c, &NoopExpander).unwrap(), "cargo --color always build");
     }
 }

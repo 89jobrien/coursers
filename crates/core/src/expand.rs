@@ -1,3 +1,28 @@
+/// Port: abstracts how shell variable references are resolved in a command string.
+pub trait VarExpander {
+    fn expand(&self, command: &str) -> String;
+}
+
+/// Production expander — resolves `$VAR`, `${VAR}`, `$env.VAR`, and `~` against
+/// the real process environment.
+pub struct EnvExpander;
+
+impl VarExpander for EnvExpander {
+    fn expand(&self, command: &str) -> String {
+        expand_vars(command)
+    }
+}
+
+/// No-op expander — returns the command unchanged. Use in tests or sandbox modes
+/// where env expansion is undesirable.
+pub struct NoopExpander;
+
+impl VarExpander for NoopExpander {
+    fn expand(&self, command: &str) -> String {
+        command.to_string()
+    }
+}
+
 /// Shell-agnostic environment variable expansion pass.
 ///
 /// Resolves the following reference styles before a command is processed:
@@ -11,8 +36,6 @@
 /// - Tokens beginning with `http://` or `https://` are skipped entirely.
 /// - References inside single-quoted tokens are not expanded (the token starts with `'`).
 pub fn expand_vars(command: &str) -> String {
-    // Split on whitespace boundaries while preserving spacing is complex.
-    // Instead, expand inline: scan character-by-character.
     expand_inline(command)
 }
 
@@ -166,48 +189,66 @@ fn read_bare_name(s: &str) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
 
-    // Helper: set env var for the duration of the closure, then restore.
-    // Tests are NOT parallelized across env mutations — they each use unique vars.
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
+
+    /// Set one or more env vars for the duration of a closure, then restore.
+    /// Serializes all env-touching tests via ENV_MUTEX.
+    macro_rules! with_env {
+        ($(($k:expr, $v:expr)),+ => $body:expr) => {{
+            let _guard = ENV_MUTEX.lock().unwrap();
+            unsafe { $(std::env::set_var($k, $v);)+ }
+            let _result = { $body };
+            unsafe { $(std::env::remove_var($k);)+ }
+            _result
+        }};
+    }
 
     #[test]
     fn expands_dollar_varname() {
-        unsafe { std::env::set_var("_CRS_TEST_FOO", "/test/foo") };
-        assert_eq!(expand_vars("echo $_CRS_TEST_FOO"), "echo /test/foo");
-        unsafe { std::env::remove_var("_CRS_TEST_FOO") };
+        with_env!(("_CRS_TEST_FOO", "/test/foo") => {
+            assert_eq!(expand_vars("echo $_CRS_TEST_FOO"), "echo /test/foo");
+        });
     }
 
     #[test]
     fn expands_dollar_brace_varname() {
-        unsafe { std::env::set_var("_CRS_TEST_BAR", "/test/bar") };
-        assert_eq!(expand_vars("op run --env-file=${_CRS_TEST_BAR}/.secrets"), "op run --env-file=/test/bar/.secrets");
-        unsafe { std::env::remove_var("_CRS_TEST_BAR") };
+        with_env!(("_CRS_TEST_BAR", "/test/bar") => {
+            assert_eq!(
+                expand_vars("op run --env-file=${_CRS_TEST_BAR}/.secrets"),
+                "op run --env-file=/test/bar/.secrets"
+            );
+        });
     }
 
     #[test]
     fn expands_nu_env_style() {
-        unsafe { std::env::set_var("_CRS_TEST_HOME", "/nu/home") };
-        assert_eq!(expand_vars("op run --env-file=$env._CRS_TEST_HOME/.secrets"), "op run --env-file=/nu/home/.secrets");
-        unsafe { std::env::remove_var("_CRS_TEST_HOME") };
+        with_env!(("_CRS_TEST_HOME", "/nu/home") => {
+            assert_eq!(
+                expand_vars("op run --env-file=$env._CRS_TEST_HOME/.secrets"),
+                "op run --env-file=/nu/home/.secrets"
+            );
+        });
     }
 
     #[test]
     fn expands_tilde_slash() {
-        unsafe { std::env::set_var("HOME", "/home/joe") };
-        assert_eq!(expand_vars("op run --env-file=~/.secrets"), "op run --env-file=/home/joe/.secrets");
+        with_env!(("HOME", "/home/joe") => {
+            assert_eq!(expand_vars("op run --env-file=~/.secrets"), "op run --env-file=/home/joe/.secrets");
+        });
     }
 
     #[test]
     fn expands_tilde_alone() {
-        unsafe { std::env::set_var("HOME", "/home/joe") };
-        assert_eq!(expand_vars("cd ~"), "cd /home/joe");
+        with_env!(("HOME", "/home/joe") => {
+            assert_eq!(expand_vars("cd ~"), "cd /home/joe");
+        });
     }
 
     #[test]
     fn does_not_expand_tilde_in_middle_of_word() {
-        // e.g. a filename like foo~bar should not expand
-        let result = expand_vars("echo foo~bar");
-        assert_eq!(result, "echo foo~bar");
+        assert_eq!(expand_vars("echo foo~bar"), "echo foo~bar");
     }
 
     #[test]
@@ -217,29 +258,33 @@ mod tests {
 
     #[test]
     fn does_not_expand_inside_single_quotes() {
-        let result = expand_vars("echo '$HOME'");
-        assert_eq!(result, "echo '$HOME'");
+        assert_eq!(expand_vars("echo '$HOME'"), "echo '$HOME'");
     }
 
     #[test]
     fn does_not_expand_url_tokens() {
         let url = "https://example.com/$path";
-        let result = expand_vars(url);
-        assert_eq!(result, url);
+        assert_eq!(expand_vars(url), url);
     }
 
     #[test]
     fn leaves_unresolved_var_as_is() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         unsafe { std::env::remove_var("_CRS_DEFINITELY_NOT_SET_XYZ") };
-        let result = expand_vars("echo $_CRS_DEFINITELY_NOT_SET_XYZ");
-        assert_eq!(result, "echo $_CRS_DEFINITELY_NOT_SET_XYZ");
+        assert_eq!(
+            expand_vars("echo $_CRS_DEFINITELY_NOT_SET_XYZ"),
+            "echo $_CRS_DEFINITELY_NOT_SET_XYZ"
+        );
     }
 
     #[test]
     fn leaves_unresolved_brace_var_as_is() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         unsafe { std::env::remove_var("_CRS_DEFINITELY_NOT_SET_ABC") };
-        let result = expand_vars("echo ${_CRS_DEFINITELY_NOT_SET_ABC}");
-        assert_eq!(result, "echo ${_CRS_DEFINITELY_NOT_SET_ABC}");
+        assert_eq!(
+            expand_vars("echo ${_CRS_DEFINITELY_NOT_SET_ABC}"),
+            "echo ${_CRS_DEFINITELY_NOT_SET_ABC}"
+        );
     }
 
     #[test]
@@ -249,17 +294,11 @@ mod tests {
 
     #[test]
     fn expands_multiple_vars_in_one_command() {
-        unsafe {
-            std::env::set_var("_CRS_TEST_A", "aaa");
-            std::env::set_var("_CRS_TEST_B", "bbb");
-        }
-        assert_eq!(
-            expand_vars("echo $_CRS_TEST_A $_CRS_TEST_B"),
-            "echo aaa bbb"
-        );
-        unsafe {
-            std::env::remove_var("_CRS_TEST_A");
-            std::env::remove_var("_CRS_TEST_B");
-        }
+        with_env!(("_CRS_TEST_A", "aaa"), ("_CRS_TEST_B", "bbb") => {
+            assert_eq!(
+                expand_vars("echo $_CRS_TEST_A $_CRS_TEST_B"),
+                "echo aaa bbb"
+            );
+        });
     }
 }
