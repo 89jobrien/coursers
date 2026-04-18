@@ -1,2 +1,4 @@
 /target
-.ctx/
+.ctx/*
+!.ctx/HANDOFF.*.yaml
+.ctx/HANDOFF.*.state.yaml
