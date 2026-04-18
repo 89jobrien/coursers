@@ -41,6 +41,18 @@ enum Command {
     Probe,
     /// Show cumulative block counts by rule
     Stats,
+    /// Analyze session facets enriched with git context
+    Insights {
+        /// Output format: text or json
+        #[arg(short, long, default_value = "text")]
+        format: String,
+        /// Only include facets from the last N days (based on git timestamp)
+        #[arg(short, long)]
+        since: Option<u32>,
+        /// Filter to sessions in a specific repo (matches cwd basename)
+        #[arg(short, long)]
+        repo: Option<String>,
+    },
     /// Show rx prefix learning state: confirmed mappings and pending probes
     Audit {
         /// Remove a confirmed mapping by key
@@ -73,6 +85,7 @@ fn main() {
         Command::Validate => cmd_validate(),
         Command::Probe => cmd_probe(),
         Command::Stats => cmd_stats(),
+        Command::Insights { format, since, repo } => cmd_insights(&format, since, repo.as_deref()),
         Command::Audit { remove } => cmd_audit(remove),
     }
 }
@@ -790,6 +803,187 @@ fn cmd_stats() {
     }
     println!("{}", "-".repeat(42));
     println!("{:<32} {:>8}", "Total", total);
+}
+
+fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
+    use crs_core::insights::{aggregate, enrich, load_facets};
+
+    let facets_dir = std::env::var("CLAUDE_FACETS_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .expect("home dir")
+                .join(".claude/usage-data/facets")
+        });
+
+    let projects_root = std::env::var("CLAUDE_PROJECTS_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| {
+            dirs::home_dir()
+                .expect("home dir")
+                .join(".claude/projects")
+        });
+
+    if !facets_dir.exists() {
+        eprintln!("crs insights: facets directory not found: {}", facets_dir.display());
+        eprintln!("  Run /insights in Claude Code first to generate facet data.");
+        std::process::exit(1);
+    }
+
+    let facets = load_facets(&facets_dir);
+    let mut enriched = enrich(facets, &projects_root);
+
+    // Filter by repo if requested
+    if let Some(repo_filter) = repo {
+        enriched.retain(|ef| {
+            ef.git.as_ref().map(|g| g.repo == repo_filter).unwrap_or(false)
+        });
+    }
+
+    // Filter by since days (based on git timestamp)
+    if let Some(days) = since {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let cutoff_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            .saturating_sub(days as u64 * 86400);
+        let cutoff = format_unix_date(cutoff_secs);
+        enriched.retain(|ef| {
+            ef.git
+                .as_ref()
+                .and_then(|g| g.timestamp.as_deref())
+                .map(|ts| &ts[..ts.len().min(10)] >= cutoff.as_str())
+                .unwrap_or(true) // keep facets with no timestamp
+        });
+    }
+
+    let report = aggregate(&enriched);
+
+    match format {
+        "json" => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
+        _ => print_insights_text(&report, &enriched),
+    }
+}
+
+fn format_unix_date(secs: u64) -> String {
+    let days = secs / 86400;
+    let mut remaining = days + 719468;
+    let era = remaining / 146097;
+    remaining %= 146097;
+    let yoe = (remaining - remaining / 1460 + remaining / 36524 - remaining / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = remaining - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}-{m:02}-{d:02}")
+}
+
+fn print_insights_text(
+    report: &crs_core::insights::InsightsReport,
+    enriched: &[crs_core::insights::EnrichedFacet],
+) {
+    println!("CRS Insights — Session Facet Analysis");
+    println!("{}", "=".repeat(60));
+    println!(
+        "Sessions: {}  (git-enriched: {})\n",
+        report.total, report.git_enriched
+    );
+
+    // Outcomes
+    if !report.outcomes.is_empty() {
+        println!("Outcomes");
+        println!("{}", "-".repeat(40));
+        let mut outcomes: Vec<_> = report.outcomes.iter().collect();
+        outcomes.sort_by(|a, b| b.1.cmp(a.1));
+        for (k, v) in &outcomes {
+            let pct = *v * 100 / report.total;
+            println!("  {:<28} {:>4}  ({pct}%)", k, v);
+        }
+        println!();
+    }
+
+    // Helpfulness
+    if !report.helpfulness.is_empty() {
+        println!("Claude Helpfulness");
+        println!("{}", "-".repeat(40));
+        let mut h: Vec<_> = report.helpfulness.iter().collect();
+        h.sort_by(|a, b| b.1.cmp(a.1));
+        for (k, v) in &h {
+            println!("  {:<28} {:>4}", k, v);
+        }
+        println!();
+    }
+
+    // Friction
+    if !report.friction.is_empty() {
+        println!("Friction (cumulative across sessions)");
+        println!("{}", "-".repeat(40));
+        let mut f: Vec<_> = report.friction.iter().collect();
+        f.sort_by(|a, b| b.1.cmp(a.1));
+        for (k, v) in &f {
+            println!("  {:<28} {:>4}", k, v);
+        }
+        println!();
+    }
+
+    // Top goal categories
+    if !report.goal_categories.is_empty() {
+        println!("Goal Categories");
+        println!("{}", "-".repeat(40));
+        let mut g: Vec<_> = report.goal_categories.iter().collect();
+        g.sort_by(|a, b| b.1.cmp(a.1));
+        for (k, v) in g.iter().take(10) {
+            println!("  {:<28} {:>4}", k, v);
+        }
+        println!();
+    }
+
+    // Top repos
+    if !report.top_repos.is_empty() {
+        println!("Top Repos");
+        println!("{}", "-".repeat(40));
+        for (repo, count) in &report.top_repos {
+            println!("  {:<28} {:>4}", repo, count);
+        }
+        println!();
+    }
+
+    // Top branches
+    if !report.top_branches.is_empty() {
+        println!("Top Branches");
+        println!("{}", "-".repeat(40));
+        for (branch, count) in report.top_branches.iter().take(10) {
+            println!("  {:<28} {:>4}", branch, count);
+        }
+        println!();
+    }
+
+    // Recent sessions sample (last 5 with git context)
+    let with_git: Vec<_> = enriched
+        .iter()
+        .filter(|ef| ef.git.is_some())
+        .rev()
+        .take(5)
+        .collect();
+    if !with_git.is_empty() {
+        println!("Recent Sessions (with git context)");
+        println!("{}", "-".repeat(60));
+        for ef in &with_git {
+            let git = ef.git.as_ref().unwrap();
+            let branch = git.branch.as_deref().unwrap_or("?");
+            let ts = git.timestamp.as_deref().map(|t| &t[..t.len().min(10)]).unwrap_or("?");
+            let outcome = ef.facet.outcome.as_deref().unwrap_or("?");
+            let summary = ef.facet.brief_summary.as_deref().unwrap_or("");
+            let summary = if summary.len() > 60 { &summary[..60] } else { summary };
+            println!("  {} | {} | {} | {}", ts, git.repo, branch, outcome);
+            if !summary.is_empty() {
+                println!("    {}", summary);
+            }
+        }
+    }
 }
 
 fn cmd_audit(remove: Option<String>) {
