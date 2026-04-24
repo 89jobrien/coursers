@@ -1,10 +1,16 @@
 project: coursers
 id: coursers
-updated: 2026-04-23
+updated: 2026-04-24
 notes: null
 items: []
 
 log:
+  - date: 2026-04-24
+    summary: >-
+      Activity detected on 2026-04-24. Recent commits continue feature work on
+      discover command and rules engine. Previous session (2026-04-23) closed issues
+      #2 and #5 with --min-count flag and version manager block rule.
+    commits: []
   - date: 2026-04-23
     summary: >-
       5 new crs subcommands: suggest, history, export, heat, replay (TDD, 142→153 tests).
