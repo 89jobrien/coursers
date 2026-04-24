@@ -417,12 +417,6 @@ mod tests {
 
     #[test]
     fn discover_min_count_filters_low_frequency_intercepted() {
-        let records = vec![
-            make_record("grep foo .", "/p"),
-            make_record("grep bar .", "/p"),
-            make_record("grep baz .", "/p"),
-            make_record("grep once .", "/p"),
-        ];
         // Use two different rule-matching stems with different frequencies
         let records = vec![
             make_record("grep foo .", "/p"), // count 1 — below threshold
