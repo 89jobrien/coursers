@@ -1,53 +1,65 @@
 project: coursers
 id: coursers
-updated: 2026-04-18
+updated: 2026-04-23
 notes: null
 items: []
 
 log:
-- date: 2026-04-18
-  summary: >-
-    handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues (2×P1, 3×P2),
-    0 local TODOs. VarExpander trait + with_env! macro refactor committed (5d8cfa2).
-    Backlog sweep closed 7 stale issues across devkit/slash/dotfiles. mcpipe CRLF fix
-    and harvestrs PathBuf fix shipped.
-- date: 2026-04-18
-  summary: >-
-    Add crs insights subcommand: loads session facets from ~/.claude/usage-data/facets/,
-    enriches each with git branch/repo/timestamp by correlating session IDs to .jsonl
-    files, aggregates into outcome/friction/repo/branch summary. FacetRecord, GitContext,
-    EnrichedFacet, InsightsReport in crs-core::insights. Flags: --format, --since, --repo.
-    167 tests pass.
-  commits:
-  - 6298261
-  - da03901
-- date: 2026-04-18
-  summary: >-
-    Add no-ls-use-glob block rule: ls commands blocked with Glob redirect message + live eza
-    --tree output (fallback: find -maxdepth 2) embedded in deny reason. rules::check return type
-    changed from Option<String> to Option<(rule_id, msg)> to enable per-rule enrichment in
-    pre.rs. HANDOFF file renamed to .ctx/ convention. 113 tests pass.
-  commits:
-  - fbc678d
-  - 7662873
-- date: 2026-04-12
-  summary: >-
-    coursers-11 (obfsck MCP port/adapter): ObfsckMcp trait + NullObfsckMcpClient in crs-core,
-    ProcessObfsckMcpClient adapter in crs (JSON-RPC stdio to obfsck-mcp). obfsck_audit_mcp
-    replaces old shell-out in write_tools_yaml. crs discover generates .ctx/obfsck-filters.yaml
-    from unhandled command examples via generate-filters MCP tool. 79 tests pass.
-  commits:
-  - 09f9f2d
-- date: 2026-04-11
-  summary: Unblocked coursers-11 — obfsck-11 (MCP server, obfsck-mcp binary) and mcpipe-21
-    (PathBinaryScanner) both completed. coursers-11 status changed from blocked to open.
-  commits: []
-- date: 2026-04-10
-  summary: >-
-    Fixed hook-diagnostics skill (coursers-14): corrected failure log path to
-    course-correct-state.json, updated hook names. Rule-blocked commands now recorded
-    in failure state (coursers-12): pre.rs records before deny so repeated violations
-    accumulate. Failure threshold changed to total count not windowed (coursers-13):
-    check_learned uses timestamps.len() directly. Marked coursers-10 done. 75 tests pass.
-  commits:
-  - 9b5a2ca
+  - date: 2026-04-23
+    summary: >-
+      5 new crs subcommands: suggest, history, export, heat, replay (TDD, 142→153 tests).
+      feat(rules): no-nvm-use-mise block rule — fires on nvm install/use/alias, redirects to
+      mise use node@<version>. Added to live config + validate known-list. 7 unit tests.
+      feat(discover): --min-count N flag filters low-frequency entries; default 1 (show all).
+      4 unit tests. Closes GH #2 (P1) and #5 (P1). Commits: edcf5a0, 42730bf.
+    commits:
+      - edcf5a0
+      - 42730bf
+      - 398f778
+  - date: 2026-04-18
+    summary: >-
+      handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues (2×P1, 3×P2),
+      0 local TODOs. VarExpander trait + with_env! macro refactor committed (5d8cfa2).
+      Backlog sweep closed 7 stale issues across devkit/slash/dotfiles. mcpipe CRLF fix
+      and harvestrs PathBuf fix shipped.
+  - date: 2026-04-18
+    summary: >-
+      Add crs insights subcommand: loads session facets from ~/.claude/usage-data/facets/,
+      enriches each with git branch/repo/timestamp by correlating session IDs to .jsonl
+      files, aggregates into outcome/friction/repo/branch summary. FacetRecord, GitContext,
+      EnrichedFacet, InsightsReport in crs-core::insights. Flags: --format, --since, --repo.
+      167 tests pass.
+    commits:
+      - 6298261
+      - da03901
+  - date: 2026-04-18
+    summary: >-
+      Add no-ls-use-glob block rule: ls commands blocked with Glob redirect message + live eza
+      --tree output (fallback: find -maxdepth 2) embedded in deny reason. rules::check return type
+      changed from Option<String> to Option<(rule_id, msg)> to enable per-rule enrichment in
+      pre.rs. HANDOFF file renamed to .ctx/ convention. 113 tests pass.
+    commits:
+      - fbc678d
+      - 7662873
+  - date: 2026-04-12
+    summary: >-
+      coursers-11 (obfsck MCP port/adapter): ObfsckMcp trait + NullObfsckMcpClient in crs-core,
+      ProcessObfsckMcpClient adapter in crs (JSON-RPC stdio to obfsck-mcp). obfsck_audit_mcp
+      replaces old shell-out in write_tools_yaml. crs discover generates .ctx/obfsck-filters.yaml
+      from unhandled command examples via generate-filters MCP tool. 79 tests pass.
+    commits:
+      - 09f9f2d
+  - date: 2026-04-11
+    summary:
+      Unblocked coursers-11 — obfsck-11 (MCP server, obfsck-mcp binary) and mcpipe-21
+      (PathBinaryScanner) both completed. coursers-11 status changed from blocked to open.
+    commits: []
+  - date: 2026-04-10
+    summary: >-
+      Fixed hook-diagnostics skill (coursers-14): corrected failure log path to
+      course-correct-state.json, updated hook names. Rule-blocked commands now recorded
+      in failure state (coursers-12): pre.rs records before deny so repeated violations
+      accumulate. Failure threshold changed to total count not windowed (coursers-13):
+      check_learned uses timestamps.len() directly. Marked coursers-10 done. 75 tests pass.
+    commits:
+      - 9b5a2ca
