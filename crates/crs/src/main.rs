@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use crs_lib::{run_filter, run_rewrite, FilterPayload, FilterResult};
+use crs_lib::{FilterPayload, FilterResult, run_filter, run_rewrite};
 use serde::Deserialize;
 use serde_json::Value;
 use std::io::{self, Read, Write};
@@ -59,6 +59,54 @@ enum Command {
         #[arg(long)]
         remove: Option<String>,
     },
+    /// Suggest new rules from the top unhandled commands in session history
+    Suggest {
+        /// Scan all projects (default: current project only)
+        #[arg(short, long)]
+        all: bool,
+        /// Scan sessions from last N days
+        #[arg(short, long, default_value = "30")]
+        since: u32,
+        /// Max candidates to suggest
+        #[arg(short, long, default_value = "10")]
+        limit: usize,
+        /// Output format: text or json
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+    /// Show recent blocked commands with timestamps and firing rules
+    History {
+        /// Max entries to show
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+        /// Filter to a specific rule id
+        #[arg(short, long)]
+        rule: Option<String>,
+        /// Output format: text or json
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
+    /// Dump rules + stats + state as a portable JSON snapshot
+    Export {
+        /// Write output to this file instead of stdout
+        #[arg(short, long)]
+        out: Option<String>,
+    },
+    /// Show a heatmap of rule firings by hour-of-day and day-of-week
+    Heat {
+        /// Filter to a specific rule id
+        #[arg(short, long)]
+        rule: Option<String>,
+    },
+    /// Replay a session's Bash commands through the current ruleset (no side effects)
+    Replay {
+        /// Path to a .jsonl session file (default: most recent session for current project)
+        #[arg(short, long)]
+        session: Option<String>,
+        /// Output format: text or json
+        #[arg(short, long, default_value = "text")]
+        format: String,
+    },
 }
 
 /// Minimal PostToolUse hook payload.
@@ -79,14 +127,38 @@ fn main() {
     match cli.command {
         Command::Filter => cmd_filter(),
         Command::Rewrite => cmd_rewrite(),
-        Command::Discover { all, limit, since, format, generate_filters } => {
+        Command::Discover {
+            all,
+            limit,
+            since,
+            format,
+            generate_filters,
+        } => {
             cmd_discover(all, limit, since, &format, generate_filters);
         }
         Command::Validate => cmd_validate(),
         Command::Probe => cmd_probe(),
         Command::Stats => cmd_stats(),
-        Command::Insights { format, since, repo } => cmd_insights(&format, since, repo.as_deref()),
+        Command::Insights {
+            format,
+            since,
+            repo,
+        } => cmd_insights(&format, since, repo.as_deref()),
         Command::Audit { remove } => cmd_audit(remove),
+        Command::Suggest {
+            all,
+            since,
+            limit,
+            format,
+        } => cmd_suggest(all, since, limit, &format),
+        Command::History {
+            limit,
+            rule,
+            format,
+        } => cmd_history(limit, rule.as_deref(), &format),
+        Command::Export { out } => cmd_export(out.as_deref()),
+        Command::Heat { rule } => cmd_heat(rule.as_deref()),
+        Command::Replay { session, format } => cmd_replay(session.as_deref(), &format),
     }
 }
 
@@ -103,7 +175,10 @@ fn apply_rx_learning(
     prefix_store: &dyn crs_core::rx_prefix::PrefixStore,
 ) {
     let probes = probe_store.load();
-    let matching: Vec<_> = probes.iter().filter(|p| p.original_command == command).collect();
+    let matching: Vec<_> = probes
+        .iter()
+        .filter(|p| p.original_command == command)
+        .collect();
     if matching.is_empty() {
         return;
     }
@@ -124,7 +199,11 @@ fn cmd_filter() {
         return;
     }
 
-    let command = match payload.tool_input.as_ref().and_then(|i| i.command.as_deref()) {
+    let command = match payload
+        .tool_input
+        .as_ref()
+        .and_then(|i| i.command.as_deref())
+    {
         Some(c) if !c.is_empty() => c.to_string(),
         _ => return,
     };
@@ -145,7 +224,11 @@ fn cmd_filter() {
         .unwrap_or(0);
 
     let config = crs_core::filters::load();
-    let fp = FilterPayload { command: command.clone(), output: output.clone(), exit_code };
+    let fp = FilterPayload {
+        command: command.clone(),
+        output: output.clone(),
+        exit_code,
+    };
 
     // Apply compression rules first.
     let filtered_output = match run_filter(&fp, &config) {
@@ -187,7 +270,11 @@ fn cmd_rewrite() {
         std::process::exit(1);
     }
 
-    let command = match payload.tool_input.as_ref().and_then(|i| i.command.as_deref()) {
+    let command = match payload
+        .tool_input
+        .as_ref()
+        .and_then(|i| i.command.as_deref())
+    {
         Some(c) if !c.is_empty() => c,
         _ => std::process::exit(1),
     };
@@ -195,7 +282,11 @@ fn cmd_rewrite() {
     // 1. Try AST tool swap first
     let filters_cfg = crs_core::filters::load();
     let swap = crs_core::tool_swap::apply(command, &filters_cfg.tool_swap);
-    if let crs_core::tool_swap::ToolAction::SwapTool { tool_name, tool_input } = swap {
+    if let crs_core::tool_swap::ToolAction::SwapTool {
+        tool_name,
+        tool_input,
+    } = swap
+    {
         emit_tool_swap(&tool_name, tool_input);
         return;
     }
@@ -306,9 +397,9 @@ fn cmd_validate() {
     let known: &[KnownRule<'_>] = &[
         (
             "no-grep-use-tool",
-            &["grep foo .", "rg pattern src/"],              // must trigger
+            &["grep foo .", "rg pattern src/"], // must trigger
             &["cmd | grep foo", "cmd | rg foo", "grep -A3"], // must be excepted
-            &[],                                              // alternative binaries to check on PATH
+            &[],                                // alternative binaries to check on PATH
         ),
         (
             "no-npm-use-bun",
@@ -321,6 +412,12 @@ fn cmd_validate() {
             &["pip install requests", "pip3 upgrade pip"],
             &["pip install --target /tmp/x"],
             &["uv"],
+        ),
+        (
+            "no-nvm-use-mise",
+            &["nvm install 20", "nvm use 18", "nvm alias default 20"],
+            &[],
+            &["mise"],
         ),
     ];
 
@@ -358,18 +455,20 @@ fn cmd_validate() {
         // 3. Known-good trigger examples actually trigger (after exceptions)
         if let Some((_, triggers, excepts, alts)) = known.iter().find(|(id, ..)| *id == rule.id) {
             for &cmd in *triggers {
-                let excepted = rule.exceptions.iter().any(|exc| {
-                    Regex::new(exc).map(|r| r.is_match(cmd)).unwrap_or(false)
-                });
+                let excepted = rule
+                    .exceptions
+                    .iter()
+                    .any(|exc| Regex::new(exc).map(|r| r.is_match(cmd)).unwrap_or(false));
                 if !re.is_match(cmd) || excepted {
                     issues.push(format!("should trigger but does not: `{cmd}`"));
                 }
             }
             // 4. Known exception examples are correctly excepted
             for &cmd in *excepts {
-                let excepted = rule.exceptions.iter().any(|exc| {
-                    Regex::new(exc).map(|r| r.is_match(cmd)).unwrap_or(false)
-                });
+                let excepted = rule
+                    .exceptions
+                    .iter()
+                    .any(|exc| Regex::new(exc).map(|r| r.is_match(cmd)).unwrap_or(false));
                 if re.is_match(cmd) && !excepted {
                     issues.push(format!("should be excepted but triggers: `{cmd}`"));
                 }
@@ -449,7 +548,9 @@ fn cmd_probe() {
         } else {
             rule.pattern.clone()
         };
-        let Ok(re) = Regex::new(&pat_str) else { continue };
+        let Ok(re) = Regex::new(&pat_str) else {
+            continue;
+        };
         if !re.is_match(&command) {
             continue;
         }
@@ -458,7 +559,13 @@ fn cmd_probe() {
         // Find the first matching exception, if any
         let matched_exc: Option<&str> = rule.exceptions.iter().find_map(|exc| {
             Regex::new(exc)
-                .map(|r| if r.is_match(&command) { Some(exc.as_str()) } else { None })
+                .map(|r| {
+                    if r.is_match(&command) {
+                        Some(exc.as_str())
+                    } else {
+                        None
+                    }
+                })
                 .unwrap_or(None)
         });
 
@@ -513,11 +620,7 @@ fn cmd_discover(all: bool, limit: usize, since: u32, format: &str, generate_filt
 
     let root = std::env::var("CLAUDE_PROJECTS_DIR")
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .expect("home dir")
-                .join(".claude/projects")
-        });
+        .unwrap_or_else(|_| dirs::home_dir().expect("home dir").join(".claude/projects"));
 
     let current_dir = std::env::current_dir().ok();
     let src = crs_lib::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
@@ -534,16 +637,20 @@ fn cmd_discover(all: bool, limit: usize, since: u32, format: &str, generate_filt
 
     // Enrich with RTK data if rtk is on PATH.
     // Build stem -> (rtk_equivalent, est_savings_tokens, est_savings_pct) lookup.
-    let rtk_map: HashMap<String, (String, u64, f64)> =
-        crs_lib::rtk::detect()
-            .and_then(|c| c.discover(since))
-            .map(|r| {
-                r.supported
-                    .into_iter()
-                    .map(|e| (e.command.clone(), (e.rtk_equivalent, e.est_savings_tokens, e.est_savings_pct)))
-                    .collect()
-            })
-            .unwrap_or_default();
+    let rtk_map: HashMap<String, (String, u64, f64)> = crs_lib::rtk::detect()
+        .and_then(|c| c.discover(since))
+        .map(|r| {
+            r.supported
+                .into_iter()
+                .map(|e| {
+                    (
+                        e.command.clone(),
+                        (e.rtk_equivalent, e.est_savings_tokens, e.est_savings_pct),
+                    )
+                })
+                .collect()
+        })
+        .unwrap_or_default();
 
     match format {
         "json" => print_discover_json(&report),
@@ -558,11 +665,8 @@ fn cmd_discover(all: bool, limit: usize, since: u32, format: &str, generate_filt
         if generate_filters {
             let client = crs_lib::obfsck::detect();
             if let Some(client) = client {
-                let examples: Vec<String> = report
-                    .unhandled
-                    .iter()
-                    .map(|f| f.example.clone())
-                    .collect();
+                let examples: Vec<String> =
+                    report.unhandled.iter().map(|f| f.example.clone()).collect();
                 let suggestions = if examples.is_empty() {
                     vec![]
                 } else {
@@ -637,7 +741,9 @@ fn write_tools_yaml(
 /// Falls back silently if obfsck-mcp is not on PATH.
 fn obfsck_audit_mcp(content: &str) {
     use crs_core::obfsck::ObfsckMcp as _;
-    let Some(client) = crs_lib::obfsck::detect() else { return };
+    let Some(client) = crs_lib::obfsck::detect() else {
+        return;
+    };
     let hits = client.audit(content);
     if !hits.is_empty() {
         eprintln!("obfsck: secret pattern hits in generated YAML:");
@@ -713,7 +819,10 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
         println!("{}", "-".repeat(72));
         let has_tokens = report.intercepted.iter().any(|f| f.est_tokens > 0);
         if has_tokens {
-            println!("{:<24} {:>6}   {:<24} {:>12}", "Command", "Count", "Rule", "Output tokens");
+            println!(
+                "{:<24} {:>6}   {:<24} {:>12}",
+                "Command", "Count", "Rule", "Output tokens"
+            );
         } else {
             println!("{:<24} {:>6}   Rule", "Command", "Count");
         }
@@ -721,7 +830,10 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
             let rule = f.rule_id.as_deref().unwrap_or("-");
             if has_tokens {
                 let savings = format_tokens(f.est_tokens);
-                println!("{:<24} {:>6}   {:<24} {:>12}", f.stem, f.count, rule, savings);
+                println!(
+                    "{:<24} {:>6}   {:<24} {:>12}",
+                    f.stem, f.count, rule, savings
+                );
             } else {
                 println!("{:<24} {:>6}   {}", f.stem, f.count, rule);
             }
@@ -730,9 +842,15 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
         let total_cmds: u64 = report.intercepted.iter().map(|f| f.count).sum();
         println!("{}", "-".repeat(72));
         if has_tokens {
-            println!("Total: {} commands → {} output tokens", total_cmds, total_tokens);
+            println!(
+                "Total: {} commands → {} output tokens",
+                total_cmds, total_tokens
+            );
         } else {
-            println!("Total: {} commands (no output data in sessions)", total_cmds);
+            println!(
+                "Total: {} commands (no output data in sessions)",
+                total_cmds
+            );
         }
     }
 
@@ -750,7 +868,6 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
         }
         println!("{}", "-".repeat(52));
     }
-
 }
 
 fn print_discover_json(report: &crs_core::history::DiscoverReport) {
@@ -818,14 +935,13 @@ fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
 
     let projects_root = std::env::var("CLAUDE_PROJECTS_DIR")
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|_| {
-            dirs::home_dir()
-                .expect("home dir")
-                .join(".claude/projects")
-        });
+        .unwrap_or_else(|_| dirs::home_dir().expect("home dir").join(".claude/projects"));
 
     if !facets_dir.exists() {
-        eprintln!("crs insights: facets directory not found: {}", facets_dir.display());
+        eprintln!(
+            "crs insights: facets directory not found: {}",
+            facets_dir.display()
+        );
         eprintln!("  Run /insights in Claude Code first to generate facet data.");
         std::process::exit(1);
     }
@@ -836,7 +952,10 @@ fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
     // Filter by repo if requested
     if let Some(repo_filter) = repo {
         enriched.retain(|ef| {
-            ef.git.as_ref().map(|g| g.repo == repo_filter).unwrap_or(false)
+            ef.git
+                .as_ref()
+                .map(|g| g.repo == repo_filter)
+                .unwrap_or(false)
         });
     }
 
@@ -974,10 +1093,18 @@ fn print_insights_text(
         for ef in &with_git {
             let git = ef.git.as_ref().unwrap();
             let branch = git.branch.as_deref().unwrap_or("?");
-            let ts = git.timestamp.as_deref().map(|t| &t[..t.len().min(10)]).unwrap_or("?");
+            let ts = git
+                .timestamp
+                .as_deref()
+                .map(|t| &t[..t.len().min(10)])
+                .unwrap_or("?");
             let outcome = ef.facet.outcome.as_deref().unwrap_or("?");
             let summary = ef.facet.brief_summary.as_deref().unwrap_or("");
-            let summary = if summary.len() > 60 { &summary[..60] } else { summary };
+            let summary = if summary.len() > 60 {
+                &summary[..60]
+            } else {
+                summary
+            };
             println!("  {} | {} | {} | {}", ts, git.repo, branch, outcome);
             if !summary.is_empty() {
                 println!("    {}", summary);
@@ -987,10 +1114,14 @@ fn print_insights_text(
 }
 
 fn cmd_audit(remove: Option<String>) {
-    use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, audit_state};
+    use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, audit_state};
 
-    let prefix_store = FilePrefixStore { path: FilePrefixStore::default_path() };
-    let probe_store = FileProbeStore { path: FileProbeStore::default_path() };
+    let prefix_store = FilePrefixStore {
+        path: FilePrefixStore::default_path(),
+    };
+    let probe_store = FileProbeStore {
+        path: FileProbeStore::default_path(),
+    };
 
     if let Some(ref key) = remove {
         if prefix_store.remove_mapping(key) {
@@ -1032,6 +1163,368 @@ fn cmd_audit(remove: Option<String>) {
     }
 }
 
+fn cmd_suggest(all: bool, since: u32, limit: usize, format: &str) {
+    use crs_core::history::{DiscoverOpts, discover};
+    use crs_core::rules::load as load_rules;
+    use crs_core::suggest::suggest;
+
+    let root = std::env::var("CLAUDE_PROJECTS_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| dirs::home_dir().expect("home dir").join(".claude/projects"));
+
+    let current_dir = std::env::current_dir().ok();
+    let src = crs_lib::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
+
+    let rules_cfg = load_rules();
+    let opts = DiscoverOpts {
+        limit,
+        since_days: Some(since),
+        all_projects: all,
+        current_dir,
+    };
+
+    let report = discover(&src, &rules_cfg.rules, &opts);
+    let suggestions = suggest(&report.unhandled);
+
+    match format {
+        "json" => println!("{}", serde_json::to_string_pretty(&suggestions).unwrap()),
+        _ => {
+            if suggestions.is_empty() {
+                println!("No unhandled commands found — nothing to suggest.");
+                return;
+            }
+            println!("CRS Suggest — Candidate Rules from Session History");
+            println!("{}", "=".repeat(60));
+            println!(
+                "Based on top {} unhandled commands in the last {since} days.\n",
+                suggestions.len()
+            );
+            println!("Add to ~/.config/coursers/course-correct-rules.json:\n");
+            println!("[");
+            for (i, s) in suggestions.iter().enumerate() {
+                let comma = if i + 1 < suggestions.len() { "," } else { "" };
+                println!("  {{");
+                println!("    \"id\": \"{}\",", s.id);
+                println!("    \"pattern\": \"{}\",", s.pattern.replace('"', "\\\""));
+                println!("    \"message\": \"{}\",", s.message);
+                println!("    \"enabled\": true");
+                println!("    // seen {} time(s) — example: {}", s.count, s.example);
+                println!("  }}{comma}");
+            }
+            println!("]");
+        }
+    }
+}
+
+fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
+    use crs_core::rules::load as load_rules;
+    use crs_core::state::{load as load_state, state_path};
+    use crs_core::stats::{load as load_stats, stats_path};
+
+    let rules_cfg = load_rules();
+    let stats_p = stats_path();
+    let stats = load_stats(&stats_p);
+
+    let state_p = state_path(&rules_cfg.failure_learning);
+    let state = load_state(&state_p);
+
+    // Build per-rule history from stats last_seen + failure state entries
+    #[derive(serde::Serialize)]
+    struct HistoryEntry {
+        rule_id: String,
+        last_seen_unix: f64,
+        last_seen_date: String,
+        block_count: u64,
+        command_preview: Option<String>,
+    }
+
+    let mut entries: Vec<HistoryEntry> = stats
+        .last_seen
+        .iter()
+        .filter(|(rule_id, _)| rule_filter.map(|f| f == rule_id.as_str()).unwrap_or(true))
+        .map(|(rule_id, &ts)| {
+            let date = format_unix_date(ts as u64);
+            let count = stats.blocks.get(rule_id).copied().unwrap_or(0);
+            // Best-effort: find a matching failure state entry for a command preview
+            let preview = state
+                .failures
+                .values()
+                .max_by(|a, b| {
+                    a.last_seen
+                        .partial_cmp(&b.last_seen)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+                .map(|e| e.command_preview.clone());
+            HistoryEntry {
+                rule_id: rule_id.clone(),
+                last_seen_unix: ts,
+                last_seen_date: date,
+                block_count: count,
+                command_preview: preview,
+            }
+        })
+        .collect();
+
+    entries.sort_by(|a, b| {
+        b.last_seen_unix
+            .partial_cmp(&a.last_seen_unix)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    entries.truncate(limit);
+
+    match format {
+        "json" => println!("{}", serde_json::to_string_pretty(&entries).unwrap()),
+        _ => {
+            if entries.is_empty() {
+                println!("No block history found.");
+                return;
+            }
+            println!("CRS History — Recent Rule Firings");
+            println!("{}", "=".repeat(70));
+            println!("{:<12}  {:<30}  {:>6}", "Last Seen", "Rule", "Blocks");
+            println!("{}", "-".repeat(54));
+            for e in &entries {
+                println!(
+                    "{:<12}  {:<30}  {:>6}",
+                    e.last_seen_date, e.rule_id, e.block_count
+                );
+                if let Some(ref preview) = e.command_preview {
+                    let p = if preview.len() > 60 {
+                        &preview[..60]
+                    } else {
+                        preview
+                    };
+                    println!("              └─ {p}");
+                }
+            }
+        }
+    }
+}
+
+fn cmd_export(out_path: Option<&str>) {
+    use crs_core::rules::load as load_rules;
+    use crs_core::state::{load as load_state, state_path};
+    use crs_core::stats::{load as load_stats, stats_path};
+
+    let rules_cfg = load_rules();
+    let stats = load_stats(&stats_path());
+    let state = load_state(&state_path(&rules_cfg.failure_learning));
+
+    let snapshot = serde_json::json!({
+        "exported_at": chrono::Local::now().to_rfc3339(),
+        "rules": rules_cfg.rules.iter().map(|r| serde_json::json!({
+            "id": r.id,
+            "enabled": r.enabled,
+            "pattern": r.pattern,
+            "pattern_flags": r.pattern_flags,
+            "exceptions": r.exceptions,
+            "message": r.message,
+        })).collect::<Vec<_>>(),
+        "failure_learning": {
+            "enabled": rules_cfg.failure_learning.enabled,
+            "block_threshold": rules_cfg.failure_learning.block_threshold,
+            "window_seconds": rules_cfg.failure_learning.window_seconds,
+            "max_tracked_commands": rules_cfg.failure_learning.max_tracked_commands,
+        },
+        "stats": {
+            "blocks": stats.blocks,
+            "last_seen": stats.last_seen,
+        },
+        "failure_state_entries": state.failures.len(),
+    });
+
+    let json = serde_json::to_string_pretty(&snapshot).unwrap();
+
+    match out_path {
+        Some(path) => {
+            std::fs::write(path, &json).unwrap_or_else(|e| {
+                eprintln!("crs export: failed to write {path}: {e}");
+                std::process::exit(1);
+            });
+            eprintln!("exported to {path}");
+        }
+        None => println!("{json}"),
+    }
+}
+
+fn cmd_heat(rule_filter: Option<&str>) {
+    use crs_core::heat::build;
+    use crs_core::stats::{load as load_stats, stats_path};
+
+    let stats = load_stats(&stats_path());
+
+    if stats.last_seen.is_empty() {
+        println!("No block history to plot — run some commands first.");
+        return;
+    }
+
+    // Build firing list from last_seen: one data point per rule (the most recent firing).
+    // This is sparse by design — stats only records the most recent timestamp per rule,
+    // not a full log. The heatmap shows *when rules last fired*, not full density.
+    let firings: Vec<(String, u64)> = stats
+        .last_seen
+        .iter()
+        .filter(|(rule_id, _)| rule_filter.map(|f| f == rule_id.as_str()).unwrap_or(true))
+        .map(|(rule_id, &ts)| (rule_id.clone(), ts as u64))
+        .collect();
+
+    if firings.is_empty() {
+        println!("No data for rule filter.");
+        return;
+    }
+
+    let hm = build(&firings);
+
+    let title = match rule_filter {
+        Some(r) => format!("CRS Heat — Rule firing times for [{r}]"),
+        None => "CRS Heat — Rule firing times (hour × day)".to_string(),
+    };
+    println!("{title}");
+    println!("{}", "=".repeat(title.len()));
+    println!("Total data points: {}", hm.total_blocks);
+    println!("(Note: one data point per rule — shows when each rule last fired)\n");
+    print!("{}", hm.render());
+}
+
+fn cmd_replay(session_path: Option<&str>, format: &str) {
+    use crs_core::replay::{format_text, replay};
+    use crs_core::rules::load as load_rules;
+
+    let rules_cfg = load_rules();
+
+    // Resolve session file: explicit path or most-recent .jsonl for current project
+    let jsonl_path: std::path::PathBuf = if let Some(p) = session_path {
+        std::path::PathBuf::from(p)
+    } else {
+        let root = std::env::var("CLAUDE_PROJECTS_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| dirs::home_dir().expect("home dir").join(".claude/projects"));
+        let current_dir = std::env::current_dir().ok();
+        find_most_recent_session(&root, current_dir.as_deref()).unwrap_or_else(|| {
+            eprintln!("crs replay: no session found for current project. Use --session <path>.");
+            std::process::exit(1);
+        })
+    };
+
+    // Parse commands from the JSONL file
+    let content = std::fs::read_to_string(&jsonl_path).unwrap_or_else(|e| {
+        eprintln!("crs replay: cannot read {}: {e}", jsonl_path.display());
+        std::process::exit(1);
+    });
+
+    let commands: Vec<String> = content
+        .lines()
+        .filter_map(|line| {
+            let v: serde_json::Value = serde_json::from_str(line).ok()?;
+            if v.get("type").and_then(|t| t.as_str()) != Some("assistant") {
+                return None;
+            }
+            v.get("message")
+                .and_then(|m| m.get("content"))
+                .and_then(|c| c.as_array())
+                .into_iter()
+                .flatten()
+                .find_map(|block| {
+                    if block.get("type").and_then(|t| t.as_str()) != Some("tool_use") {
+                        return None;
+                    }
+                    if block.get("name").and_then(|n| n.as_str()) != Some("Bash") {
+                        return None;
+                    }
+                    block
+                        .get("input")
+                        .and_then(|i| i.get("command"))
+                        .and_then(|c| c.as_str())
+                        .map(|s| s.to_string())
+                })
+        })
+        .collect();
+
+    if commands.is_empty() {
+        println!("No Bash commands found in {}", jsonl_path.display());
+        return;
+    }
+
+    let report = replay(&commands, &rules_cfg.rules);
+
+    match format {
+        "json" => {
+            let out = serde_json::json!({
+                "session": jsonl_path.display().to_string(),
+                "total": report.entries.len(),
+                "blocked": report.blocked,
+                "passed": report.passed,
+                "entries": report.entries.iter().map(|e| {
+                    match &e.verdict {
+                        crs_core::replay::ReplayVerdict::Blocked { rule_id, message } => serde_json::json!({
+                            "command": e.command,
+                            "verdict": "blocked",
+                            "rule_id": rule_id,
+                            "message": message,
+                        }),
+                        crs_core::replay::ReplayVerdict::Pass => serde_json::json!({
+                            "command": e.command,
+                            "verdict": "pass",
+                        }),
+                    }
+                }).collect::<Vec<_>>(),
+            });
+            println!("{}", serde_json::to_string_pretty(&out).unwrap());
+        }
+        _ => {
+            println!("Session: {}", jsonl_path.display());
+            print!("{}", format_text(&report));
+        }
+    }
+}
+
+/// Find the most recently modified `.jsonl` file matching the current project directory.
+fn find_most_recent_session(
+    root: &std::path::Path,
+    current_dir: Option<&std::path::Path>,
+) -> Option<std::path::PathBuf> {
+    use walkdir::WalkDir;
+
+    let cwd_str = current_dir.map(|p| p.to_string_lossy().to_string());
+
+    let mut best: Option<(std::time::SystemTime, std::path::PathBuf)> = None;
+
+    for entry in WalkDir::new(root)
+        .min_depth(1)
+        .max_depth(3)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.into_path();
+        if path.extension().map(|x| x == "jsonl").unwrap_or(false) && path.is_file() {
+            // Quick project filter: read first line, check cwd
+            if let Some(ref cwd) = cwd_str {
+                let ok = std::fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|s| s.lines().next().map(|l| l.to_string()))
+                    .and_then(|l| serde_json::from_str::<serde_json::Value>(&l).ok())
+                    .and_then(|v| {
+                        v.get("cwd")
+                            .and_then(|c| c.as_str())
+                            .map(|s| s == cwd.as_str())
+                    })
+                    .unwrap_or(false);
+                if !ok {
+                    continue;
+                }
+            }
+            if let Ok(meta) = std::fs::metadata(&path)
+                && let Ok(modified) = meta.modified()
+                && best.as_ref().map(|(t, _)| modified > *t).unwrap_or(true)
+            {
+                best = Some((modified, path));
+            }
+        }
+    }
+
+    best.map(|(_, p)| p)
+}
+
 #[cfg(test)]
 mod cli_tests {
     use super::*;
@@ -1041,7 +1534,9 @@ mod cli_tests {
     fn discover_default_no_generate_filters() {
         let cli = Cli::try_parse_from(["crs", "discover"]).unwrap();
         match cli.command {
-            Command::Discover { generate_filters, .. } => {
+            Command::Discover {
+                generate_filters, ..
+            } => {
                 assert!(!generate_filters);
             }
             _ => panic!("expected Discover"),
@@ -1052,7 +1547,9 @@ mod cli_tests {
     fn discover_generate_filters_flag() {
         let cli = Cli::try_parse_from(["crs", "discover", "--generate-filters"]).unwrap();
         match cli.command {
-            Command::Discover { generate_filters, .. } => {
+            Command::Discover {
+                generate_filters, ..
+            } => {
                 assert!(generate_filters);
             }
             _ => panic!("expected Discover"),
@@ -1086,11 +1583,15 @@ mod cli_tests {
 
         let content = std::fs::read_to_string(&path).unwrap();
         // existing pattern retained
-        assert!(content.contains("existing-pat"), "existing pattern must be retained");
+        assert!(
+            content.contains("existing-pat"),
+            "existing pattern must be retained"
+        );
         // new pattern added
         assert!(content.contains("new-pat"), "new pattern must be added");
         // no duplicate label — "existing" should appear exactly once as a label value
-        let label_count = content.lines()
+        let label_count = content
+            .lines()
             .filter(|l| l.trim() == "- label: existing")
             .count();
         assert_eq!(label_count, 1, "duplicate label must not be written twice");
@@ -1102,14 +1603,15 @@ mod cli_tests {
         use std::collections::HashMap;
 
         let config = RxPrefixConfig {
-            mappings: HashMap::from([
-                ("gh".to_string(), vec![
+            mappings: HashMap::from([(
+                "gh".to_string(),
+                vec![
                     "op".to_string(),
                     "plugin".to_string(),
                     "run".to_string(),
                     "--".to_string(),
-                ]),
-            ]),
+                ],
+            )]),
             candidate_prefixes: vec![],
             learn_on_successful_fallback: false,
         };
@@ -1120,14 +1622,16 @@ mod cli_tests {
 
     #[test]
     fn rx_learning_confirms_mapping_on_success() {
-        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, ProbeEntry, PrefixStore as _};
+        use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeEntry};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
         let probe_path = dir.path().join("rx-candidates.toml");
         let prefixes_path = dir.path().join("prefixes.toml");
 
-        let probe_store = FileProbeStore { path: probe_path.clone() };
+        let probe_store = FileProbeStore {
+            path: probe_path.clone(),
+        };
         probe_store.write(&[ProbeEntry {
             key: "gh".to_string(),
             prefix: vec![
@@ -1139,7 +1643,9 @@ mod cli_tests {
             original_command: "gh issue list".to_string(),
         }]);
 
-        let prefix_store = FilePrefixStore { path: prefixes_path.clone() };
+        let prefix_store = FilePrefixStore {
+            path: prefixes_path.clone(),
+        };
         apply_rx_learning("gh issue list", 0, &probe_store, &prefix_store);
 
         let config = prefix_store.load();
@@ -1157,22 +1663,26 @@ mod cli_tests {
 
     #[test]
     fn rx_learning_removes_probe_on_failure() {
-        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, ProbeEntry};
         use crs_core::rx_prefix::PrefixStore as _;
+        use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, ProbeEntry};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
         let probe_path = dir.path().join("rx-candidates.toml");
         let prefixes_path = dir.path().join("prefixes.toml");
 
-        let probe_store = FileProbeStore { path: probe_path.clone() };
+        let probe_store = FileProbeStore {
+            path: probe_path.clone(),
+        };
         probe_store.write(&[ProbeEntry {
             key: "gh".to_string(),
             prefix: vec!["op".to_string()],
             original_command: "gh issue list".to_string(),
         }]);
 
-        let prefix_store = FilePrefixStore { path: prefixes_path.clone() };
+        let prefix_store = FilePrefixStore {
+            path: prefixes_path.clone(),
+        };
         apply_rx_learning("gh issue list", 1, &probe_store, &prefix_store);
 
         assert!(probe_store.load().is_empty());
@@ -1193,12 +1703,16 @@ mod cli_tests {
 
     #[test]
     fn audit_state_empty_stores_returns_empty() {
-        use crs_core::rx_prefix::{FileProbeStore, FilePrefixStore, audit_state};
+        use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, audit_state};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
-        let prefix_store = FilePrefixStore { path: dir.path().join("prefixes.toml") };
-        let probe_store = FileProbeStore { path: dir.path().join("rx-candidates.toml") };
+        let prefix_store = FilePrefixStore {
+            path: dir.path().join("prefixes.toml"),
+        };
+        let probe_store = FileProbeStore {
+            path: dir.path().join("rx-candidates.toml"),
+        };
 
         let state = audit_state(&prefix_store, &probe_store);
         assert!(state.mappings.is_empty());
@@ -1208,18 +1722,27 @@ mod cli_tests {
     #[test]
     fn audit_state_returns_sorted_mappings_and_probes() {
         use crs_core::rx_prefix::{
-            FileProbeStore, FilePrefixStore, ProbeEntry, PrefixStore as _, ProbeStore as _,
+            FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeEntry, ProbeStore as _,
             audit_state,
         };
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
-        let prefix_store = FilePrefixStore { path: dir.path().join("prefixes.toml") };
-        let probe_store = FileProbeStore { path: dir.path().join("rx-candidates.toml") };
+        let prefix_store = FilePrefixStore {
+            path: dir.path().join("prefixes.toml"),
+        };
+        let probe_store = FileProbeStore {
+            path: dir.path().join("rx-candidates.toml"),
+        };
 
         prefix_store.confirm_mapping(
             "gh",
-            &["op".to_string(), "plugin".to_string(), "run".to_string(), "--".to_string()],
+            &[
+                "op".to_string(),
+                "plugin".to_string(),
+                "run".to_string(),
+                "--".to_string(),
+            ],
         );
         prefix_store.confirm_mapping(
             "cargo",
@@ -1247,7 +1770,15 @@ mod cli_tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("prefixes.toml");
         let store = FilePrefixStore { path: path.clone() };
-        store.confirm_mapping("gh", &["op".to_string(), "plugin".to_string(), "run".to_string(), "--".to_string()]);
+        store.confirm_mapping(
+            "gh",
+            &[
+                "op".to_string(),
+                "plugin".to_string(),
+                "run".to_string(),
+                "--".to_string(),
+            ],
+        );
 
         assert!(store.remove_mapping("gh"));
         assert!(store.load().mappings.is_empty());

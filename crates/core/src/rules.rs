@@ -97,12 +97,16 @@ pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
         } else {
             rule.pattern.clone()
         };
-        let Ok(re) = Regex::new(&pattern_str) else { continue };
+        let Ok(re) = Regex::new(&pattern_str) else {
+            continue;
+        };
         if !re.is_match(command) {
             continue;
         }
         let excepted = rule.exceptions.iter().any(|exc| {
-            Regex::new(exc).map(|re| re.is_match(command)).unwrap_or(false)
+            Regex::new(exc)
+                .map(|re| re.is_match(command))
+                .unwrap_or(false)
         });
         if excepted {
             continue;
@@ -142,9 +146,10 @@ pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
             continue;
         }
 
-        let msg = rule.message.clone().unwrap_or_else(|| {
-            format!("Blocked by rule '{}'.", rule.id)
-        });
+        let msg = rule
+            .message
+            .clone()
+            .unwrap_or_else(|| format!("Blocked by rule '{}'.", rule.id));
         return Some((rule.id.clone(), msg));
     }
     None
@@ -215,6 +220,63 @@ mod tests {
     fn rule_custom_message_returned() {
         let mut rule = make_rule("no-grep", r"\bgrep\b");
         rule.message = Some("Use the Grep tool.".to_string());
-        assert_eq!(check("grep foo .", &[rule]).unwrap().1, "Use the Grep tool.");
+        assert_eq!(
+            check("grep foo .", &[rule]).unwrap().1,
+            "Use the Grep tool."
+        );
+    }
+
+    // ── no-nvm-use-mise rule ──────────────────────────────────────────────
+
+    fn nvm_rule() -> Rule {
+        Rule {
+            id: "no-nvm-use-mise".to_string(),
+            enabled: true,
+            pattern: r"(?:^|\s)nvm\b".to_string(),
+            pattern_flags: String::new(),
+            exceptions: vec![],
+            message: Some(
+                "Use `mise use node@<version>` instead of nvm. \
+                 Example: `mise use node@20` or `mise use --global node@lts`."
+                    .to_string(),
+            ),
+        }
+    }
+
+    #[test]
+    fn nvm_rule_blocks_nvm_install() {
+        assert!(check("nvm install 20", &[nvm_rule()]).is_some());
+    }
+
+    #[test]
+    fn nvm_rule_blocks_nvm_use() {
+        assert!(check("nvm use 18", &[nvm_rule()]).is_some());
+    }
+
+    #[test]
+    fn nvm_rule_blocks_nvm_alias() {
+        assert!(check("nvm alias default 20", &[nvm_rule()]).is_some());
+    }
+
+    #[test]
+    fn nvm_rule_blocks_nvm_ls() {
+        assert!(check("nvm ls", &[nvm_rule()]).is_some());
+    }
+
+    #[test]
+    fn nvm_rule_passes_mise_use_node() {
+        assert!(check("mise use node@20", &[nvm_rule()]).is_none());
+    }
+
+    #[test]
+    fn nvm_rule_message_mentions_mise() {
+        let (_, msg) = check("nvm install 20", &[nvm_rule()]).unwrap();
+        assert!(msg.contains("mise"));
+    }
+
+    #[test]
+    fn nvm_rule_id_is_correct() {
+        let (rule_id, _) = check("nvm install 20", &[nvm_rule()]).unwrap();
+        assert_eq!(rule_id, "no-nvm-use-mise");
     }
 }
