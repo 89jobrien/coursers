@@ -34,6 +34,9 @@ enum Command {
         /// Generate .ctx/obfsck-filters.yaml from unhandled command examples
         #[arg(long)]
         generate_filters: bool,
+        /// Only show commands seen at least N times (default: 1 = show all)
+        #[arg(long, default_value = "1")]
+        min_count: u64,
     },
     /// Validate rules: check patterns compile, examples fire, exceptions work, alternatives on PATH
     Validate,
@@ -133,8 +136,9 @@ fn main() {
             since,
             format,
             generate_filters,
+            min_count,
         } => {
-            cmd_discover(all, limit, since, &format, generate_filters);
+            cmd_discover(all, limit, since, &format, generate_filters, min_count);
         }
         Command::Validate => cmd_validate(),
         Command::Probe => cmd_probe(),
@@ -611,7 +615,14 @@ fn cmd_probe() {
     }
 }
 
-fn cmd_discover(all: bool, limit: usize, since: u32, format: &str, generate_filters: bool) {
+fn cmd_discover(
+    all: bool,
+    limit: usize,
+    since: u32,
+    format: &str,
+    generate_filters: bool,
+    min_count: u64,
+) {
     use crs_core::history::{DiscoverOpts, discover};
     use crs_core::obfsck::ObfsckMcp as _;
     use crs_core::rtk::RtkAnalysis as _;
@@ -631,11 +642,13 @@ fn cmd_discover(all: bool, limit: usize, since: u32, format: &str, generate_filt
         since_days: Some(since),
         all_projects: all,
         current_dir,
+        min_count,
     };
 
     let report = discover(&src, &rules_cfg.rules, &opts);
 
     // Enrich with RTK data if rtk is on PATH.
+
     // Build stem -> (rtk_equivalent, est_savings_tokens, est_savings_pct) lookup.
     let rtk_map: HashMap<String, (String, u64, f64)> = crs_lib::rtk::detect()
         .and_then(|c| c.discover(since))
@@ -1181,6 +1194,7 @@ fn cmd_suggest(all: bool, since: u32, limit: usize, format: &str) {
         since_days: Some(since),
         all_projects: all,
         current_dir,
+        min_count: 1, // suggest always scans all frequencies
     };
 
     let report = discover(&src, &rules_cfg.rules, &opts);

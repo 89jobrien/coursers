@@ -12,7 +12,10 @@ pub fn stem_of(command: &str) -> String {
     }
 
     // Strip leading KEY=val env assignments
-    let start = tokens.iter().take_while(|t| t.contains('=') && !t.starts_with('-')).count();
+    let start = tokens
+        .iter()
+        .take_while(|t| t.contains('=') && !t.starts_with('-'))
+        .count();
     let tokens = &tokens[start..];
     if tokens.is_empty() {
         return String::new();
@@ -32,9 +35,9 @@ pub fn stem_of(command: &str) -> String {
     base.to_string()
 }
 
+use crate::rules::Rule;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use crate::rules::Rule;
 
 pub struct CommandRecord {
     pub command: String,
@@ -54,6 +57,8 @@ pub struct DiscoverOpts {
     pub since_days: Option<u32>,
     pub all_projects: bool,
     pub current_dir: Option<PathBuf>,
+    /// Filter out entries with count below this threshold. 0 or 1 means show all.
+    pub min_count: u64,
 }
 
 impl Default for DiscoverOpts {
@@ -63,6 +68,7 @@ impl Default for DiscoverOpts {
             since_days: Some(30),
             all_projects: false,
             current_dir: None,
+            min_count: 1,
         }
     }
 }
@@ -125,7 +131,11 @@ pub fn discover(
         // including exception evaluation, so discover matches what actually fires.
         let rule_id = crate::rules::matched_rule_id(&rec.command, rules);
 
-        let bucket = if rule_id.is_some() { &mut intercepted } else { &mut unhandled };
+        let bucket = if rule_id.is_some() {
+            &mut intercepted
+        } else {
+            &mut unhandled
+        };
         let entry = bucket.entry(stem.clone()).or_insert_with(|| CommandFreq {
             stem: stem.clone(),
             count: 0,
@@ -141,9 +151,18 @@ pub fn discover(
         }
     }
 
+    // Apply min_count filter (0 treated as 1 — show all singletons)
+    let threshold = opts.min_count.max(1);
+    let mut intercepted: Vec<CommandFreq> = intercepted
+        .into_values()
+        .filter(|f| f.count >= threshold)
+        .collect();
+    let mut unhandled: Vec<CommandFreq> = unhandled
+        .into_values()
+        .filter(|f| f.count >= threshold)
+        .collect();
+
     // Sort by count desc, truncate to limit
-    let mut intercepted: Vec<CommandFreq> = intercepted.into_values().collect();
-    let mut unhandled: Vec<CommandFreq> = unhandled.into_values().collect();
     intercepted.sort_by(|a, b| b.count.cmp(&a.count));
     unhandled.sort_by(|a, b| b.count.cmp(&a.count));
     if opts.limit > 0 {
@@ -275,10 +294,14 @@ mod tests {
             make_record("doob todo list", "/project"),
             make_record("doob todo list", "/project"),
         ]);
-        let report = discover(&src, &[], &DiscoverOpts {
-            all_projects: true,
-            ..Default::default()
-        });
+        let report = discover(
+            &src,
+            &[],
+            &DiscoverOpts {
+                all_projects: true,
+                ..Default::default()
+            },
+        );
         assert_eq!(report.scanned_commands, 3);
         assert_eq!(report.unhandled.len(), 1);
         assert_eq!(report.unhandled[0].stem, "doob todo");
@@ -292,10 +315,14 @@ mod tests {
             make_record("cargo nextest run -p foo", "/project"),
         ]);
         let rules = vec![make_rule("no-nextest", r"cargo nextest")];
-        let report = discover(&src, &rules, &DiscoverOpts {
-            all_projects: true,
-            ..Default::default()
-        });
+        let report = discover(
+            &src,
+            &rules,
+            &DiscoverOpts {
+                all_projects: true,
+                ..Default::default()
+            },
+        );
         assert_eq!(report.intercepted.len(), 1);
         assert_eq!(report.intercepted[0].stem, "cargo nextest");
         assert_eq!(report.intercepted[0].count, 2);
@@ -308,22 +335,34 @@ mod tests {
             make_record("doob todo", "/project/a"),
             make_record("doob todo", "/project/b"),
         ]);
-        let report = discover(&src, &[], &DiscoverOpts {
-            all_projects: false,
-            current_dir: Some(PathBuf::from("/project/a")),
-            ..Default::default()
-        });
+        let report = discover(
+            &src,
+            &[],
+            &DiscoverOpts {
+                all_projects: false,
+                current_dir: Some(PathBuf::from("/project/a")),
+                ..Default::default()
+            },
+        );
         assert_eq!(report.scanned_commands, 1);
     }
 
     #[test]
     fn discover_respects_limit() {
-        let src = VecSource((0..20).map(|i| make_record(&format!("cmd{i} sub"), "/p")).collect());
-        let report = discover(&src, &[], &DiscoverOpts {
-            limit: 5,
-            all_projects: true,
-            ..Default::default()
-        });
+        let src = VecSource(
+            (0..20)
+                .map(|i| make_record(&format!("cmd{i} sub"), "/p"))
+                .collect(),
+        );
+        let report = discover(
+            &src,
+            &[],
+            &DiscoverOpts {
+                limit: 5,
+                all_projects: true,
+                ..Default::default()
+            },
+        );
         assert!(report.unhandled.len() <= 5);
     }
 
@@ -340,12 +379,104 @@ mod tests {
             r
         };
         let src = VecSource(vec![old, new_rec]);
-        let report = discover(&src, &[], &DiscoverOpts {
-            since_days: Some(30),
-            all_projects: true,
-            ..Default::default()
-        });
+        let report = discover(
+            &src,
+            &[],
+            &DiscoverOpts {
+                since_days: Some(30),
+                all_projects: true,
+                ..Default::default()
+            },
+        );
         assert_eq!(report.scanned_commands, 1);
         assert_eq!(report.unhandled[0].stem, "new cmd");
+    }
+
+    #[test]
+    fn discover_min_count_filters_low_frequency_unhandled() {
+        // cmd-a appears 3 times, cmd-b appears 1 time
+        let records = vec![
+            make_record("cmd-a sub", "/p"),
+            make_record("cmd-a sub", "/p"),
+            make_record("cmd-a sub", "/p"),
+            make_record("cmd-b sub", "/p"),
+        ];
+        let src = VecSource(records);
+        let report = discover(
+            &src,
+            &[],
+            &DiscoverOpts {
+                all_projects: true,
+                min_count: 2,
+                ..Default::default()
+            },
+        );
+        assert_eq!(report.unhandled.len(), 1);
+        assert_eq!(report.unhandled[0].stem, "cmd-a");
+    }
+
+    #[test]
+    fn discover_min_count_filters_low_frequency_intercepted() {
+        let records = vec![
+            make_record("grep foo .", "/p"),
+            make_record("grep bar .", "/p"),
+            make_record("grep baz .", "/p"),
+            make_record("grep once .", "/p"),
+        ];
+        // Use two different rule-matching stems with different frequencies
+        let records = vec![
+            make_record("grep foo .", "/p"), // count 1 — below threshold
+            make_record("ls -la", "/p"),     // count 3 — above threshold
+            make_record("ls /tmp", "/p"),
+            make_record("ls /usr", "/p"),
+        ];
+        let rules = vec![
+            make_rule("no-grep", r"\bgrep\b"),
+            make_rule("no-ls", r"\bls\b"),
+        ];
+        let src = VecSource(records);
+        let report = discover(
+            &src,
+            &rules,
+            &DiscoverOpts {
+                all_projects: true,
+                min_count: 2,
+                ..Default::default()
+            },
+        );
+        // grep intercepted once — filtered out; ls intercepted 3 times — kept
+        assert_eq!(report.intercepted.len(), 1);
+        assert_eq!(report.intercepted[0].stem, "ls");
+    }
+
+    #[test]
+    fn discover_min_count_default_one_shows_all() {
+        let src = VecSource(vec![make_record("rare cmd here", "/p")]);
+        let report = discover(
+            &src,
+            &[],
+            &DiscoverOpts {
+                all_projects: true,
+                min_count: 1,
+                ..Default::default()
+            },
+        );
+        assert_eq!(report.unhandled.len(), 1);
+    }
+
+    #[test]
+    fn discover_min_count_zero_treated_as_one() {
+        let src = VecSource(vec![make_record("rare cmd here", "/p")]);
+        let report = discover(
+            &src,
+            &[],
+            &DiscoverOpts {
+                all_projects: true,
+                min_count: 0,
+                ..Default::default()
+            },
+        );
+        // min_count 0 is treated same as 1 — show everything
+        assert_eq!(report.unhandled.len(), 1);
     }
 }
