@@ -51,16 +51,24 @@ impl FiltersConfig {
 }
 
 /// Resolve the active filters config using the hierarchy:
-/// 1. `.ctx/crs-filters.toml` (project-local, wins)
-/// 2. `~/.config/crs/filters.toml` (global fallback)
+/// 1. `CRS_FILTERS` env var (explicit override)
+/// 2. `.ctx/crs-filters.toml` walking up from CWD to filesystem root
+/// 3. `~/.config/crs/filters.toml` (global fallback)
 pub fn filters_path() -> Option<PathBuf> {
     if let Ok(p) = std::env::var("CRS_FILTERS") {
         return Some(PathBuf::from(p));
     }
 
-    let local = std::path::Path::new(".ctx/crs-filters.toml");
-    if local.exists() {
-        return Some(local.to_path_buf());
+    if let Ok(mut dir) = std::env::current_dir() {
+        loop {
+            let candidate = dir.join(".ctx/crs-filters.toml");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
     }
 
     let global = dirs::home_dir()?.join(".config/crs/filters.toml");
@@ -201,6 +209,35 @@ mode = "truncate"
     }
 
     #[test]
+    fn walks_up_to_find_filters() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Create .ctx/crs-filters.toml in the grandparent
+        let ctx = tmp.path().join(".ctx");
+        std::fs::create_dir_all(&ctx).unwrap();
+        let toml_path = ctx.join("crs-filters.toml");
+        std::fs::write(
+            &toml_path,
+            "[[filters]]\npattern = \"walk-test\"\nmode = \"passthrough\"\n",
+        )
+        .unwrap();
+
+        // Create a nested child dir to start from
+        let child = tmp.path().join("a").join("b");
+        std::fs::create_dir_all(&child).unwrap();
+
+        // Save and restore CWD
+        let orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(&child).unwrap();
+        let result = filters_path();
+        std::env::set_current_dir(&orig).unwrap();
+
+        assert_eq!(
+            result.unwrap().canonicalize().unwrap(),
+            toml_path.canonicalize().unwrap()
+        );
+    }
+
+    #[test]
     fn env_override_takes_precedence() {
         let f = write_toml(
             r#"
@@ -312,10 +349,22 @@ mod redaction_tests {
         let filters = make_obfsck_filters(&[("api-key", r"sk-[A-Za-z0-9]{10,}")]);
         let output = "some output\nsk-abc1234567890 is a secret\nclean line";
         let result = apply_redaction(output, &filters);
-        assert!(result.contains("[REDACTED]"), "matching line must be redacted");
-        assert!(result.contains("some output"), "non-matching lines must be preserved");
-        assert!(result.contains("clean line"), "non-matching lines must be preserved");
-        assert!(!result.contains("sk-abc1234567890"), "secret must not appear in output");
+        assert!(
+            result.contains("[REDACTED]"),
+            "matching line must be redacted"
+        );
+        assert!(
+            result.contains("some output"),
+            "non-matching lines must be preserved"
+        );
+        assert!(
+            result.contains("clean line"),
+            "non-matching lines must be preserved"
+        );
+        assert!(
+            !result.contains("sk-abc1234567890"),
+            "secret must not appear in output"
+        );
     }
 
     #[test]
@@ -344,7 +393,11 @@ mod redaction_tests {
     fn load_obfsck_filters_parses_yaml() {
         use std::io::Write as _;
         let mut f = tempfile::NamedTempFile::new().unwrap();
-        write!(f, "filters:\n  - label: test\n    pattern: \"secret-[0-9]+\"\n").unwrap();
+        write!(
+            f,
+            "filters:\n  - label: test\n    pattern: \"secret-[0-9]+\"\n"
+        )
+        .unwrap();
         let filters = ObfsckFilters::load_from(f.path());
         assert_eq!(filters.filters.len(), 1);
         assert_eq!(filters.filters[0].label, "test");
