@@ -2,17 +2,25 @@
 # enrich-handoff.nu — write .ctx/HANDOFF.tools.yaml and update .ctx/HANDOFF.state.yaml
 # Usage: nu scripts/enrich-handoff.nu [--since <int>]
 
+# yaml_quote: return a JSON-quoted string safe for embedding in YAML scalar positions.
+# e.g. yaml_quote "hello \"world\"" => "\"hello \\\"world\\\"\""
+def yaml_quote [s: string]: nothing -> string {
+    $s | to json
+}
+
 def main [--since: int = 1] {
     # Verify rtk is on PATH — first? returns null on empty list rather than crashing
     let rtk_path = (which rtk | get path | first?)
     if $rtk_path == null {
-        exit 0
+        print --stderr "enrich-handoff: rtk not found on PATH, aborting"
+        exit 1
     }
 
     # Resolve repo root via handoff-detect
     let root_result = (do { handoff-detect --root } | complete)
     if $root_result.exit_code != 0 {
-        exit 0
+        print --stderr "enrich-handoff: handoff-detect --root failed, aborting"
+        exit 1
     }
     let root = ($root_result.stdout | str trim)
     let ctx = ($root | path join ".ctx")
@@ -23,7 +31,8 @@ def main [--since: int = 1] {
     # Run rtk discover
     let discover_result = (do { rtk discover --format json --since $since } | complete)
     if $discover_result.exit_code != 0 {
-        exit 0
+        print --stderr "enrich-handoff: rtk discover failed, aborting"
+        exit 1
     }
     let data = ($discover_result.stdout | from json)
 
@@ -59,7 +68,7 @@ def write_tools_yaml [ctx: string, data: record, since: int] {
     )
 
     let lines = [
-        $"generated: ($today)"
+        $"generated: (yaml_quote $today)"
         $"since_days: ($since)"
         $"sessions_scanned: ($data.sessions_scanned)"
         $"total_commands: ($data.total_commands)"
@@ -67,9 +76,9 @@ def write_tools_yaml [ctx: string, data: record, since: int] {
     ] ++ (
         $top_supported | each {|r|
             [
-                $"  - command: ($r.command)"
+                $"  - command: (yaml_quote $r.command)"
                 $"    count: ($r.count)"
-                $"    rtk_equivalent: ($r.rtk_equivalent)"
+                $"    rtk_equivalent: (yaml_quote $r.rtk_equivalent)"
                 $"    est_savings_tokens: ($r.est_savings_tokens)"
                 $"    est_savings_pct: ($r.est_savings_pct)"
             ]
@@ -77,9 +86,9 @@ def write_tools_yaml [ctx: string, data: record, since: int] {
     ) ++ ["top_unhandled:"] ++ (
         $top_unhandled | each {|r|
             [
-                $"  - base_command: ($r.base_command)"
+                $"  - base_command: (yaml_quote $r.base_command)"
                 $"    count: ($r.count)"
-                $"    example: \"($r.example | str replace '"' '\"')\""
+                $"    example: (yaml_quote $r.example)"
             ]
         } | flatten
     )
@@ -106,9 +115,9 @@ def merge_state_yaml [ctx: string, data: record] {
         "tool_usage:"
         $"  sessions_scanned: ($data.sessions_scanned)"
         $"  total_commands: ($data.total_commands)"
-        $"  top_command: \"($top_cmd)\""
+        $"  top_command: (yaml_quote $top_cmd)"
         $"  est_savings_tokens: ($total_savings)"
-        $"  unhandled_top: \"($top_unhandled)\""
+        $"  unhandled_top: (yaml_quote $top_unhandled)"
     ] | str join "\n"
 
     # Read existing state, strip any previous tool_usage block, append new one

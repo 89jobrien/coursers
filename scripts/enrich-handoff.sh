@@ -8,8 +8,11 @@ set -e
 SINCE=1
 while [ "$#" -gt 0 ]; do
     case "$1" in
-        --since) SINCE="$2"; shift 2 ;;
-        *) shift ;;
+    --since)
+        SINCE="$2"
+        shift 2
+        ;;
+    *) shift ;;
     esac
 done
 
@@ -43,6 +46,13 @@ trap 'rm -f "$TMP" "$TMP_TOOLS" "$TMP_STATE"' EXIT
 TMP_TOOLS=$(mktemp)
 TMP_STATE=$(mktemp)
 
+# --- yaml_quote: emit a JSON-quoted string safe for YAML plain scalars ---
+# Usage: yaml_quote <string>
+# Outputs a double-quoted JSON string (e.g. "hello \"world\"")
+yaml_quote() {
+    printf '%s' "$1" | jq -Rs .
+}
+
 # --- run rtk discover and validate JSON output ---
 
 if ! rtk discover --format json --since "$SINCE" >"$TMP" 2>/tmp/_rtk_err; then
@@ -60,8 +70,8 @@ jqf() { jq -r -L "$JQ_LIB" "include \"enrich-handoff\"; $1" "$TMP"; }
 # --- write HANDOFF.tools.yaml (atomic via tmp file) ---
 
 {
-    echo "generated: $TODAY"
-    echo "since_days: $SINCE"
+    printf 'generated: %s\n' "$(yaml_quote "$TODAY")"
+    printf 'since_days: %s\n' "$SINCE"
     jqf 'sessions_scanned'
     jqf 'total_commands'
     echo "top_supported:"
@@ -81,15 +91,15 @@ TOTAL=$(jqf '.total_commands')
 
 BLOCK=$(printf 'tool_usage:\n  sessions_scanned: %s\n  total_commands: %s\n  top_command: %s\n  est_savings_tokens: %s\n  unhandled_top: %s' \
     "$SESSIONS" "$TOTAL" \
-    "$(printf '%s' "$TOP_CMD" | jq -Rs .)" \
+    "$(yaml_quote "$TOP_CMD")" \
     "$TOTAL_SAVINGS" \
-    "$(printf '%s' "$UNHANDLED_TOP" | jq -Rs .)")
+    "$(yaml_quote "$UNHANDLED_TOP")")
 
 # Strip previous tool_usage block (everything from that line onward), append new one
 if [ -f "$STATE_FILE" ]; then
-    STRIPPED=$(awk '/^tool_usage:/{exit} {print}' "$STATE_FILE" | \
-        sed 's/[[:space:]]*$//' | \
-        awk 'NF{last=NR} {lines[NR]=$0} END{for(i=1;i<=last;i++) print lines[i]}')
+    STRIPPED=$(awk '/^tool_usage:/{exit} {print}' "$STATE_FILE" \
+        | sed 's/[[:space:]]*$//' \
+        | awk 'NF{last=NR} {lines[NR]=$0} END{for(i=1;i<=last;i++) print lines[i]}')
 else
     STRIPPED=""
 fi
