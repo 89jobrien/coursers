@@ -1,3 +1,8 @@
+---
+status: partial
+note: Tasks 3-6 are unexecuted and target external plugin files
+---
+
 # Handoff Tool Usage Enrichment Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
@@ -20,19 +25,20 @@ text — no parser dependency), `handoff-detect --root`
 
 ## File Map
 
-| File | Action | Responsibility |
-|------|--------|----------------|
-| `scripts/enrich-handoff.nu` | Create | Primary script — nu implementation |
-| `scripts/enrich-handoff.sh` | Create | POSIX fallback — identical output schema |
-| `~/.claude/plugins/hand/hand/skills/handoff/skill.md` | Modify | Call enrich script after state write (step 5) |
-| `~/.claude/plugins/hand/hand/skills/handon/skill.md` | Modify | Surface `tool_usage` summary after state read |
-| `~/.claude/plugins/hand/hand/skills/handover/skill.md` | Modify | Add Tool Usage section + Mermaid chart |
+| File                                                   | Action | Responsibility                                |
+| ------------------------------------------------------ | ------ | --------------------------------------------- |
+| `scripts/enrich-handoff.nu`                            | Create | Primary script — nu implementation            |
+| `scripts/enrich-handoff.sh`                            | Create | POSIX fallback — identical output schema      |
+| `~/.claude/plugins/hand/hand/skills/handoff/skill.md`  | Modify | Call enrich script after state write (step 5) |
+| `~/.claude/plugins/hand/hand/skills/handon/skill.md`   | Modify | Surface `tool_usage` summary after state read |
+| `~/.claude/plugins/hand/hand/skills/handover/skill.md` | Modify | Add Tool Usage section + Mermaid chart        |
 
 ---
 
 ## Task 1: Write `scripts/enrich-handoff.nu`
 
 **Files:**
+
 - Create: `scripts/enrich-handoff.nu`
 
 - [ ] **Step 1: Validate nu syntax stub compiles**
@@ -212,6 +218,7 @@ git commit -m "feat(scripts): add enrich-handoff.nu — RTK tool usage enrichmen
 ## Task 2: Write `scripts/enrich-handoff.sh` (POSIX fallback)
 
 **Files:**
+
 - Create: `scripts/enrich-handoff.sh`
 
 - [ ] **Step 1: Write the script**
@@ -363,6 +370,7 @@ git commit -m "feat(scripts): add enrich-handoff.sh — POSIX fallback for RTK e
 ## Task 3: Update `hand:off` skill to call enrich script
 
 **Files:**
+
 - Modify: `~/.claude/plugins/hand/hand/skills/handoff/skill.md`
 
 The existing step 5 ("Write .ctx/HANDOFF.state.yaml") needs a new step 5b inserted after it,
@@ -378,7 +386,7 @@ text around step 5 and step 6.
 After the paragraph that ends with "Overwrite completely with current state from step 1.",
 insert:
 
-```markdown
+````markdown
 ### 5b. Enrich with tool usage data
 
 Run the enrich script to write `.ctx/HANDOFF.tools.yaml` and add a `tool_usage` summary
@@ -391,9 +399,11 @@ else
   sh "$(git rev-parse --show-toplevel)/scripts/enrich-handoff.sh" 2>/dev/null || true
 fi
 ```
+````
 
 Non-blocking: if `rtk` is absent or the script fails, continue without error.
-```
+
+````
 
 - [ ] **Step 3: Verify edit looks correct**
 
@@ -405,13 +415,14 @@ Re-read the modified file. Confirm step numbering flows: …5. Write state → 5
 cd ~/.claude/plugins/hand
 git add hand/skills/handoff/skill.md
 git commit -m "feat(handoff): call enrich-handoff script after state write (step 5b)"
-```
+````
 
 ---
 
 ## Task 4: Update `hand:on` skill to surface tool usage summary
 
 **Files:**
+
 - Modify: `~/.claude/plugins/hand/hand/skills/handon/skill.md`
 
 - [ ] **Step 1: Locate insertion point**
@@ -429,22 +440,27 @@ After the doob sync block and before "### 3. Review on wake", insert:
 
 After reading `.ctx/HANDOFF.state.yaml`, check for a `tool_usage` key. If present, emit
 a one-line summary before proceeding:
-
 ```
+
 Tool usage (last session): <total_commands> commands · ~<est_savings_tokens_rounded> tokens
 saveable · top unhandled: <unhandled_top>
+
 ```
 
 Example:
 ```
+
 Tool usage (last session): 414 commands · ~19K tokens saveable · top unhandled: op account (19)
+
 ```
 
 Round `est_savings_tokens` to nearest K when ≥1000 (e.g. 19217 → ~19K).
 
 If `.ctx/HANDOFF.tools.yaml` also exists, add one line:
 ```
-  Full tool usage detail in .ctx/HANDOFF.tools.yaml
+
+Full tool usage detail in .ctx/HANDOFF.tools.yaml
+
 ```
 
 Skip silently if `tool_usage` key is absent from state.
@@ -467,6 +483,7 @@ git commit -m "feat(handon): surface tool_usage summary after state read (step 2
 ## Task 5: Update `hand:over` skill to add Tool Usage section
 
 **Files:**
+
 - Modify: `~/.claude/plugins/hand/hand/skills/handover/skill.md`
 
 - [ ] **Step 1: Read current output structure section**
@@ -490,7 +507,7 @@ In the numbered output sections list, insert after "4. **Log**":
 
 After the "### Review on Wake" section description and before "## Mermaid Diagrams", insert:
 
-```markdown
+````markdown
 ### Tool Usage
 
 Read `.ctx/HANDOFF.tools.yaml` from the repo root if it exists. If absent, skip this section.
@@ -500,14 +517,15 @@ Emit:
 **Summary table:**
 
 ```markdown
-| Metric | Value |
-|--------|-------|
-| Sessions scanned | <sessions_scanned> |
-| Total commands | <total_commands> |
-| Top command | <top_supported[0].command> (<top_supported[0].count>x) |
-| Est. savings | ~<sum of est_savings_tokens rounded>K tokens |
-| Top unhandled | <top_unhandled[0].base_command> (<top_unhandled[0].count>x) |
+| Metric           | Value                                                       |
+| ---------------- | ----------------------------------------------------------- |
+| Sessions scanned | <sessions_scanned>                                          |
+| Total commands   | <total_commands>                                            |
+| Top command      | <top_supported[0].command> (<top_supported[0].count>x)      |
+| Est. savings     | ~<sum of est_savings_tokens rounded>K tokens                |
+| Top unhandled    | <top_unhandled[0].base_command> (<top_unhandled[0].count>x) |
 ```
+````
 
 **Mermaid bar chart** (top 5 commands by count from `top_supported` + `top_unhandled` combined,
 labeled by command stem):
@@ -521,11 +539,13 @@ xychart-beta
 ```
 
 Rules:
+
 - Use up to 5 entries total: take top 3 from `top_supported`, top 2 from `top_unhandled`
 - Truncate command labels to 15 chars max
 - Round y-axis max to next multiple of 20 above the highest count
 - If fewer than 2 entries total, emit summary table only (no chart)
-```
+
+````
 
 - [ ] **Step 4: Verify**
 
@@ -539,7 +559,7 @@ in the output structure. Confirm chart rules reference the correct YAML field na
 cd ~/.claude/plugins/hand
 git add hand/skills/handover/skill.md
 git commit -m "feat(handover): add Tool Usage section with summary table and xychart"
-```
+````
 
 ---
 
