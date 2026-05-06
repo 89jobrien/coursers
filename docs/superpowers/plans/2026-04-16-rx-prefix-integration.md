@@ -1,3 +1,7 @@
+---
+status: done
+---
+
 # rx Prefix Integration Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
@@ -20,17 +24,18 @@ redaction for learning. A `PrefixStore` trait keeps file I/O out of unit tests.
 
 ## File Map
 
-| File | Action | Responsibility |
-|------|--------|----------------|
+| File                           | Action | Responsibility                                         |
+| ------------------------------ | ------ | ------------------------------------------------------ |
 | `crates/core/src/rx_prefix.rs` | Create | All rx-prefix logic: types, parsing, rewrite, learning |
-| `crates/core/src/lib.rs` | Modify | `pub mod rx_prefix;` |
-| `crates/crs/src/main.rs` | Modify | Wire rx_prefix into `cmd_rewrite` and `cmd_filter` |
+| `crates/core/src/lib.rs`       | Modify | `pub mod rx_prefix;`                                   |
+| `crates/crs/src/main.rs`       | Modify | Wire rx_prefix into `cmd_rewrite` and `cmd_filter`     |
 
 ---
 
 ## Task 1: Shell segment splitter
 
 **Files:**
+
 - Create: `crates/core/src/rx_prefix.rs`
 - Modify: `crates/core/src/lib.rs`
 
@@ -208,6 +213,7 @@ redaction for learning. A `PrefixStore` trait keeps file I/O out of unit tests.
 ## Task 2: TOML types + `PrefixStore` trait + file loader
 
 **Files:**
+
 - Modify: `crates/core/src/rx_prefix.rs`
 
 - [ ] **Step 1: Write the failing tests**
@@ -367,6 +373,7 @@ redaction for learning. A `PrefixStore` trait keeps file I/O out of unit tests.
 ## Task 3: Prefix lookup — two-word key, single-word key, candidate fallback
 
 **Files:**
+
 - Modify: `crates/core/src/rx_prefix.rs`
 
 - [ ] **Step 1: Write the failing tests**
@@ -522,6 +529,7 @@ redaction for learning. A `PrefixStore` trait keeps file I/O out of unit tests.
 ## Task 4: Full command rewriter + candidate probe recorder
 
 **Files:**
+
 - Modify: `crates/core/src/rx_prefix.rs`
 
 - [ ] **Step 1: Write the failing tests**
@@ -673,6 +681,7 @@ redaction for learning. A `PrefixStore` trait keeps file I/O out of unit tests.
 ## Task 5: Candidate probe TOML persistence
 
 **Files:**
+
 - Modify: `crates/core/src/rx_prefix.rs`
 
 The probe store persists `ProbeEntry` records to `.ctx/rx-candidates.toml` so that
@@ -835,6 +844,7 @@ The probe store persists `ProbeEntry` records to `.ctx/rx-candidates.toml` so th
 ## Task 6: Wire into `cmd_rewrite`
 
 **Files:**
+
 - Modify: `crates/crs/src/main.rs`
 
 - [ ] **Step 1: Write the failing integration test**
@@ -951,6 +961,7 @@ The probe store persists `ProbeEntry` records to `.ctx/rx-candidates.toml` so th
 ## Task 7: Post-hook learning in `cmd_filter`
 
 **Files:**
+
 - Modify: `crates/crs/src/main.rs`
 
 When a candidate-prefixed command succeeds (exit_code == 0), confirm the mapping into
@@ -1109,18 +1120,18 @@ tempfile = "3"
 
 **Spec coverage:**
 
-| Requirement | Task |
-|-------------|------|
+| Requirement                                                   | Task                                     |
+| ------------------------------------------------------------- | ---------------------------------------- | --------- | --- | ------ |
 | Load `~/.config/rx/prefixes.toml`, `CRS_RX_PREFIXES` override | Task 2 (`FilePrefixStore::default_path`) |
-| Split on `&&`, `||`, `;`, `|` | Task 1 |
-| Two-word key lookup before single-word | Task 3 |
-| Subshell `$(` / backtick skip | Task 3 (`lookup_prefix`) |
-| Candidate prefix fallback + probe recording | Tasks 3 + 4 |
-| Rejoin with preserved separators | Task 1 |
-| Wire into `cmd_rewrite` as step 3 | Task 6 |
-| Post-hook: confirm mapping on success | Task 7 |
-| Post-hook: remove probe on failure | Task 7 |
-| `PrefixStore` trait for testability | Task 2 |
+| Split on `&&`, `                                              |                                          | `, `;`, ` | `   | Task 1 |
+| Two-word key lookup before single-word                        | Task 3                                   |
+| Subshell `$(` / backtick skip                                 | Task 3 (`lookup_prefix`)                 |
+| Candidate prefix fallback + probe recording                   | Tasks 3 + 4                              |
+| Rejoin with preserved separators                              | Task 1                                   |
+| Wire into `cmd_rewrite` as step 3                             | Task 6                                   |
+| Post-hook: confirm mapping on success                         | Task 7                                   |
+| Post-hook: remove probe on failure                            | Task 7                                   |
+| `PrefixStore` trait for testability                           | Task 2                                   |
 
 All requirements covered. No placeholders found. Type names are consistent across all tasks
 (`ProbeEntry`, `FileProbeStore`, `FilePrefixStore`, `RxPrefixConfig`, `rewrite_command`,

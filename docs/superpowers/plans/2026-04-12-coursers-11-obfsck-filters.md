@@ -1,3 +1,7 @@
+---
+status: done
+---
+
 # coursers-11: obfsck Filter Generation + Redaction Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
@@ -18,17 +22,18 @@ adapter.
 
 ## File Map
 
-| File | Change |
-|------|--------|
-| `crates/crs/src/main.rs` | Add `generate_filters: bool` to `Discover` variant; gate call; merge logic in `write_obfsck_filters` |
-| `crates/core/src/filters.rs` | Add `ObfsckFilters`, `RedactRule`, `load_obfsck_filters()`, `apply_redaction()` |
-| `crates/core/src/lib.rs` | No change needed (filters already pub) |
+| File                         | Change                                                                                               |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `crates/crs/src/main.rs`     | Add `generate_filters: bool` to `Discover` variant; gate call; merge logic in `write_obfsck_filters` |
+| `crates/core/src/filters.rs` | Add `ObfsckFilters`, `RedactRule`, `load_obfsck_filters()`, `apply_redaction()`                      |
+| `crates/core/src/lib.rs`     | No change needed (filters already pub)                                                               |
 
 ---
 
 ## Task 1: Add `--generate-filters` flag to `crs discover`
 
 **Files:**
+
 - Modify: `crates/crs/src/main.rs:14-64`
 
 - [ ] **Step 1: Write the failing test**
@@ -154,6 +159,7 @@ adapter.
 ## Task 2: Merge with existing `.ctx/obfsck-filters.yaml` instead of overwriting
 
 **Files:**
+
 - Modify: `crates/crs/src/main.rs` — `write_obfsck_filters` function (~line 562)
 
 - [ ] **Step 1: Write the failing test**
@@ -292,6 +298,7 @@ adapter.
 ## Task 3: Add `ObfsckFilters` + `apply_redaction()` to `crs_core::filters`
 
 **Files:**
+
 - Modify: `crates/core/src/filters.rs`
 
 - [ ] **Step 1: Write failing tests**
@@ -481,6 +488,7 @@ adapter.
 ## Task 4: Call `apply_redaction()` in `cmd_filter`
 
 **Files:**
+
 - Modify: `crates/crs/src/main.rs` — `cmd_filter` function (~line 73)
 
 - [ ] **Step 1: Write failing test**
@@ -667,6 +675,7 @@ grep serde_yaml /Users/joe/dev/coursers/crates/core/Cargo.toml
 ```
 
 If absent:
+
 ```bash
 cd /Users/joe/dev/coursers && cargo add serde_yaml -p crs-core
 ```

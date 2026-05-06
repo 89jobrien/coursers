@@ -1,3 +1,7 @@
+---
+status: done
+---
+
 # Test Harness Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
@@ -21,6 +25,7 @@ tests, Nushell for smoke script.
 ## Task 1: Cleanup — delete dead code and add tempfile dependency
 
 **Files:**
+
 - Delete: `hooks/pre-tool-course-correct.nu`
 - Delete: `hooks/post-tool-track-failures.nu`
 - Modify: `Cargo.toml` (workspace root)
@@ -70,6 +75,7 @@ git commit -m "chore: remove dead hooks/ and src/, add tempfile workspace dep"
 ## Task 2: Add `RulesLoader` trait and `FsRulesLoader` to `crs-core`
 
 **Files:**
+
 - Create: `crates/core/src/loader.rs`
 - Modify: `crates/core/src/lib.rs`
 - Modify: `crates/core/Cargo.toml`
@@ -167,6 +173,7 @@ git commit -m "feat(core): add RulesLoader trait and FsRulesLoader"
 ## Task 3: Add `StateStore` trait and `FsStateStore` to `crs-core`
 
 **Files:**
+
 - Create: `crates/core/src/store.rs`
 - Modify: `crates/core/src/lib.rs`
 
@@ -307,6 +314,7 @@ git commit -m "feat(core): add StateStore trait, FsStateStore, InMemoryStateStor
 ## Task 4: Refactor `hook::pre` and `hook::post` to use traits
 
 **Files:**
+
 - Modify: `crates/coursers/src/hook/pre.rs`
 - Modify: `crates/coursers/src/hook/post.rs`
 - Modify: `crates/coursers/src/main.rs`
@@ -497,6 +505,7 @@ git commit -m "refactor(coursers): inject RulesLoader+StateStore into hook run_w
 ## Task 5: Unit tests for `crates/core/src/rules.rs`
 
 **Files:**
+
 - Modify: `crates/core/src/rules.rs`
 
 - [ ] **Step 1: Add tests module to `crates/core/src/rules.rs`**
@@ -595,6 +604,7 @@ git commit -m "test(core): unit tests for rules::check"
 ## Task 6: Unit tests for `crates/core/src/state.rs`
 
 **Files:**
+
 - Modify: `crates/core/src/state.rs`
 
 - [ ] **Step 1: Add tests module to `crates/core/src/state.rs`**
@@ -773,6 +783,7 @@ git commit -m "test(core): unit tests for state — record, prune, check_learned
 ## Task 7: Unit tests for `crates/core/src/config.rs`
 
 **Files:**
+
 - Modify: `crates/core/src/config.rs`
 
 - [ ] **Step 1: Add tests to `crates/core/src/config.rs`**
@@ -826,6 +837,7 @@ git commit -m "test(core): unit tests for config path resolution"
 ## Task 8: Unit tests for `hook::pre` in `crates/coursers`
 
 **Files:**
+
 - Modify: `crates/coursers/src/hook/pre.rs`
 
 - [ ] **Step 1: Append tests to `crates/coursers/src/hook/pre.rs`**
@@ -958,6 +970,7 @@ git commit -m "test(coursers): unit tests for hook::pre allow paths"
 ## Task 9: Unit tests for `hook::post` in `crates/coursers`
 
 **Files:**
+
 - Modify: `crates/coursers/src/hook/post.rs`
 
 - [ ] **Step 1: Append tests to `crates/coursers/src/hook/post.rs`**
@@ -1078,6 +1091,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ## Task 10: Integration test fixtures
 
 **Files:**
+
 - Create: `tests/integration/fixtures/rules_basic.json`
 - Create: `tests/integration/fixtures/rules_empty.json`
 - Create: `tests/integration/fixtures/payload_bash_grep.json`
@@ -1090,6 +1104,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 - [ ] **Step 1: Create fixture directory and files**
 
 `tests/integration/fixtures/rules_basic.json`:
+
 ```json
 {
   "rules": [
@@ -1114,6 +1129,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ```
 
 `tests/integration/fixtures/rules_empty.json`:
+
 ```json
 {
   "rules": [],
@@ -1126,6 +1142,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ```
 
 `tests/integration/fixtures/payload_bash_grep.json`:
+
 ```json
 {
   "tool_name": "Bash",
@@ -1134,6 +1151,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ```
 
 `tests/integration/fixtures/payload_bash_ls.json`:
+
 ```json
 {
   "tool_name": "Bash",
@@ -1142,6 +1160,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ```
 
 `tests/integration/fixtures/payload_non_bash.json`:
+
 ```json
 {
   "tool_name": "Read",
@@ -1150,6 +1169,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ```
 
 `tests/integration/fixtures/payload_post_fail.json`:
+
 ```json
 {
   "tool_name": "Bash",
@@ -1159,6 +1179,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ```
 
 `tests/integration/fixtures/payload_post_ok.json`:
+
 ```json
 {
   "tool_name": "Bash",
@@ -1168,6 +1189,7 @@ git commit -m "test(coursers): unit tests for hook::post"
 ```
 
 `tests/integration/fixtures/payload_post_signal.json`:
+
 ```json
 {
   "tool_name": "Bash",
@@ -1188,6 +1210,7 @@ git commit -m "test(integration): add fixture JSON files"
 ## Task 11: Integration tests — `pre_hook` and `post_hook`
 
 **Files:**
+
 - Create: `tests/integration/pre_hook.rs`
 - Create: `tests/integration/post_hook.rs`
 - Create: `tests/integration/common.rs`
@@ -1442,6 +1465,7 @@ git commit -m "test(integration): pre_hook and post_hook binary integration test
 ## Task 12: Smoke script
 
 **Files:**
+
 - Create: `scripts/smoke.nu`
 
 - [ ] **Step 1: Create `scripts/` directory and write `smoke.nu`**
@@ -1588,23 +1612,23 @@ git commit -m "chore: clippy fixes after test harness implementation"
 
 **Spec coverage check:**
 
-| Spec requirement | Task |
-|-----------------|------|
-| `RulesLoader` trait + `FsRulesLoader` | Task 2 |
-| `StateStore` trait + `FsStateStore` | Task 3 |
+| Spec requirement                                             | Task      |
+| ------------------------------------------------------------ | --------- |
+| `RulesLoader` trait + `FsRulesLoader`                        | Task 2    |
+| `StateStore` trait + `FsStateStore`                          | Task 3    |
 | `InMemoryRulesLoader` + `InMemoryStateStore` (feature-gated) | Tasks 2+3 |
-| `hook::pre::run_with` refactor | Task 4 |
-| `hook::post::run_with` refactor | Task 4 |
-| `rules.rs` unit tests (7 cases) | Task 5 |
-| `state.rs` unit tests (8 cases) | Task 6 |
-| `config.rs` unit tests (2 cases) | Task 7 |
-| `hook::pre` unit tests | Task 8 |
-| `hook::post` unit tests | Task 9 |
-| Integration fixtures | Task 10 |
-| `pre_hook` integration tests (4 cases) | Task 11 |
-| `post_hook` integration tests (4 cases) | Task 11 |
-| `scripts/smoke.nu` | Task 12 |
-| Delete `hooks/` and `src/` dead code | Task 1 |
+| `hook::pre::run_with` refactor                               | Task 4    |
+| `hook::post::run_with` refactor                              | Task 4    |
+| `rules.rs` unit tests (7 cases)                              | Task 5    |
+| `state.rs` unit tests (8 cases)                              | Task 6    |
+| `config.rs` unit tests (2 cases)                             | Task 7    |
+| `hook::pre` unit tests                                       | Task 8    |
+| `hook::post` unit tests                                      | Task 9    |
+| Integration fixtures                                         | Task 10   |
+| `pre_hook` integration tests (4 cases)                       | Task 11   |
+| `post_hook` integration tests (4 cases)                      | Task 11   |
+| `scripts/smoke.nu`                                           | Task 12   |
+| Delete `hooks/` and `src/` dead code                         | Task 1    |
 
 All spec requirements covered.
 

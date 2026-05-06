@@ -1,3 +1,7 @@
+---
+status: done
+---
+
 # crs discover Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
@@ -18,26 +22,28 @@ and feeds records into the domain. `main.rs` wires them together and formats the
 
 ## File Map
 
-| File | Action | Purpose |
-|---|---|---|
-| `crates/core/src/history.rs` | Create | `CommandSource` trait, `CommandRecord`, `DiscoverOpts`, `DiscoverReport`, `CommandFreq`, `stem_of()`, `discover()` |
-| `crates/core/src/lib.rs` | Modify | Add `pub mod history;` |
-| `crates/crs/src/jsonl_source.rs` | Create | `JsonlCommandSource` adapter — walks *.jsonl, parses assistant records |
-| `crates/crs/src/main.rs` | Modify | Wire `Command::Discover` arm, add `--limit`/`--since`/`--format` args, format report |
-| `Cargo.toml` (workspace) | Modify | Add `walkdir = "2"` to `[workspace.dependencies]` |
-| `crates/crs/Cargo.toml` | Modify | Add `walkdir = { workspace = true }` to `[dependencies]` |
+| File                             | Action | Purpose                                                                                                            |
+| -------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------ |
+| `crates/core/src/history.rs`     | Create | `CommandSource` trait, `CommandRecord`, `DiscoverOpts`, `DiscoverReport`, `CommandFreq`, `stem_of()`, `discover()` |
+| `crates/core/src/lib.rs`         | Modify | Add `pub mod history;`                                                                                             |
+| `crates/crs/src/jsonl_source.rs` | Create | `JsonlCommandSource` adapter — walks \*.jsonl, parses assistant records                                            |
+| `crates/crs/src/main.rs`         | Modify | Wire `Command::Discover` arm, add `--limit`/`--since`/`--format` args, format report                               |
+| `Cargo.toml` (workspace)         | Modify | Add `walkdir = "2"` to `[workspace.dependencies]`                                                                  |
+| `crates/crs/Cargo.toml`          | Modify | Add `walkdir = { workspace = true }` to `[dependencies]`                                                           |
 
 ---
 
 ## Task 1: Add `walkdir` to workspace
 
 **Files:**
+
 - Modify: `Cargo.toml`
 - Modify: `crates/crs/Cargo.toml`
 
 - [ ] **Step 1: Add walkdir to workspace deps**
 
 In `Cargo.toml`, add to `[workspace.dependencies]`:
+
 ```toml
 walkdir = "2"
 ```
@@ -45,6 +51,7 @@ walkdir = "2"
 - [ ] **Step 2: Add walkdir to crs crate deps**
 
 In `crates/crs/Cargo.toml`, add to `[dependencies]`:
+
 ```toml
 walkdir = { workspace = true }
 ```
@@ -54,6 +61,7 @@ walkdir = { workspace = true }
 ```bash
 cargo check -p crs 2>&1
 ```
+
 Expected: `Finished` with no errors (walkdir downloaded and linked).
 
 - [ ] **Step 4: Commit**
@@ -68,6 +76,7 @@ git commit -m "chore: add walkdir workspace dependency for crs discover"
 ## Task 2: Domain types and `stem_of()` in `crs-core`
 
 **Files:**
+
 - Create: `crates/core/src/history.rs`
 - Modify: `crates/core/src/lib.rs`
 
@@ -144,6 +153,7 @@ mod tests {
 ```bash
 cargo test -p crs-core stem_of 2>&1
 ```
+
 Expected: `FAILED` — `todo!()` panics.
 
 - [ ] **Step 3: Implement `stem_of()`**
@@ -183,6 +193,7 @@ pub fn stem_of(command: &str) -> String {
 ```bash
 cargo test -p crs-core stem_of 2>&1
 ```
+
 Expected: `test result: ok. 9 passed`.
 
 - [ ] **Step 5: Commit**
@@ -197,6 +208,7 @@ git commit -m "feat(core): add stem_of() with tests"
 ## Task 3: `CommandSource` trait and domain types
 
 **Files:**
+
 - Modify: `crates/core/src/history.rs`
 - Modify: `crates/core/src/lib.rs`
 
@@ -258,6 +270,7 @@ pub struct DiscoverReport {
 - [ ] **Step 2: Export `history` from `crs-core`**
 
 In `crates/core/src/lib.rs`, add:
+
 ```rust
 pub mod history;
 ```
@@ -267,6 +280,7 @@ pub mod history;
 ```bash
 cargo check -p crs-core 2>&1
 ```
+
 Expected: `Finished` with no errors.
 
 - [ ] **Step 4: Commit**
@@ -281,6 +295,7 @@ git commit -m "feat(core): add CommandSource trait and DiscoverReport types"
 ## Task 4: `discover()` domain function
 
 **Files:**
+
 - Modify: `crates/core/src/history.rs`
 
 - [ ] **Step 1: Write failing tests for `discover()`**
@@ -411,6 +426,7 @@ Add to the `#[cfg(test)]` block in `history.rs`:
 ```bash
 cargo test -p crs-core discover 2>&1
 ```
+
 Expected: compile error — `discover` not defined yet.
 
 - [ ] **Step 3: Implement `discover()`**
@@ -545,6 +561,7 @@ fn unix_secs_to_date(secs: u64) -> String {
 ```bash
 cargo test -p crs-core discover 2>&1
 ```
+
 Expected: `test result: ok. 5 passed`.
 
 - [ ] **Step 5: Run full test suite**
@@ -552,6 +569,7 @@ Expected: `test result: ok. 5 passed`.
 ```bash
 cargo test -p crs-core 2>&1
 ```
+
 Expected: all tests pass.
 
 - [ ] **Step 6: Commit**
@@ -566,6 +584,7 @@ git commit -m "feat(core): implement discover() domain function"
 ## Task 5: `JsonlCommandSource` adapter
 
 **Files:**
+
 - Create: `crates/crs/src/jsonl_source.rs`
 - Modify: `crates/crs/src/main.rs` (add `mod jsonl_source;`)
 
@@ -598,6 +617,7 @@ fn jsonl_source_empty_dir_yields_no_commands() {
 ```
 
 Add `tempfile` to `crates/crs/Cargo.toml` `[dev-dependencies]`:
+
 ```toml
 [dev-dependencies]
 tempfile = { workspace = true }
@@ -608,6 +628,7 @@ tempfile = { workspace = true }
 ```bash
 cargo test -p crs discover_integration 2>&1
 ```
+
 Expected: compile error — `crs::jsonl_source` not found.
 
 - [ ] **Step 3: Implement `JsonlCommandSource`**
@@ -710,6 +731,7 @@ impl CommandSource for JsonlCommandSource {
 ```
 
 Add `mod jsonl_source;` to `crates/crs/src/main.rs` and expose it:
+
 ```rust
 pub mod jsonl_source;
 ```
@@ -719,6 +741,7 @@ pub mod jsonl_source;
 ```bash
 cargo test -p crs jsonl_source_empty_dir_yields_no_commands 2>&1
 ```
+
 Expected: `test result: ok. 1 passed`.
 
 - [ ] **Step 5: Commit**
@@ -733,6 +756,7 @@ git commit -m "feat(crs): add JsonlCommandSource adapter"
 ## Task 6: Fixture-based integration test
 
 **Files:**
+
 - Create: `crates/crs/tests/fixtures/discover/session.jsonl`
 - Modify: `crates/crs/tests/discover_integration.rs`
 
@@ -790,6 +814,7 @@ fn jsonl_source_reads_fixture_commands() {
 ```bash
 cargo test -p crs jsonl_source_reads_fixture_commands 2>&1
 ```
+
 Expected: `test result: ok. 1 passed`.
 
 - [ ] **Step 4: Commit**
@@ -804,6 +829,7 @@ git commit -m "test(crs): fixture-based discover integration test"
 ## Task 7: Wire `Command::Discover` in `main.rs`
 
 **Files:**
+
 - Modify: `crates/crs/src/main.rs`
 
 - [ ] **Step 1: Expand CLI args for Discover**
@@ -949,11 +975,13 @@ Command::Discover { all, limit, since, format } => {
 ```bash
 cargo build -p crs 2>&1
 ```
+
 Expected: `Finished` with no errors.
 
 ```bash
 ./target/debug/crs discover --all --since 1 2>&1 | head -5
 ```
+
 Expected: first line is `CRS Discover — Savings Opportunities`.
 
 - [ ] **Step 5: Run full test suite**
@@ -961,6 +989,7 @@ Expected: first line is `CRS Discover — Savings Opportunities`.
 ```bash
 cargo test 2>&1
 ```
+
 Expected: all tests pass.
 
 - [ ] **Step 6: Commit**
@@ -979,6 +1008,7 @@ git commit -m "feat(crs): wire crs discover subcommand with text and json output
 ```bash
 cargo test 2>&1
 ```
+
 Expected: all tests pass.
 
 - [ ] **Step 2: Commit final state**
