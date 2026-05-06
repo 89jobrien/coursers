@@ -1,6 +1,6 @@
 ---
-status: partial
-note: Tasks 3-6 are unexecuted and target external plugin files
+status: superseded
+note: Tasks 1-2 (scripts) landed. Tasks 3-6 targeted the hand plugin which no longer exists — dropped.
 ---
 
 # Handoff Tool Usage Enrichment Implementation Plan
