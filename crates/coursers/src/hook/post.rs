@@ -1,6 +1,6 @@
 use crs_core::loader::RulesLoader;
-use crs_core::store::StateStore;
 use crs_core::state;
+use crs_core::store::StateStore;
 
 use super::HookPayload;
 
@@ -27,17 +27,29 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
         .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
-    if exit_code == 0 {
-        return;
-    }
-    if SIGNAL_EXIT_CODES.contains(&exit_code) {
-        return;
-    }
-
-    let command = match payload.tool_input.as_ref().and_then(|i| i.command.as_deref()) {
+    let command = match payload
+        .tool_input
+        .as_ref()
+        .and_then(|i| i.command.as_deref())
+    {
         Some(c) if !c.is_empty() => c,
         _ => return,
     };
+
+    // Check for suggestion acceptance on exit 0.
+    if exit_code == 0 {
+        if let Some(session_id) = payload.session_id.as_deref() {
+            let capture_store = crs_core::capture::SuggestionStore::new(
+                crs_core::capture::SuggestionStore::default_path(),
+            );
+            capture_store.mark_accepted(session_id, command, exit_code);
+        }
+        return;
+    }
+
+    if SIGNAL_EXIT_CODES.contains(&exit_code) {
+        return;
+    }
 
     if is_excluded(command) {
         return;
@@ -73,11 +85,11 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
+    use super::super::{HookPayload, ToolInput};
     use super::*;
     use crs_core::loader::InMemoryRulesLoader;
     use crs_core::rules::{FailureLearning, RulesConfig};
     use crs_core::store::InMemoryStateStore;
-    use super::super::{HookPayload, ToolInput};
     use serde_json::json;
 
     fn config_fl(enabled: bool) -> RulesConfig {
@@ -98,8 +110,12 @@ mod tests {
     fn post_payload(cmd: &str, exit_code: i64) -> HookPayload {
         HookPayload {
             tool_name: Some("Bash".to_string()),
-            tool_input: Some(ToolInput { command: Some(cmd.to_string()) }),
+            tool_input: Some(ToolInput {
+                command: Some(cmd.to_string()),
+            }),
             tool_response: Some(json!({ "exit_code": exit_code })),
+            session_id: None,
+            cwd: None,
         }
     }
 
@@ -149,8 +165,12 @@ mod tests {
         let store = InMemoryStateStore::new();
         let payload = HookPayload {
             tool_name: Some("Read".to_string()),
-            tool_input: Some(ToolInput { command: Some("grep foo .".to_string()) }),
+            tool_input: Some(ToolInput {
+                command: Some("grep foo .".to_string()),
+            }),
             tool_response: Some(json!({ "exit_code": 1 })),
+            session_id: None,
+            cwd: None,
         };
         run_with(&loader, &store, &payload);
         assert!(store.get_state().failures.is_empty());

@@ -2,7 +2,7 @@ use crs_core::loader::RulesLoader;
 use crs_core::store::StateStore;
 use crs_core::{rules, state};
 
-use super::{deny, HookPayload};
+use super::{HookPayload, deny};
 
 /// For the `no-ls-use-glob` rule, extract the target path from the `ls` command and append
 /// a file-tree listing so Claude gets useful context without needing to retry.
@@ -21,7 +21,10 @@ fn enrich_message(rule_id: &str, command: &str, base_msg: &str) -> String {
         .unwrap_or(".");
 
     let tree = file_tree(path);
-    format!("{}\n\nDirectory listing for `{}`:\n{}", base_msg, path, tree)
+    format!(
+        "{}\n\nDirectory listing for `{}`:\n{}",
+        base_msg, path, tree
+    )
 }
 
 /// Run `eza --tree --level 2 <path>`, falling back to a manual two-level walk.
@@ -33,12 +36,12 @@ fn file_tree(path: &str) -> String {
         .args(["--tree", "--level", "2", "--color=never", path])
         .output();
 
-    if let Ok(out) = eza {
-        if out.status.success() {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !s.is_empty() {
-                return s;
-            }
+    if let Ok(out) = eza
+        && out.status.success()
+    {
+        let s = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !s.is_empty() {
+            return s;
         }
     }
 
@@ -47,15 +50,15 @@ fn file_tree(path: &str) -> String {
         .args([path, "-maxdepth", "2", "-not", "-name", ".*"])
         .output();
 
-    if let Ok(out) = find {
-        if out.status.success() {
-            let mut lines: Vec<_> = String::from_utf8_lossy(&out.stdout)
-                .lines()
-                .map(str::to_string)
-                .collect();
-            lines.sort();
-            return lines.join("\n");
-        }
+    if let Ok(out) = find
+        && out.status.success()
+    {
+        let mut lines: Vec<_> = String::from_utf8_lossy(&out.stdout)
+            .lines()
+            .map(str::to_string)
+            .collect();
+        lines.sort();
+        return lines.join("\n");
     }
 
     "(could not list directory)".to_string()
@@ -66,7 +69,11 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
         return;
     }
 
-    let command = match payload.tool_input.as_ref().and_then(|i| i.command.as_deref()) {
+    let command = match payload
+        .tool_input
+        .as_ref()
+        .and_then(|i| i.command.as_deref())
+    {
         Some(c) if !c.is_empty() => c,
         _ => return,
     };
@@ -82,6 +89,29 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
             store.save(&st);
         }
         crs_core::stats::record_block(&crs_core::stats::stats_path(), &rule_id);
+
+        // Capture (original, suggestion) pair for fine-tuning dataset.
+        let capture_store = crs_core::capture::SuggestionStore::new(
+            crs_core::capture::SuggestionStore::default_path(),
+        );
+        let cwd = payload
+            .cwd
+            .clone()
+            .or_else(|| {
+                std::env::current_dir()
+                    .ok()
+                    .map(|p| p.display().to_string())
+            })
+            .unwrap_or_default();
+        capture_store.record(crs_core::capture::SuggestionRecord::new(
+            command,
+            &msg,
+            &rule_id,
+            cwd,
+            payload.session_id.clone(),
+            payload.tool_name.as_deref().unwrap_or("Bash"),
+        ));
+
         let full_msg = enrich_message(&rule_id, command, &msg);
         deny(&full_msg);
     }
@@ -97,19 +127,23 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
 
 #[cfg(test)]
 mod tests {
+    use super::super::{HookPayload, ToolInput};
     use super::*;
     use crs_core::loader::InMemoryRulesLoader;
     use crs_core::rules::{FailureLearning, Rule, RulesConfig};
-    use crs_core::state::{command_key, FailureEntry, State};
+    use crs_core::state::{FailureEntry, State, command_key};
     use crs_core::store::InMemoryStateStore;
-    use super::super::{HookPayload, ToolInput};
     use std::collections::HashMap;
 
     fn bash_payload(cmd: &str) -> HookPayload {
         HookPayload {
             tool_name: Some("Bash".to_string()),
-            tool_input: Some(ToolInput { command: Some(cmd.to_string()) }),
+            tool_input: Some(ToolInput {
+                command: Some(cmd.to_string()),
+            }),
             tool_response: None,
+            session_id: None,
+            cwd: None,
         }
     }
 
@@ -138,11 +172,14 @@ mod tests {
         let now = crs_core::state::now_secs();
         let key = command_key(cmd);
         let mut failures = HashMap::new();
-        failures.insert(key, FailureEntry {
-            command_preview: cmd.to_string(),
-            timestamps: vec![now; count],
-            last_seen: now as f64,
-        });
+        failures.insert(
+            key,
+            FailureEntry {
+                command_preview: cmd.to_string(),
+                timestamps: vec![now; count],
+                last_seen: now as f64,
+            },
+        );
         State { failures }
     }
 
@@ -154,6 +191,8 @@ mod tests {
             tool_name: Some("Read".to_string()),
             tool_input: None,
             tool_response: None,
+            session_id: None,
+            cwd: None,
         };
         run_with(&loader, &store, &payload);
     }
@@ -164,8 +203,12 @@ mod tests {
         let store = InMemoryStateStore::new();
         let payload = HookPayload {
             tool_name: Some("Bash".to_string()),
-            tool_input: Some(ToolInput { command: Some(String::new()) }),
+            tool_input: Some(ToolInput {
+                command: Some(String::new()),
+            }),
             tool_response: None,
+            session_id: None,
+            cwd: None,
         };
         run_with(&loader, &store, &payload);
     }
@@ -213,7 +256,14 @@ mod tests {
         }
 
         assert_eq!(
-            store.get_state().failures.values().next().unwrap().timestamps.len(),
+            store
+                .get_state()
+                .failures
+                .values()
+                .next()
+                .unwrap()
+                .timestamps
+                .len(),
             2
         );
     }

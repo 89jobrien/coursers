@@ -1,5 +1,5 @@
-pub mod pre;
 pub mod post;
+pub mod pre;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,6 +10,8 @@ pub struct HookPayload {
     pub tool_name: Option<String>,
     pub tool_input: Option<ToolInput>,
     pub tool_response: Option<Value>,
+    pub session_id: Option<String>,
+    pub cwd: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
