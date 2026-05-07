@@ -1,3 +1,4 @@
+use crs_core::capture::CaptureStore;
 use crs_core::loader::RulesLoader;
 use crs_core::state;
 use crs_core::store::StateStore;
@@ -15,7 +16,12 @@ const EXCLUDE_PATTERNS: &[&str] = &[
     r">/dev/null\s+2>&1",
 ];
 
-pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &HookPayload) {
+pub fn run_with<L: RulesLoader, S: StateStore>(
+    loader: &L,
+    store: &S,
+    capture: &dyn CaptureStore,
+    payload: &HookPayload,
+) {
     if payload.tool_name.as_deref() != Some("Bash") {
         return;
     }
@@ -39,10 +45,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
     // Check for suggestion acceptance on exit 0.
     if exit_code == 0 {
         if let Some(session_id) = payload.session_id.as_deref() {
-            let capture_store = crs_core::capture::SuggestionStore::new(
-                crs_core::capture::SuggestionStore::default_path(),
-            );
-            capture_store.mark_accepted(session_id, command, exit_code);
+            capture.mark_accepted(session_id, command, exit_code);
         }
         return;
     }
@@ -67,6 +70,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
 }
 
 pub fn run() {
+    use crs_core::capture::SuggestionStore;
     use crs_core::loader::FsRulesLoader;
     use crs_core::state::state_path;
     use crs_core::store::FsStateStore;
@@ -79,14 +83,16 @@ pub fn run() {
     let config = loader.load();
     let path = state_path(&config.failure_learning);
     let store = FsStateStore { path };
+    let capture = SuggestionStore::new(SuggestionStore::default_path());
 
-    run_with(&loader, &store, &payload);
+    run_with(&loader, &store, &capture, &payload);
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::{HookPayload, ToolInput};
     use super::*;
+    use crs_core::capture::InMemoryCaptureStore;
     use crs_core::loader::InMemoryRulesLoader;
     use crs_core::rules::{FailureLearning, RulesConfig};
     use crs_core::store::InMemoryStateStore;
@@ -123,7 +129,12 @@ mod tests {
     fn exit_zero_no_record() {
         let loader = InMemoryRulesLoader(config_fl(true));
         let store = InMemoryStateStore::new();
-        run_with(&loader, &store, &post_payload("grep foo .", 0));
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &post_payload("grep foo .", 0),
+        );
         assert!(store.get_state().failures.is_empty());
     }
 
@@ -131,7 +142,12 @@ mod tests {
     fn signal_exit_no_record() {
         let loader = InMemoryRulesLoader(config_fl(true));
         let store = InMemoryStateStore::new();
-        run_with(&loader, &store, &post_payload("grep foo .", 130));
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &post_payload("grep foo .", 130),
+        );
         assert!(store.get_state().failures.is_empty());
     }
 
@@ -139,7 +155,12 @@ mod tests {
     fn excluded_pattern_no_record() {
         let loader = InMemoryRulesLoader(config_fl(true));
         let store = InMemoryStateStore::new();
-        run_with(&loader, &store, &post_payload("cmd 2>/dev/null", 1));
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &post_payload("cmd 2>/dev/null", 1),
+        );
         assert!(store.get_state().failures.is_empty());
     }
 
@@ -147,7 +168,12 @@ mod tests {
     fn real_failure_recorded() {
         let loader = InMemoryRulesLoader(config_fl(true));
         let store = InMemoryStateStore::new();
-        run_with(&loader, &store, &post_payload("grep foo .", 1));
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &post_payload("grep foo .", 1),
+        );
         assert!(!store.get_state().failures.is_empty());
     }
 
@@ -155,7 +181,12 @@ mod tests {
     fn failure_learning_disabled_no_record() {
         let loader = InMemoryRulesLoader(config_fl(false));
         let store = InMemoryStateStore::new();
-        run_with(&loader, &store, &post_payload("grep foo .", 1));
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &post_payload("grep foo .", 1),
+        );
         assert!(store.get_state().failures.is_empty());
     }
 
@@ -172,7 +203,7 @@ mod tests {
             session_id: None,
             cwd: None,
         };
-        run_with(&loader, &store, &payload);
+        run_with(&loader, &store, &InMemoryCaptureStore::new(), &payload);
         assert!(store.get_state().failures.is_empty());
     }
 }

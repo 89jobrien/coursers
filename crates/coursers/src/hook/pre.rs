@@ -1,3 +1,4 @@
+use crs_core::capture::CaptureStore;
 use crs_core::loader::RulesLoader;
 use crs_core::store::StateStore;
 use crs_core::{rules, state};
@@ -64,7 +65,12 @@ fn file_tree(path: &str) -> String {
     "(could not list directory)".to_string()
 }
 
-pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &HookPayload) {
+pub fn run_with<L: RulesLoader, S: StateStore>(
+    loader: &L,
+    store: &S,
+    capture: &dyn CaptureStore,
+    payload: &HookPayload,
+) {
     if payload.tool_name.as_deref() != Some("Bash") {
         return;
     }
@@ -91,9 +97,6 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
         crs_core::stats::record_block(&crs_core::stats::stats_path(), &rule_id);
 
         // Capture (original, suggestion) pair for fine-tuning dataset.
-        let capture_store = crs_core::capture::SuggestionStore::new(
-            crs_core::capture::SuggestionStore::default_path(),
-        );
         let cwd = payload
             .cwd
             .clone()
@@ -103,7 +106,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
                     .map(|p| p.display().to_string())
             })
             .unwrap_or_default();
-        capture_store.record(crs_core::capture::SuggestionRecord::new(
+        capture.record(crs_core::capture::SuggestionRecord::new(
             command,
             &msg,
             &rule_id,
@@ -129,6 +132,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(loader: &L, store: &S, payload: &
 mod tests {
     use super::super::{HookPayload, ToolInput};
     use super::*;
+    use crs_core::capture::InMemoryCaptureStore;
     use crs_core::loader::InMemoryRulesLoader;
     use crs_core::rules::{FailureLearning, Rule, RulesConfig};
     use crs_core::state::{FailureEntry, State, command_key};
@@ -194,7 +198,7 @@ mod tests {
             session_id: None,
             cwd: None,
         };
-        run_with(&loader, &store, &payload);
+        run_with(&loader, &store, &InMemoryCaptureStore::new(), &payload);
     }
 
     #[test]
@@ -210,14 +214,19 @@ mod tests {
             session_id: None,
             cwd: None,
         };
-        run_with(&loader, &store, &payload);
+        run_with(&loader, &store, &InMemoryCaptureStore::new(), &payload);
     }
 
     #[test]
     fn allowed_command_completes() {
         let loader = InMemoryRulesLoader(config_with_rule(r"\bgrep\b"));
         let store = InMemoryStateStore::new();
-        run_with(&loader, &store, &bash_payload("ls -la"));
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &bash_payload("ls -la"),
+        );
     }
 
     #[test]
@@ -274,11 +283,17 @@ mod tests {
         config.failure_learning.enabled = false;
         let loader = InMemoryRulesLoader(config);
         let store = InMemoryStateStore::with_state(state_with_failures("grep foo .", 5));
-        run_with(&loader, &store, &bash_payload("grep foo ."));
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &bash_payload("grep foo ."),
+        );
     }
 }
 
 pub fn run() {
+    use crs_core::capture::SuggestionStore;
     use crs_core::loader::FsRulesLoader;
     use crs_core::state::state_path;
     use crs_core::store::FsStateStore;
@@ -291,6 +306,7 @@ pub fn run() {
     let config = loader.load();
     let path = state_path(&config.failure_learning);
     let store = FsStateStore { path };
+    let capture = SuggestionStore::new(SuggestionStore::default_path());
 
-    run_with(&loader, &store, &payload);
+    run_with(&loader, &store, &capture, &payload);
 }
