@@ -112,7 +112,7 @@ pub fn enrich(facets: Vec<FacetRecord>, projects_root: &Path) -> Vec<EnrichedFac
 pub fn aggregate(facets: &[EnrichedFacet]) -> InsightsReport {
     let mut report = InsightsReport {
         total: facets.len(),
-        ..InsightsReport::default()
+        ..Default::default()
     };
 
     let mut repos: HashMap<String, usize> = HashMap::new();
