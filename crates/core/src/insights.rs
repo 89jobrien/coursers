@@ -75,7 +75,9 @@ pub struct InsightsReport {
 
 /// Load all facet JSON files from `facets_dir`.
 pub fn load_facets(facets_dir: &Path) -> Vec<FacetRecord> {
-    let Ok(entries) = std::fs::read_dir(facets_dir) else { return vec![] };
+    let Ok(entries) = std::fs::read_dir(facets_dir) else {
+        return vec![];
+    };
     entries
         .filter_map(|e| e.ok())
         .filter(|e| {
@@ -108,8 +110,10 @@ pub fn enrich(facets: Vec<FacetRecord>, projects_root: &Path) -> Vec<EnrichedFac
 
 /// Aggregate enriched facets into a summary report.
 pub fn aggregate(facets: &[EnrichedFacet]) -> InsightsReport {
-    let mut report = InsightsReport::default();
-    report.total = facets.len();
+    let mut report = InsightsReport {
+        total: facets.len(),
+        ..InsightsReport::default()
+    };
 
     let mut repos: HashMap<String, usize> = HashMap::new();
     let mut branches: HashMap<String, usize> = HashMap::new();
@@ -154,19 +158,24 @@ pub fn aggregate(facets: &[EnrichedFacet]) -> InsightsReport {
 /// Top-level session files only (depth 2: <project-dir>/<session-id>.jsonl).
 fn build_jsonl_index(projects_root: &Path) -> HashMap<String, PathBuf> {
     let mut index = HashMap::new();
-    let Ok(project_dirs) = std::fs::read_dir(projects_root) else { return index };
+    let Ok(project_dirs) = std::fs::read_dir(projects_root) else {
+        return index;
+    };
     for project_entry in project_dirs.filter_map(|e| e.ok()) {
         let project_path = project_entry.path();
-        if !project_path.is_dir() { continue; }
-        let Ok(sessions) = std::fs::read_dir(&project_path) else { continue };
+        if !project_path.is_dir() {
+            continue;
+        }
+        let Ok(sessions) = std::fs::read_dir(&project_path) else {
+            continue;
+        };
         for session_entry in sessions.filter_map(|e| e.ok()) {
             let path = session_entry.path();
             if path.extension().map(|x| x == "jsonl").unwrap_or(false)
                 && path.is_file()
+                && let Some(stem) = path.file_stem().and_then(|s| s.to_str())
             {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    index.insert(stem.to_string(), path);
-                }
+                index.insert(stem.to_string(), path);
             }
         }
     }
@@ -231,9 +240,18 @@ mod tests {
     #[test]
     fn aggregate_counts_outcomes() {
         let facets = vec![
-            EnrichedFacet { facet: make_facet("a", "fully_achieved", "very_helpful"), git: None },
-            EnrichedFacet { facet: make_facet("b", "fully_achieved", "moderately_helpful"), git: None },
-            EnrichedFacet { facet: make_facet("c", "partially_achieved", "very_helpful"), git: None },
+            EnrichedFacet {
+                facet: make_facet("a", "fully_achieved", "very_helpful"),
+                git: None,
+            },
+            EnrichedFacet {
+                facet: make_facet("b", "fully_achieved", "moderately_helpful"),
+                git: None,
+            },
+            EnrichedFacet {
+                facet: make_facet("c", "partially_achieved", "very_helpful"),
+                git: None,
+            },
         ];
         let report = aggregate(&facets);
         assert_eq!(report.total, 3);
@@ -250,8 +268,14 @@ mod tests {
         f2.friction_counts.insert("wrong_approach".to_string(), 2);
 
         let facets = vec![
-            EnrichedFacet { facet: f, git: None },
-            EnrichedFacet { facet: f2, git: None },
+            EnrichedFacet {
+                facet: f,
+                git: None,
+            },
+            EnrichedFacet {
+                facet: f2,
+                git: None,
+            },
         ];
         let report = aggregate(&facets);
         assert_eq!(report.friction["wrong_approach"], 5);
@@ -267,8 +291,14 @@ mod tests {
             timestamp: None,
         };
         let facets = vec![
-            EnrichedFacet { facet: make_facet("a", "fully_achieved", "very_helpful"), git: Some(git) },
-            EnrichedFacet { facet: make_facet("b", "fully_achieved", "very_helpful"), git: None },
+            EnrichedFacet {
+                facet: make_facet("a", "fully_achieved", "very_helpful"),
+                git: Some(git),
+            },
+            EnrichedFacet {
+                facet: make_facet("b", "fully_achieved", "very_helpful"),
+                git: None,
+            },
         ];
         let report = aggregate(&facets);
         assert_eq!(report.git_enriched, 1);
@@ -278,6 +308,9 @@ mod tests {
     #[test]
     fn repo_name_from_cwd_extracts_last_component() {
         assert_eq!(repo_name_from_cwd("/Users/joe/dev/minibox"), "minibox");
-        assert_eq!(repo_name_from_cwd("/Users/joe/dev/orca-strait"), "orca-strait");
+        assert_eq!(
+            repo_name_from_cwd("/Users/joe/dev/orca-strait"),
+            "orca-strait"
+        );
     }
 }

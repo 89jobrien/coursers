@@ -97,6 +97,69 @@ impl DedupeKey {
 }
 
 // ---------------------------------------------------------------------------
+// CaptureStore trait (port)
+// ---------------------------------------------------------------------------
+
+pub trait CaptureStore {
+    fn record(&self, record: SuggestionRecord);
+    fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64);
+}
+
+// ---------------------------------------------------------------------------
+// InMemoryCaptureStore (test double)
+// ---------------------------------------------------------------------------
+
+#[cfg(any(test, feature = "testing"))]
+pub struct InMemoryCaptureStore {
+    inner: std::cell::RefCell<Vec<SuggestionRecord>>,
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl InMemoryCaptureStore {
+    pub fn new() -> Self {
+        Self {
+            inner: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+
+    pub fn records(&self) -> Vec<SuggestionRecord> {
+        self.inner.borrow().clone()
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl Default for InMemoryCaptureStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl CaptureStore for InMemoryCaptureStore {
+    fn record(&self, record: SuggestionRecord) {
+        self.inner.borrow_mut().push(record);
+    }
+
+    fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
+        let mut records = self.inner.borrow_mut();
+        for r in records.iter_mut() {
+            if r.accepted {
+                continue;
+            }
+            if r.session_id.as_deref() != Some(session_id) {
+                continue;
+            }
+            if r.suggestion.trim() != command.trim() {
+                continue;
+            }
+            r.accepted = true;
+            r.accepted_ts = Some(now_iso8601());
+            r.exit_code = Some(exit_code);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
@@ -125,7 +188,7 @@ impl SuggestionStore {
         };
         std::io::BufReader::new(file)
             .lines()
-            .filter_map(|l| l.ok())
+            .map_while(Result::ok)
             .filter(|l| !l.trim().is_empty())
             .filter_map(|l| serde_json::from_str(&l).ok())
             .collect()
@@ -134,6 +197,16 @@ impl SuggestionStore {
     /// Record a block event. If the (original, suggestion) pair is new, append.
     /// If it already exists, increment count (and upgrade accepted if applicable).
     pub fn record(&self, record: SuggestionRecord) {
+        self.do_record(record);
+    }
+
+    /// Mark a pending (unaccepted) record as accepted, matched by session_id +
+    /// suggestion text. Updates in-place.
+    pub fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
+        self.do_mark_accepted(session_id, command, exit_code);
+    }
+
+    fn do_record(&self, record: SuggestionRecord) {
         let mut records = self.load();
         let key = DedupeKey::from_record(&record);
 
@@ -154,9 +227,7 @@ impl SuggestionStore {
         }
     }
 
-    /// Mark a pending (unaccepted) record as accepted, matched by session_id +
-    /// suggestion text. Updates in-place.
-    pub fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
+    fn do_mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
         let mut records = self.load();
         let mut changed = false;
 
@@ -218,6 +289,16 @@ impl SuggestionStore {
     }
 }
 
+impl CaptureStore for SuggestionStore {
+    fn record(&self, record: SuggestionRecord) {
+        self.do_record(record);
+    }
+
+    fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
+        self.do_mark_accepted(session_id, command, exit_code);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -268,7 +349,7 @@ fn epoch_to_ymd_hms(secs: u64) -> (u64, u64, u64, u64, u64, u64) {
 }
 
 fn is_leap(year: u64) -> bool {
-    (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
+    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 fn repo_from_cwd(cwd: &str) -> Option<String> {
@@ -286,6 +367,22 @@ fn repo_from_cwd(cwd: &str) -> Option<String> {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+
+    #[test]
+    fn in_memory_store_record_increments_count() {
+        let store = InMemoryCaptureStore::new();
+        let r = SuggestionRecord::new(
+            "grep foo .",
+            "rg foo .",
+            "no-grep-use-tool",
+            "/Users/joe/dev/coursers",
+            Some("sess-1".to_string()),
+            "Bash",
+        );
+        store.record(r.clone());
+        store.record(r);
+        assert_eq!(store.records().len(), 2);
+    }
 
     fn store(dir: &TempDir) -> SuggestionStore {
         SuggestionStore::new(dir.path().join("suggestions.jsonl"))
