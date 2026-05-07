@@ -172,6 +172,80 @@ fn read_stdin_payload() -> Option<HookPayload> {
     serde_json::from_str(&buf).ok()
 }
 
+/// Executables registered as 1Password CLI plugins (from `op plugin list`).
+/// `op plugin run --` may only be auto-confirmed for keys in this set.
+const OP_PLUGIN_EXECUTABLES: &[&str] = &[
+    "akamai",
+    "argocd",
+    "aws",
+    "cdk",
+    "axiom",
+    "binance-cli",
+    "cachix",
+    "cargo",
+    "circleci",
+    "civo",
+    "wrangler",
+    "crowdin",
+    "databricks",
+    "dog",
+    "doctl",
+    "fastly",
+    "flyctl",
+    "fly",
+    "fossa",
+    "tea",
+    "gh",
+    "glab",
+    "vault",
+    "heroku",
+    "hcloud",
+    "brew",
+    "huggingface-cli",
+    "influx",
+    "kaggle",
+    "lacework",
+    "forge",
+    "vapor",
+    "linode-cli",
+    "localstack",
+    "atlas",
+    "mysql",
+    "ngrok",
+    "ohdear",
+    "okta",
+    "openai",
+    "oaieval",
+    "oaievalset",
+    "pd",
+    "psql",
+    "pg_dump",
+    "pg_restore",
+    "pgcli",
+    "pulumi",
+    "rdme",
+    "sentry-cli",
+    "snowsql",
+    "snyk",
+    "src",
+    "stripe",
+    "todoist",
+    "td",
+    "tugboat",
+    "twilio",
+    "upstash",
+    "vercel",
+    "vsql",
+    "vultr-cli",
+    "ysqlsh",
+    "zapier",
+    "zcli",
+];
+
+fn is_op_plugin_prefix(prefix: &[String]) -> bool {
+    matches!(prefix, [a, b, c, d] if a == "op" && b == "plugin" && c == "run" && d == "--")
+}
+
 fn apply_rx_learning(
     command: &str,
     exit_code: i64,
@@ -188,6 +262,11 @@ fn apply_rx_learning(
     }
     if exit_code == 0 {
         for probe in &matching {
+            if is_op_plugin_prefix(&probe.prefix)
+                && !OP_PLUGIN_EXECUTABLES.contains(&probe.key.as_str())
+            {
+                continue;
+            }
             prefix_store.confirm_mapping(&probe.key, &probe.prefix);
         }
     }
