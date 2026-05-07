@@ -135,7 +135,8 @@ fn expand_inline(s: &str) -> String {
             }
 
             // `${VARNAME}`.
-            if i + 1 < len && bytes[i + 1] == b'{'
+            if i + 1 < len
+                && bytes[i + 1] == b'{'
                 && let Some(end) = s[i + 2..].find('}')
             {
                 let var_name = &s[i + 2..i + 2 + end];
@@ -289,7 +290,10 @@ mod tests {
 
     #[test]
     fn passthrough_plain_command() {
-        assert_eq!(expand_vars("cargo build --release"), "cargo build --release");
+        assert_eq!(
+            expand_vars("cargo build --release"),
+            "cargo build --release"
+        );
     }
 
     #[test]

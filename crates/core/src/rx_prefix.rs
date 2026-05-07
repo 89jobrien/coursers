@@ -56,7 +56,10 @@ impl PrefixStore for FilePrefixStore {
         match toml::to_string_pretty(&config) {
             Ok(serialized) => {
                 if let Err(e) = std::fs::write(&self.path, &serialized) {
-                    eprintln!("crs: warn: could not write rx prefixes to {}: {e}", self.path.display());
+                    eprintln!(
+                        "crs: warn: could not write rx prefixes to {}: {e}",
+                        self.path.display()
+                    );
                 }
             }
             Err(e) => {
@@ -115,7 +118,10 @@ pub fn split_segments(cmd: &str) -> Vec<Segment> {
         }
         match earliest {
             None => {
-                result.push(Segment { text: remaining.to_string(), sep: None });
+                result.push(Segment {
+                    text: remaining.to_string(),
+                    sep: None,
+                });
                 break 'outer;
             }
             Some((pos, sep)) => {
@@ -172,13 +178,19 @@ pub fn lookup_prefix(segment: &str, config: &RxPrefixConfig) -> Option<PrefixMat
     if let Some(second) = second {
         let two_word = format!("{first} {second}");
         if let Some(prefix) = config.mappings.get(&two_word) {
-            return Some(PrefixMatch::Confirmed { key: two_word, prefix: prefix.clone() });
+            return Some(PrefixMatch::Confirmed {
+                key: two_word,
+                prefix: prefix.clone(),
+            });
         }
     }
 
     // Single-word key check.
     if let Some(prefix) = config.mappings.get(first) {
-        return Some(PrefixMatch::Confirmed { key: first.to_string(), prefix: prefix.clone() });
+        return Some(PrefixMatch::Confirmed {
+            key: first.to_string(),
+            prefix: prefix.clone(),
+        });
     }
 
     // Candidate fallback — use the first candidate prefix.
@@ -250,7 +262,10 @@ pub fn rewrite_command(cmd: &str, config: &RxPrefixConfig) -> RewriteResult {
         }
     }
 
-    RewriteResult { rewritten: rejoin(&segs), probes }
+    RewriteResult {
+        rewritten: rejoin(&segs),
+        probes,
+    }
 }
 
 /// TOML-serializable wrapper for a list of probe entries.
@@ -279,7 +294,11 @@ impl From<&ProbeEntry> for ProbeEntryToml {
 
 impl From<ProbeEntryToml> for ProbeEntry {
     fn from(t: ProbeEntryToml) -> Self {
-        Self { key: t.key, prefix: t.prefix, original_command: t.original_command }
+        Self {
+            key: t.key,
+            prefix: t.prefix,
+            original_command: t.original_command,
+        }
     }
 }
 
@@ -319,10 +338,15 @@ impl FileProbeStore {
         if let Some(parent) = self.path.parent()
             && let Err(e) = std::fs::create_dir_all(parent)
         {
-            eprintln!("crs: warn: could not create directory {}: {e}", parent.display());
+            eprintln!(
+                "crs: warn: could not create directory {}: {e}",
+                parent.display()
+            );
             return;
         }
-        let file = ProbeFile { probes: entries.iter().map(ProbeEntryToml::from).collect() };
+        let file = ProbeFile {
+            probes: entries.iter().map(ProbeEntryToml::from).collect(),
+        };
         match toml::to_string_pretty(&file) {
             Ok(serialized) => {
                 if let Err(e) = std::fs::write(&self.path, &serialized) {
@@ -350,9 +374,15 @@ impl FileProbeStore {
 }
 
 impl ProbeStore for FileProbeStore {
-    fn load(&self) -> Vec<ProbeEntry> { self.load() }
-    fn write(&self, entries: &[ProbeEntry]) { self.write(entries); }
-    fn remove_matching(&self, cmd: &str) { self.remove_matching(cmd); }
+    fn load(&self) -> Vec<ProbeEntry> {
+        self.load()
+    }
+    fn write(&self, entries: &[ProbeEntry]) {
+        self.write(entries);
+    }
+    fn remove_matching(&self, cmd: &str) {
+        self.remove_matching(cmd);
+    }
 }
 
 /// Snapshot of rx prefix learning state for display / operator tooling.
@@ -409,12 +439,16 @@ pub struct FakeProbeStore {
 
 #[cfg(test)]
 impl ProbeStore for FakeProbeStore {
-    fn load(&self) -> Vec<ProbeEntry> { self.entries.borrow().clone() }
+    fn load(&self) -> Vec<ProbeEntry> {
+        self.entries.borrow().clone()
+    }
     fn write(&self, entries: &[ProbeEntry]) {
         *self.entries.borrow_mut() = entries.to_vec();
     }
     fn remove_matching(&self, cmd: &str) {
-        self.entries.borrow_mut().retain(|e| e.original_command != cmd);
+        self.entries
+            .borrow_mut()
+            .retain(|e| e.original_command != cmd);
     }
 }
 
@@ -425,73 +459,140 @@ mod tests {
     #[test]
     fn split_simple_pipeline() {
         let segs = split_segments("cargo build | tail -5");
-        assert_eq!(segs, vec![
-            Segment { text: "cargo build ".to_string(), sep: Some("|".to_string()) },
-            Segment { text: " tail -5".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "cargo build ".to_string(),
+                    sep: Some("|".to_string())
+                },
+                Segment {
+                    text: " tail -5".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn split_and_and() {
         let segs = split_segments("git add -A && git commit -m 'msg'");
-        assert_eq!(segs, vec![
-            Segment { text: "git add -A ".to_string(), sep: Some("&&".to_string()) },
-            Segment { text: " git commit -m 'msg'".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "git add -A ".to_string(),
+                    sep: Some("&&".to_string())
+                },
+                Segment {
+                    text: " git commit -m 'msg'".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn split_semicolon() {
         let segs = split_segments("echo a; echo b");
-        assert_eq!(segs, vec![
-            Segment { text: "echo a".to_string(), sep: Some(";".to_string()) },
-            Segment { text: " echo b".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "echo a".to_string(),
+                    sep: Some(";".to_string())
+                },
+                Segment {
+                    text: " echo b".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn split_or_or() {
         let segs = split_segments("cargo check || echo failed");
-        assert_eq!(segs, vec![
-            Segment { text: "cargo check ".to_string(), sep: Some("||".to_string()) },
-            Segment { text: " echo failed".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "cargo check ".to_string(),
+                    sep: Some("||".to_string())
+                },
+                Segment {
+                    text: " echo failed".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn split_or_or_beats_single_pipe_at_same_position() {
         // "a || b" — `||` and `|` both match at position 2; `||` must win (longest).
         let segs = split_segments("a || b");
-        assert_eq!(segs, vec![
-            Segment { text: "a ".to_string(), sep: Some("||".to_string()) },
-            Segment { text: " b".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "a ".to_string(),
+                    sep: Some("||".to_string())
+                },
+                Segment {
+                    text: " b".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn split_mixed_or_or_and_pipe() {
         // Both operators present; each should split at the right place.
         let segs = split_segments("a || b | c");
-        assert_eq!(segs, vec![
-            Segment { text: "a ".to_string(), sep: Some("||".to_string()) },
-            Segment { text: " b ".to_string(), sep: Some("|".to_string()) },
-            Segment { text: " c".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "a ".to_string(),
+                    sep: Some("||".to_string())
+                },
+                Segment {
+                    text: " b ".to_string(),
+                    sep: Some("|".to_string())
+                },
+                Segment {
+                    text: " c".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn split_no_separator_is_single_segment() {
         let segs = split_segments("cargo test --workspace");
-        assert_eq!(segs, vec![
-            Segment { text: "cargo test --workspace".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![Segment {
+                text: "cargo test --workspace".to_string(),
+                sep: None
+            },]
+        );
     }
 
     #[test]
     fn rejoin_preserves_separators() {
         let segs = vec![
-            Segment { text: "cargo build ".to_string(), sep: Some("|".to_string()) },
-            Segment { text: " tail -5".to_string(), sep: None },
+            Segment {
+                text: "cargo build ".to_string(),
+                sep: Some("|".to_string()),
+            },
+            Segment {
+                text: " tail -5".to_string(),
+                sep: None,
+            },
         ];
         assert_eq!(rejoin(&segs), "cargo build | tail -5");
     }
@@ -499,32 +600,62 @@ mod tests {
     #[test]
     fn split_empty_string_returns_single_empty_segment() {
         let segs = split_segments("");
-        assert_eq!(segs, vec![Segment { text: "".to_string(), sep: None }]);
+        assert_eq!(
+            segs,
+            vec![Segment {
+                text: "".to_string(),
+                sep: None
+            }]
+        );
     }
 
     #[test]
     fn split_separator_only_returns_two_segments() {
         let segs = split_segments("&&");
-        assert_eq!(segs, vec![
-            Segment { text: "".to_string(), sep: Some("&&".to_string()) },
-            Segment { text: "".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "".to_string(),
+                    sep: Some("&&".to_string())
+                },
+                Segment {
+                    text: "".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn split_trailing_separator_produces_empty_last_segment() {
         let segs = split_segments("echo a; ");
-        assert_eq!(segs, vec![
-            Segment { text: "echo a".to_string(), sep: Some(";".to_string()) },
-            Segment { text: " ".to_string(), sep: None },
-        ]);
+        assert_eq!(
+            segs,
+            vec![
+                Segment {
+                    text: "echo a".to_string(),
+                    sep: Some(";".to_string())
+                },
+                Segment {
+                    text: " ".to_string(),
+                    sep: None
+                },
+            ]
+        );
     }
 
     #[test]
     fn rejoin_and_and() {
         let segs = vec![
-            Segment { text: "git add -A ".to_string(), sep: Some("&&".to_string()) },
-            Segment { text: " git commit -m 'msg'".to_string(), sep: None },
+            Segment {
+                text: "git add -A ".to_string(),
+                sep: Some("&&".to_string()),
+            },
+            Segment {
+                text: " git commit -m 'msg'".to_string(),
+                sep: None,
+            },
         ];
         assert_eq!(rejoin(&segs), "git add -A && git commit -m 'msg'");
     }
@@ -768,7 +899,15 @@ cargo = ["op", "plugin", "run", "--"]
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].key, "gh");
         assert_eq!(loaded[0].original_command, "gh issue list");
-        assert_eq!(loaded[0].prefix, vec!["op".to_string(), "plugin".to_string(), "run".to_string(), "--".to_string()]);
+        assert_eq!(
+            loaded[0].prefix,
+            vec![
+                "op".to_string(),
+                "plugin".to_string(),
+                "run".to_string(),
+                "--".to_string()
+            ]
+        );
     }
 
     #[test]

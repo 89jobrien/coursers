@@ -120,18 +120,40 @@ pub trait RtkRewrite {
 pub struct NullRtkClient;
 
 impl RtkAnalysis for NullRtkClient {
-    fn discover(&self, _since_days: u32) -> Option<RtkDiscoverReport> { None }
-    fn gain(&self) -> Option<RtkGainReport> { None }
-    fn session(&self) -> Option<Vec<RtkSessionEntry>> { None }
-    fn verify(&self) -> Option<RtkVerifyResult> { None }
-    fn hook_audit(&self) -> Option<RtkHookAudit> { None }
-    fn version(&self) -> Option<String> { None }
+    fn discover(&self, _since_days: u32) -> Option<RtkDiscoverReport> {
+        None
+    }
+    fn gain(&self) -> Option<RtkGainReport> {
+        None
+    }
+    fn session(&self) -> Option<Vec<RtkSessionEntry>> {
+        None
+    }
+    fn verify(&self) -> Option<RtkVerifyResult> {
+        None
+    }
+    fn hook_audit(&self) -> Option<RtkHookAudit> {
+        None
+    }
+    fn version(&self) -> Option<String> {
+        None
+    }
 }
 
 impl RtkRewrite for NullRtkClient {
-    fn rewrite(&self, _command: &str) -> Option<String> { None }
-    fn probe(&self, _command: &str) -> Option<RtkProbeResult> { None }
-    fn check(&self, _command: &str) -> bool { false }
-    fn list_proxies(&self) -> Vec<String> { vec![] }
-    fn flush(&self) -> bool { false }
+    fn rewrite(&self, _command: &str) -> Option<String> {
+        None
+    }
+    fn probe(&self, _command: &str) -> Option<RtkProbeResult> {
+        None
+    }
+    fn check(&self, _command: &str) -> bool {
+        false
+    }
+    fn list_proxies(&self) -> Vec<String> {
+        vec![]
+    }
+    fn flush(&self) -> bool {
+        false
+    }
 }
