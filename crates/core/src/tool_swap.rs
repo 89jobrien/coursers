@@ -135,8 +135,8 @@ fn swap_find(args: &[String], config: &ToolSwapConfig) -> ToolAction {
     // Only handle: find <path> -name <glob>
     // Refuse if -exec, -delete, -newer, -mtime, -atime, -ctime, -size, -perm, -empty, -L present.
     let complex_flags = [
-        "-exec", "-delete", "-newer", "-mtime", "-atime", "-ctime",
-        "-size", "-perm", "-empty", "-L",
+        "-exec", "-delete", "-newer", "-mtime", "-atime", "-ctime", "-size", "-perm", "-empty",
+        "-L",
     ];
     if args.iter().any(|a| complex_flags.contains(&a.as_str())) {
         return ToolAction::Passthrough;
@@ -151,11 +151,13 @@ fn swap_find(args: &[String], config: &ToolSwapConfig) -> ToolAction {
     }
 
     // Extract path (first non-flag arg) and -name value
-    let search_path = args.iter()
+    let search_path = args
+        .iter()
         .find(|a| !a.starts_with('-'))
         .map(|s| s.as_str())
         .unwrap_or(".");
-    let name_glob = args.iter()
+    let name_glob = args
+        .iter()
         .position(|a| a == "-name")
         .and_then(|i| args.get(i + 1))
         .map(|s| s.as_str());
@@ -300,8 +302,14 @@ mod tests {
             matches!(action, ToolAction::SwapTool { ref tool_name, .. } if tool_name == "Read")
         );
         if let ToolAction::SwapTool { tool_input, .. } = action {
-            assert_eq!(tool_input["file_path"].as_str().unwrap(), f.path().to_str().unwrap());
-            assert!(tool_input.get("limit").is_none(), "small file should have no limit");
+            assert_eq!(
+                tool_input["file_path"].as_str().unwrap(),
+                f.path().to_str().unwrap()
+            );
+            assert!(
+                tool_input.get("limit").is_none(),
+                "small file should have no limit"
+            );
         }
     }
 
@@ -320,7 +328,11 @@ mod tests {
         let f = write_lines(100);
         let cmd = format!("head -n 20 {}", f.path().display());
         let action = apply(&cmd, &cfg());
-        if let ToolAction::SwapTool { tool_name, tool_input } = action {
+        if let ToolAction::SwapTool {
+            tool_name,
+            tool_input,
+        } = action
+        {
             assert_eq!(tool_name, "Read");
             assert_eq!(tool_input["limit"].as_u64().unwrap(), 20);
         } else {
@@ -357,14 +369,21 @@ mod tests {
     fn tail_exceeds_limit_max_passthrough() {
         let f = write_lines(10);
         let cmd = format!("tail -n 600 {}", f.path().display());
-        let cfg = ToolSwapConfig { tail_limit_max: 500, ..Default::default() };
+        let cfg = ToolSwapConfig {
+            tail_limit_max: 500,
+            ..Default::default()
+        };
         assert_eq!(apply(&cmd, &cfg), ToolAction::Passthrough);
     }
 
     #[test]
     fn find_name_glob() {
         let action = apply("find . -name '*.rs'", &cfg());
-        if let ToolAction::SwapTool { tool_name, tool_input } = action {
+        if let ToolAction::SwapTool {
+            tool_name,
+            tool_input,
+        } = action
+        {
             assert_eq!(tool_name, "Glob");
             assert_eq!(tool_input["pattern"].as_str().unwrap(), "**/*.rs");
         } else {
@@ -376,7 +395,10 @@ mod tests {
     fn find_with_path() {
         let action = apply("find /Users/joe/dev -name '*.toml'", &cfg());
         if let ToolAction::SwapTool { tool_input, .. } = action {
-            assert_eq!(tool_input["pattern"].as_str().unwrap(), "/Users/joe/dev/**/*.toml");
+            assert_eq!(
+                tool_input["pattern"].as_str().unwrap(),
+                "/Users/joe/dev/**/*.toml"
+            );
         } else {
             panic!("expected SwapTool");
         }

@@ -82,7 +82,10 @@ mod tests {
     #[test]
     fn fake_client_returns_injected_data() {
         let c = FakeObfsckMcpClient {
-            audit_hits: vec![AuditHit { label: "api-key".into(), count: 2 }],
+            audit_hits: vec![AuditHit {
+                label: "api-key".into(),
+                count: 2,
+            }],
             filter_suggestions: vec![FilterSuggestion {
                 pattern: r"sk-[A-Za-z0-9]{32}".into(),
                 label: "api-key".into(),

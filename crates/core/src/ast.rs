@@ -9,7 +9,11 @@ impl ShellCmd {
         self.argv.first().map(|s| s.as_str()).unwrap_or("")
     }
     pub fn args(&self) -> &[String] {
-        if self.argv.is_empty() { &[] } else { &self.argv[1..] }
+        if self.argv.is_empty() {
+            &[]
+        } else {
+            &self.argv[1..]
+        }
     }
 }
 

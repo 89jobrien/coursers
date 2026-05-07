@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use crate::state::{load as fs_load, save as fs_save, State};
+use crate::state::{State, load as fs_load, save as fs_save};
 
 pub trait StateStore {
     fn load(&self) -> State;

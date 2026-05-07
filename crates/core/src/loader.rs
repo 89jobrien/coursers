@@ -1,4 +1,4 @@
-use crate::rules::{load as fs_load, RulesConfig};
+use crate::rules::{RulesConfig, load as fs_load};
 
 pub trait RulesLoader {
     fn load(&self) -> RulesConfig;

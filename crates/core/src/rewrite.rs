@@ -27,7 +27,11 @@ pub struct RewriteConfig {
 /// (so that env refs are always resolved even without an explicit rewrite rule).
 ///
 /// Returns `Some(rewritten_or_expanded)` if the command changed, `None` if unchanged.
-pub fn apply(command: &str, config: &RewriteConfig, expander: &impl crate::expand::VarExpander) -> Option<String> {
+pub fn apply(
+    command: &str,
+    config: &RewriteConfig,
+    expander: &impl crate::expand::VarExpander,
+) -> Option<String> {
     let expanded = expander.expand(command);
 
     for rule in &config.rewrites {
@@ -74,7 +78,10 @@ mod tests {
     #[test]
     fn rewrites_matching_command() {
         let c = cfg(&[("^git status$", "git status --short")]);
-        assert_eq!(apply("git status", &c, &NoopExpander).unwrap(), "git status --short");
+        assert_eq!(
+            apply("git status", &c, &NoopExpander).unwrap(),
+            "git status --short"
+        );
     }
 
     #[test]
@@ -106,7 +113,13 @@ mod tests {
 
     #[test]
     fn invalid_regex_skipped() {
-        let c = cfg(&[("[(invalid", "replace"), ("^cargo build$", "cargo --color always build")]);
-        assert_eq!(apply("cargo build", &c, &NoopExpander).unwrap(), "cargo --color always build");
+        let c = cfg(&[
+            ("[(invalid", "replace"),
+            ("^cargo build$", "cargo --color always build"),
+        ]);
+        assert_eq!(
+            apply("cargo build", &c, &NoopExpander).unwrap(),
+            "cargo --color always build"
+        );
     }
 }
