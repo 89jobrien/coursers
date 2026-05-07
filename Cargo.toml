@@ -25,6 +25,7 @@ toml = "0.8"
 walkdir = "2"
 chrono = "0.4"
 shell-words = "1"
+prefixe = "0.1"
 
 [profile.release]
 strip = true
