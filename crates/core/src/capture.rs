@@ -126,10 +126,6 @@ impl InMemoryCaptureStore {
     pub fn records(&self) -> Vec<SuggestionRecord> {
         self.inner.borrow().clone()
     }
-
-    pub fn get_records(&self) -> Vec<SuggestionRecord> {
-        self.records()
-    }
 }
 
 #[cfg(any(test, feature = "testing"))]
