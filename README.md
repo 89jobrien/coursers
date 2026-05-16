@@ -14,7 +14,7 @@ Two tools:
 ### Rule-based blocking (`coursers pre`)
 
 Reads the Claude Code `PreToolUse` JSON payload from stdin. If the `Bash` tool's command
-matches a rule in `~/.claude/hooks/course-correct-rules.json`, the hook returns a `deny`
+matches a rule in `~/.config/coursers/course-correct-rules.json`, the hook returns a `deny`
 response with a human-readable message.
 
 Rules support:
@@ -74,7 +74,7 @@ and failure learning.
 
 ## Configuration
 
-Rules file: `~/.claude/hooks/course-correct-rules.json`
+Rules file: `~/.config/coursers/course-correct-rules.json`
 (override with `COURSERS_RULES` env var)
 
 ```json
@@ -99,26 +99,26 @@ Rules file: `~/.claude/hooks/course-correct-rules.json`
 
 ### Rule fields
 
-| Field           | Required | Description                                              |
-|-----------------|----------|----------------------------------------------------------|
-| `id`            | yes      | Unique identifier shown in block messages                |
-| `pattern`       | yes      | Regex matched against the full command string            |
-| `pattern_flags` | no       | `"i"` for case-insensitive matching                      |
-| `exceptions`    | no       | List of regexes — if any match, the rule is skipped      |
-| `enabled`       | no       | Defaults to `true`                                       |
-| `message`       | no       | Custom deny message; defaults to `Blocked by rule '<id>'`|
+| Field           | Required | Description                                               |
+| --------------- | -------- | --------------------------------------------------------- |
+| `id`            | yes      | Unique identifier shown in block messages                 |
+| `pattern`       | yes      | Regex matched against the full command string             |
+| `pattern_flags` | no       | `"i"` for case-insensitive matching                       |
+| `exceptions`    | no       | List of regexes — if any match, the rule is skipped       |
+| `enabled`       | no       | Defaults to `true`                                        |
+| `message`       | no       | Custom deny message; defaults to `Blocked by rule '<id>'` |
 
 ### Failure learning fields
 
-| Field                    | Default | Description                                       |
-|--------------------------|---------|---------------------------------------------------|
-| `enabled`                | `true`  | Toggle the whole subsystem                        |
-| `block_threshold`        | `3`     | Failures required to trigger a block              |
-| `window_seconds`         | `300`   | Sliding window (5 minutes)                        |
-| `cleanup_after_seconds`  | `3600`  | Remove entries not seen in this long              |
-| `max_tracked_commands`   | `200`   | Evict oldest when over limit                      |
-| `state_file`             | —       | Override state path; supports `~/` prefix         |
-| `message_template`       | —       | Custom message with `{count}`, `{window}`, `{preview}` tokens |
+| Field                   | Default | Description                                                   |
+| ----------------------- | ------- | ------------------------------------------------------------- |
+| `enabled`               | `true`  | Toggle the whole subsystem                                    |
+| `block_threshold`       | `3`     | Failures required to trigger a block                          |
+| `window_seconds`        | `300`   | Sliding window (5 minutes)                                    |
+| `cleanup_after_seconds` | `3600`  | Remove entries not seen in this long                          |
+| `max_tracked_commands`  | `200`   | Evict oldest when over limit                                  |
+| `state_file`            | —       | Override state path; supports `~/` prefix                     |
+| `message_template`      | —       | Custom message with `{count}`, `{window}`, `{preview}` tokens |
 
 ---
 
@@ -133,12 +133,12 @@ Reads PostToolUse output and suppresses or compresses it based on rules in
 
 Filter modes per rule:
 
-| Mode            | Behaviour                                              |
-|-----------------|--------------------------------------------------------|
-| `passthrough`   | Output unchanged (default)                             |
-| `failures-only` | Suppress output on exit 0; pass through on failure     |
-| `errors-only`   | Only pass lines containing "error" (case-insensitive)  |
-| `truncate`      | Keep first N lines (`max_lines`, default 50)           |
+| Mode            | Behaviour                                             |
+| --------------- | ----------------------------------------------------- |
+| `passthrough`   | Output unchanged (default)                            |
+| `failures-only` | Suppress output on exit 0; pass through on failure    |
+| `errors-only`   | Only pass lines containing "error" (case-insensitive) |
+| `truncate`      | Keep first N lines (`max_lines`, default 50)          |
 
 Example `.ctx/crs-filters.toml`:
 
@@ -172,12 +172,15 @@ replace = "cargo build --message-format json"
 Wire into `settings.json`:
 
 ```json
-{ "matcher": "Bash", "hooks": [{ "type": "command", "command": "crs rewrite" }] }
+{
+  "matcher": "Bash",
+  "hooks": [{ "type": "command", "command": "crs rewrite" }]
+}
 ```
 
-### `crs discover` _(not yet implemented)_
+### `crs discover`
 
-Will scan Claude Code session history (`~/.claude/projects/**/*.jsonl`) to surface Bash
+Scans Claude Code session history (`~/.claude/projects/**/*.jsonl`) to surface Bash
 commands that match filter/rewrite rules but weren't intercepted.
 
 ---
