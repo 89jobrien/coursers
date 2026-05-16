@@ -33,7 +33,8 @@ pub fn unix_secs_to_ymd(secs: u64) -> (u32, u32, u32) {
     let mut z = days_since_epoch + 719_468;
     let era = z / DAYS_PER_400Y;
     z %= DAYS_PER_400Y;
-    let yoe = (z - z / DAYS_PER_4Y + z / DAYS_PER_100Y - z / (DAYS_PER_400Y - 1)) / DAYS_PER_YEAR;
+    let yoe =
+        (z - z / (DAYS_PER_4Y - 1) + z / DAYS_PER_100Y - z / (DAYS_PER_400Y - 1)) / DAYS_PER_YEAR;
     let y = yoe + era * 400;
     let doy = z - (DAYS_PER_YEAR * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
