@@ -46,6 +46,17 @@ pub struct SuggestionRecord {
     pub count: u32,
 }
 
+/// Parameters for constructing a [`SuggestionRecord`].
+/// Reduces the 6-arg constructor to a named-field struct.
+pub struct SuggestionParams {
+    pub original: String,
+    pub suggestion: String,
+    pub rule_id: String,
+    pub cwd: String,
+    pub session_id: Option<String>,
+    pub tool_name: String,
+}
+
 impl SuggestionRecord {
     pub fn new(
         original: impl Into<String>,
@@ -55,17 +66,27 @@ impl SuggestionRecord {
         session_id: Option<String>,
         tool_name: impl Into<String>,
     ) -> Self {
-        let cwd = cwd.into();
-        let repo = repo_from_cwd(&cwd);
-        Self {
-            ts: now_iso8601(),
+        Self::from_params(SuggestionParams {
             original: original.into(),
             suggestion: suggestion.into(),
             rule_id: rule_id.into(),
-            cwd,
-            repo,
+            cwd: cwd.into(),
             session_id,
             tool_name: tool_name.into(),
+        })
+    }
+
+    pub fn from_params(p: SuggestionParams) -> Self {
+        let repo = repo_from_cwd(&p.cwd);
+        Self {
+            ts: now_iso8601(),
+            original: p.original,
+            suggestion: p.suggestion,
+            rule_id: p.rule_id,
+            cwd: p.cwd,
+            repo,
+            session_id: p.session_id,
+            tool_name: p.tool_name,
             accepted: false,
             accepted_ts: None,
             exit_code: None,
@@ -225,19 +246,7 @@ impl SuggestionStore {
         let Ok(_guard) = lock.write() else { return };
 
         let mut records = self.load();
-        let key = DedupeKey::from_record(&record);
-
-        if let Some(existing) = records
-            .iter_mut()
-            .find(|r| DedupeKey::from_record(r) == key)
-        {
-            existing.count += 1;
-            // Upgrade accepted signal if new record carries it.
-            if record.accepted && !existing.accepted {
-                existing.accepted = true;
-                existing.accepted_ts = record.accepted_ts;
-                existing.exit_code = record.exit_code;
-            }
+        if merge_duplicate(&mut records, &record) {
             self.write_all(&records);
         } else {
             self.append(&record);
@@ -250,26 +259,7 @@ impl SuggestionStore {
         let Ok(_guard) = lock.write() else { return };
 
         let mut records = self.load();
-        let mut changed = false;
-
-        for r in records.iter_mut() {
-            if r.accepted {
-                continue;
-            }
-            if r.session_id.as_deref() != Some(session_id) {
-                continue;
-            }
-            // Accept if the run command matches the suggestion (trimmed).
-            if r.suggestion.trim() != command.trim() {
-                continue;
-            }
-            r.accepted = true;
-            r.accepted_ts = Some(now_iso8601());
-            r.exit_code = Some(exit_code);
-            changed = true;
-        }
-
-        if changed {
+        if apply_accepted(&mut records, session_id, command, exit_code) {
             self.write_all(&records);
         }
     }
@@ -318,6 +308,57 @@ impl CaptureStore for SuggestionStore {
     fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
         self.do_mark_accepted(session_id, command, exit_code);
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pure domain predicates (IOSP: no I/O, no side effects)
+// ---------------------------------------------------------------------------
+
+/// Merge `record` into `records` if a duplicate exists.
+/// Returns `true` if a duplicate was found (caller must rewrite), `false` if new (caller appends).
+fn merge_duplicate(records: &mut Vec<SuggestionRecord>, record: &SuggestionRecord) -> bool {
+    let key = DedupeKey::from_record(record);
+    if let Some(existing) = records
+        .iter_mut()
+        .find(|r| DedupeKey::from_record(r) == key)
+    {
+        existing.count += 1;
+        if record.accepted && !existing.accepted {
+            existing.accepted = true;
+            existing.accepted_ts = record.accepted_ts.clone();
+            existing.exit_code = record.exit_code;
+        }
+        true
+    } else {
+        false
+    }
+}
+
+/// Mark all matching pending records as accepted.
+/// Returns `true` if any record was changed.
+fn apply_accepted(
+    records: &mut Vec<SuggestionRecord>,
+    session_id: &str,
+    command: &str,
+    exit_code: i64,
+) -> bool {
+    let mut changed = false;
+    for r in records.iter_mut() {
+        if is_acceptable_match(r, session_id, command) {
+            r.accepted = true;
+            r.accepted_ts = Some(now_iso8601());
+            r.exit_code = Some(exit_code);
+            changed = true;
+        }
+    }
+    changed
+}
+
+/// Pure predicate: should this record be accepted given session + command?
+fn is_acceptable_match(r: &SuggestionRecord, session_id: &str, command: &str) -> bool {
+    !r.accepted
+        && r.session_id.as_deref() == Some(session_id)
+        && r.suggestion.trim() == command.trim()
 }
 
 // ---------------------------------------------------------------------------
