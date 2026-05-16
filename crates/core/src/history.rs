@@ -184,23 +184,8 @@ fn days_ago(days: u32) -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    let cutoff_secs = secs.saturating_sub(days as u64 * 86400);
-    unix_secs_to_date(cutoff_secs)
-}
-
-fn unix_secs_to_date(secs: u64) -> String {
-    let days_since_epoch = secs / 86400;
-    let mut remaining = days_since_epoch + 719468;
-    let era = remaining / 146097;
-    remaining %= 146097;
-    let yoe = (remaining - remaining / 1460 + remaining / 36524 - remaining / 146096) / 365;
-    let y = yoe + era * 400;
-    let doy = remaining - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = if m <= 2 { y + 1 } else { y };
-    format!("{y:04}-{m:02}-{d:02}")
+    let cutoff_secs = secs.saturating_sub(days as u64 * crate::date::SECS_PER_DAY);
+    crate::date::unix_secs_to_date_str(cutoff_secs)
 }
 
 #[cfg(test)]
