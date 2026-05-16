@@ -13,17 +13,43 @@ pub struct ProcessRtkClient;
 impl ProcessRtkClient {
     fn run(&self, args: &[&str]) -> Option<String> {
         let out = Command::new("rtk").args(args).output().ok()?;
-        if out.status.success() {
-            Some(String::from_utf8_lossy(&out.stdout).into_owned())
-        } else {
-            None
-        }
+        stdout_if_success(&out.status, &out.stdout)
     }
 
     fn run_json(&self, args: &[&str]) -> Option<serde_json::Value> {
         let stdout = self.run(args)?;
         serde_json::from_str(&stdout).ok()
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pure predicates — no I/O, fully unit-testable
+// ---------------------------------------------------------------------------
+
+/// Returns the stdout as a String when the process exited successfully.
+pub(crate) fn stdout_if_success(
+    status: &std::process::ExitStatus,
+    stdout: &[u8],
+) -> Option<String> {
+    if status.success() {
+        Some(String::from_utf8_lossy(stdout).into_owned())
+    } else {
+        None
+    }
+}
+
+/// Interprets a raw `rtk rewrite` stdout string.
+///
+/// Returns `Some(s)` when the trimmed output is non-empty, `None` otherwise.
+/// Does not touch any I/O.
+pub(crate) fn parse_rewrite_output(raw: &str) -> Option<String> {
+    let s = raw.trim().to_owned();
+    if s.is_empty() { None } else { Some(s) }
+}
+
+/// Parses `rtk verify` text output for the hook-installed predicate.
+pub(crate) fn hook_installed_from_verify(stdout: &str) -> bool {
+    !stdout.contains("RTK hook not installed")
 }
 
 impl RtkAnalysis for ProcessRtkClient {
@@ -83,7 +109,7 @@ impl RtkAnalysis for ProcessRtkClient {
 
     fn verify(&self) -> Option<RtkVerifyResult> {
         let stdout = self.run(&["verify"])?;
-        let hook_installed = !stdout.contains("RTK hook not installed");
+        let hook_installed = hook_installed_from_verify(&stdout);
         let tests_total = parse_test_count(&stdout, "tests passed").unwrap_or(0);
         Some(RtkVerifyResult {
             hook_installed,
@@ -121,12 +147,8 @@ impl RtkRewrite for ProcessRtkClient {
             .args(["rewrite", command])
             .output()
             .ok()?;
-        if out.status.success() {
-            let s = String::from_utf8_lossy(&out.stdout).trim().to_owned();
-            if s.is_empty() { None } else { Some(s) }
-        } else {
-            None
-        }
+        let raw = stdout_if_success(&out.status, &out.stdout)?;
+        parse_rewrite_output(&raw)
     }
 
     fn probe(&self, command: &str) -> Option<RtkProbeResult> {
@@ -177,4 +199,41 @@ fn parse_test_count(s: &str, suffix: &str) -> Option<u32> {
         .find(|l| l.contains(suffix))
         .and_then(|l| l.split('/').next())
         .and_then(|part| part.trim().parse().ok())
+}
+
+// ---------------------------------------------------------------------------
+// Unit tests for pure predicate functions
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_rewrite_output_returns_none_for_empty() {
+        assert_eq!(parse_rewrite_output(""), None);
+        assert_eq!(parse_rewrite_output("   \n"), None);
+    }
+
+    #[test]
+    fn parse_rewrite_output_returns_trimmed_string() {
+        assert_eq!(
+            parse_rewrite_output("  rg foo  \n"),
+            Some("rg foo".to_owned())
+        );
+    }
+
+    #[test]
+    fn hook_installed_from_verify_detects_missing_hook() {
+        assert!(!hook_installed_from_verify(
+            "RTK hook not installed\nsome other output"
+        ));
+    }
+
+    #[test]
+    fn hook_installed_from_verify_detects_present_hook() {
+        assert!(hook_installed_from_verify(
+            "All checks passed.\n3/3 tests passed"
+        ));
+    }
 }
