@@ -8,6 +8,7 @@ pub mod history;
 pub mod insights;
 pub mod loader;
 pub mod obfsck;
+pub mod pipeline;
 pub mod replay;
 pub mod rewrite;
 pub mod rtk;

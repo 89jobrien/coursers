@@ -155,6 +155,21 @@ pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
     None
 }
 
+/// Pipeline-aware variant of `check`. Splits `command` on sequential operators
+/// (`&&`, `||`, `;`) and returns a block decision if any segment matches a rule.
+pub fn check_pipeline(command: &str, rules: &[Rule]) -> Option<(String, String)> {
+    crate::pipeline::sequential_segments(command)
+        .into_iter()
+        .find_map(|seg| check(seg, rules))
+}
+
+/// Pipeline-aware variant of `matched_rule_id`.
+pub fn matched_rule_id_pipeline(command: &str, rules: &[Rule]) -> Option<String> {
+    crate::pipeline::sequential_segments(command)
+        .into_iter()
+        .find_map(|seg| matched_rule_id(seg, rules))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -214,6 +229,48 @@ mod tests {
     #[test]
     fn no_rules_allows_all() {
         assert!(check("grep foo .", &[]).is_none());
+    }
+
+    // ── check_pipeline ────────────────────────────────────────────────────
+
+    #[test]
+    fn pipeline_clean_command_passes() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        assert!(check_pipeline("cargo build && git status", &rules).is_none());
+    }
+
+    #[test]
+    fn pipeline_second_segment_blocked() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        let result = check_pipeline("cargo build && grep foo .", &rules);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().0, "no-grep");
+    }
+
+    #[test]
+    fn pipeline_first_segment_blocked() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        assert!(check_pipeline("grep foo . && cargo test", &rules).is_some());
+    }
+
+    #[test]
+    fn pipeline_pipe_exception_still_works() {
+        // `| grep` exception matches the whole piped segment — pipe is NOT split
+        let mut rule = make_rule("no-grep", r"\bgrep\b");
+        rule.exceptions = vec![r"\| grep".to_string()];
+        assert!(check_pipeline("cmd | grep foo", &[rule]).is_none());
+    }
+
+    #[test]
+    fn pipeline_semicolon_split() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        assert!(check_pipeline("echo hi; grep foo .", &rules).is_some());
+    }
+
+    #[test]
+    fn pipeline_or_or_split() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        assert!(check_pipeline("cargo build || grep foo .", &rules).is_some());
     }
 
     #[test]
