@@ -18,4 +18,6 @@ pub mod state;
 pub mod stats;
 pub mod store;
 pub mod suggest;
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 pub mod tool_swap;
