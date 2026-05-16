@@ -22,6 +22,22 @@ static EXCLUDE_RES: std::sync::LazyLock<Vec<regex::Regex>> = std::sync::LazyLock
     .collect()
 });
 
+fn is_excluded(command: &str) -> bool {
+    EXCLUDE_RES.iter().any(|re| re.is_match(command))
+}
+
+/// Pure predicate: true when a failure for `command` with `exit_code` should be recorded.
+/// Does not check whether failure_learning is enabled — that is the caller's concern.
+pub(crate) fn should_record(exit_code: i64, command: &str) -> bool {
+    if exit_code == 0 {
+        return false;
+    }
+    if SIGNAL_EXIT_CODES.contains(&exit_code) {
+        return false;
+    }
+    !is_excluded(command)
+}
+
 pub fn run_with<L: RulesLoader, S: StateStore>(
     loader: &L,
     store: &S,
@@ -56,11 +72,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
         return;
     }
 
-    if SIGNAL_EXIT_CODES.contains(&exit_code) {
-        return;
-    }
-
-    if is_excluded(command) {
+    if !should_record(exit_code, command) {
         return;
     }
 
@@ -129,6 +141,28 @@ mod tests {
             session_id: None,
             cwd: None,
         }
+    }
+
+    #[test]
+    fn should_record_exit_zero_is_false() {
+        assert!(!should_record(0, "grep foo ."));
+    }
+
+    #[test]
+    fn should_record_signal_exits_are_false() {
+        assert!(!should_record(130, "grep foo ."));
+        assert!(!should_record(137, "grep foo ."));
+        assert!(!should_record(143, "grep foo ."));
+    }
+
+    #[test]
+    fn should_record_excluded_pattern_is_false() {
+        assert!(!should_record(1, "cmd 2>/dev/null"));
+    }
+
+    #[test]
+    fn should_record_real_failure_is_true() {
+        assert!(should_record(1, "grep foo ."));
     }
 
     #[test]
@@ -212,8 +246,4 @@ mod tests {
         run_with(&loader, &store, &InMemoryCaptureStore::new(), &payload);
         assert!(store.get_state().failures.is_empty());
     }
-}
-
-fn is_excluded(command: &str) -> bool {
-    EXCLUDE_RES.iter().any(|re| re.is_match(command))
 }

@@ -5,22 +5,30 @@ use crs_core::{rules, state};
 
 use super::{HookPayload, deny};
 
-/// For the `no-ls-use-glob` rule, extract the target path from the `ls` command and append
-/// a file-tree listing so Claude gets useful context without needing to retry.
-fn enrich_message(rule_id: &str, command: &str, base_msg: &str) -> String {
-    if rule_id != "no-ls-use-glob" {
-        return base_msg.to_string();
-    }
+/// Returns true when `rule_id` is the ls rule that warrants directory enrichment.
+pub(crate) fn should_enrich(rule_id: &str) -> bool {
+    rule_id == "no-ls-use-glob"
+}
 
-    // Extract path: take the last whitespace-delimited token that doesn't start with `-`.
-    // Falls back to `.` when none is found (bare `ls`).
-    let path = command
+/// Extract the target path from an `ls` command.
+/// Takes the last non-flag token after `ls`; falls back to `.` for bare `ls`.
+pub(crate) fn extract_ls_path(command: &str) -> &str {
+    command
         .split_whitespace()
         .skip(1) // skip "ls"
         .filter(|t| !t.starts_with('-'))
         .last()
-        .unwrap_or(".");
+        .unwrap_or(".")
+}
 
+/// For the `no-ls-use-glob` rule, extract the target path from the `ls` command and append
+/// a file-tree listing so Claude gets useful context without needing to retry.
+fn enrich_message(rule_id: &str, command: &str, base_msg: &str) -> String {
+    if !should_enrich(rule_id) {
+        return base_msg.to_string();
+    }
+
+    let path = extract_ls_path(command);
     let tree = file_tree(path);
     format!(
         "{}\n\nDirectory listing for `{}`:\n{}",
@@ -185,6 +193,37 @@ mod tests {
             },
         );
         State { failures }
+    }
+
+    #[test]
+    fn should_enrich_true_for_ls_rule() {
+        assert!(should_enrich("no-ls-use-glob"));
+    }
+
+    #[test]
+    fn should_enrich_false_for_other_rules() {
+        assert!(!should_enrich("no-find-use-glob"));
+        assert!(!should_enrich(""));
+    }
+
+    #[test]
+    fn extract_ls_path_bare_ls() {
+        assert_eq!(extract_ls_path("ls"), ".");
+    }
+
+    #[test]
+    fn extract_ls_path_with_flag_only() {
+        assert_eq!(extract_ls_path("ls -la"), ".");
+    }
+
+    #[test]
+    fn extract_ls_path_with_target() {
+        assert_eq!(extract_ls_path("ls -la /tmp"), "/tmp");
+    }
+
+    #[test]
+    fn extract_ls_path_last_non_flag_wins() {
+        assert_eq!(extract_ls_path("ls src/ tests/"), "tests/");
     }
 
     #[test]
