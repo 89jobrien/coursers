@@ -4,43 +4,81 @@
 /// unit and existing exception patterns (e.g. `\| grep`) rely on the full
 /// segment context including the pipe.
 ///
-/// Each segment is trimmed. Empty segments are dropped.
+/// Operators inside single-quoted (`'...'`) or double-quoted (`"..."`) strings
+/// are skipped. Inside double quotes, `\"` is treated as an escaped quote.
+/// Single-quoted strings have no escape sequences (POSIX semantics).
 ///
-/// Note: this is a naive scan — it does not handle operators inside quoted
-/// strings. That is acceptable for Claude-generated Bash commands in practice.
+/// Each segment is trimmed. Empty segments are dropped.
 pub fn sequential_segments(cmd: &str) -> Vec<&str> {
+    #[derive(PartialEq)]
+    enum Q {
+        None,
+        Single,
+        Double,
+    }
+
     let bytes = cmd.as_bytes();
     let mut segments: Vec<&str> = Vec::new();
     let mut start = 0usize;
     let mut i = 0usize;
+    let mut quote = Q::None;
 
     while i < bytes.len() {
-        // Check for `&&` or `||` (two-char operators)
-        if i + 1 < bytes.len()
-            && ((bytes[i] == b'&' && bytes[i + 1] == b'&')
-                || (bytes[i] == b'|' && bytes[i + 1] == b'|'))
-        {
-            let seg = cmd[start..i].trim();
-            if !seg.is_empty() {
-                segments.push(seg);
+        match quote {
+            Q::None => {
+                match bytes[i] {
+                    b'\'' => {
+                        quote = Q::Single;
+                        i += 1;
+                    }
+                    b'"' => {
+                        quote = Q::Double;
+                        i += 1;
+                    }
+                    // `&&` or `||`
+                    b'&' | b'|' if i + 1 < bytes.len() && bytes[i + 1] == bytes[i] => {
+                        let seg = cmd[start..i].trim();
+                        if !seg.is_empty() {
+                            segments.push(seg);
+                        }
+                        i += 2;
+                        start = i;
+                    }
+                    b';' => {
+                        let seg = cmd[start..i].trim();
+                        if !seg.is_empty() {
+                            segments.push(seg);
+                        }
+                        i += 1;
+                        start = i;
+                    }
+                    _ => {
+                        i += 1;
+                    }
+                }
             }
-            i += 2;
-            start = i;
-            continue;
-        }
-
-        // Check for `;` (single-char operator)
-        if bytes[i] == b';' {
-            let seg = cmd[start..i].trim();
-            if !seg.is_empty() {
-                segments.push(seg);
+            Q::Single => {
+                // No escape sequences in single quotes
+                if bytes[i] == b'\'' {
+                    quote = Q::None;
+                }
+                i += 1;
             }
-            i += 1;
-            start = i;
-            continue;
+            Q::Double => {
+                match bytes[i] {
+                    b'\\' if i + 1 < bytes.len() => {
+                        i += 2;
+                    } // skip escaped char
+                    b'"' => {
+                        quote = Q::None;
+                        i += 1;
+                    }
+                    _ => {
+                        i += 1;
+                    }
+                }
+            }
         }
-
-        i += 1;
     }
 
     // Trailing segment
@@ -129,6 +167,59 @@ mod tests {
             sequential_segments("a && b || c; d"),
             vec!["a", "b", "c", "d"]
         );
+    }
+
+    // ── quote-aware tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn double_quoted_and_and_not_split() {
+        // The && is inside a double-quoted string — must not split
+        assert_eq!(
+            sequential_segments(r#"echo "cargo build && grep foo src/""#),
+            vec![r#"echo "cargo build && grep foo src/""#]
+        );
+    }
+
+    #[test]
+    fn single_quoted_and_and_not_split() {
+        assert_eq!(
+            sequential_segments("echo 'cargo build && grep foo src/'"),
+            vec!["echo 'cargo build && grep foo src/'"]
+        );
+    }
+
+    #[test]
+    fn double_quoted_semicolon_not_split() {
+        assert_eq!(
+            sequential_segments(r#"echo "a; b""#),
+            vec![r#"echo "a; b""#]
+        );
+    }
+
+    #[test]
+    fn operator_after_closing_quote_does_split() {
+        assert_eq!(
+            sequential_segments(r#"echo "hello" && cargo test"#),
+            vec![r#"echo "hello""#, "cargo test"]
+        );
+    }
+
+    #[test]
+    fn escaped_double_quote_not_mistaken_for_close() {
+        // The \" inside the string is not the closing quote
+        assert_eq!(
+            sequential_segments(r#"echo "say \"hi\" && bye""#),
+            vec![r#"echo "say \"hi\" && bye""#]
+        );
+    }
+
+    #[test]
+    fn printf_json_payload_not_split() {
+        // Simulates the hook-demo case that originally caused false positives
+        let cmd = r#"printf '{"tool_name":"Bash","tool_input":{"command":"cargo build && grep foo src/"}}' | coursers pre"#;
+        let segs = sequential_segments(cmd);
+        assert_eq!(segs.len(), 1);
+        assert_eq!(segs[0], cmd);
     }
 
     // ── property tests ────────────────────────────────────────────────────
