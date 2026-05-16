@@ -6,15 +6,21 @@ use crs_core::store::StateStore;
 use super::HookPayload;
 
 const SIGNAL_EXIT_CODES: &[i64] = &[130, 137, 143];
-const EXCLUDE_PATTERNS: &[&str] = &[
-    r"^\s*false\s*$",
-    r"\|\|\s*(true|:)\s*$",
-    r";\s*(true|:)\s*$",
-    r"^\s*\[",
-    r"\btest\s+-[defhlrswxz]\b",
-    r"2>/dev/null",
-    r">/dev/null\s+2>&1",
-];
+
+static EXCLUDE_RES: std::sync::LazyLock<Vec<regex::Regex>> = std::sync::LazyLock::new(|| {
+    [
+        r"^\s*false\s*$",
+        r"\|\|\s*(true|:)\s*$",
+        r";\s*(true|:)\s*$",
+        r"^\s*\[",
+        r"\btest\s+-[defhlrswxz]\b",
+        r"2>/dev/null",
+        r">/dev/null\s+2>&1",
+    ]
+    .iter()
+    .map(|p| regex::Regex::new(p).expect("hardcoded exclude pattern is valid"))
+    .collect()
+});
 
 pub fn run_with<L: RulesLoader, S: StateStore>(
     loader: &L,
@@ -209,9 +215,5 @@ mod tests {
 }
 
 fn is_excluded(command: &str) -> bool {
-    EXCLUDE_PATTERNS.iter().any(|pat| {
-        regex::Regex::new(pat)
-            .map(|re| re.is_match(command))
-            .unwrap_or(false)
-    })
+    EXCLUDE_RES.iter().any(|re| re.is_match(command))
 }

@@ -9,6 +9,7 @@
 //! `~/.config/coursers/suggestions.jsonl`. Dedup key is `(original, suggestion)`;
 //! duplicates increment `count` and upgrade `accepted` from false → true.
 
+use fd_lock::RwLock as FdRwLock;
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, Write};
 use std::path::{Path, PathBuf};
@@ -210,7 +211,23 @@ impl SuggestionStore {
         self.do_mark_accepted(session_id, command, exit_code);
     }
 
+    fn lock_file(&self) -> Option<std::fs::File> {
+        if let Some(parent) = self.path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .write(true)
+            .open(&self.path)
+            .ok()
+    }
+
     fn do_record(&self, record: SuggestionRecord) {
+        let Some(file) = self.lock_file() else { return };
+        let mut lock = FdRwLock::new(file);
+        let Ok(_guard) = lock.write() else { return };
+
         let mut records = self.load();
         let key = DedupeKey::from_record(&record);
 
@@ -232,6 +249,10 @@ impl SuggestionStore {
     }
 
     fn do_mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
+        let Some(file) = self.lock_file() else { return };
+        let mut lock = FdRwLock::new(file);
+        let Ok(_guard) = lock.write() else { return };
+
         let mut records = self.load();
         let mut changed = false;
 
