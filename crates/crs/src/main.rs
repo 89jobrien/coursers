@@ -1226,7 +1226,7 @@ fn cmd_audit(remove: Option<String>) {
 
     let state = audit_state(&prefix_store, &probe_store);
 
-    println!("RX Prefix Audit");
+    println!("Prefix Audit");
     println!("{}", "=".repeat(60));
 
     println!("\nConfirmed mappings ({})", state.mappings.len());

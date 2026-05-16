@@ -3,7 +3,10 @@ mod hook;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "coursers", about = "Claude Code course-correction hook pipeline")]
+#[command(
+    name = "coursers",
+    about = "Claude Code course-correction hook pipeline"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Command,

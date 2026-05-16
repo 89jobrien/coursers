@@ -53,6 +53,7 @@ All domain logic lives here. Key modules:
 ### coursers binary
 
 Two subcommands wired as Claude Code hooks:
+
 - `coursers pre` — reads `PreToolUse` JSON from stdin; blocks if command matches a rule and no
   exception overrides; also blocks commands that have hit the failure threshold
 - `coursers post` — reads `PostToolUse` JSON from stdin; records non-zero exits to the
@@ -61,6 +62,7 @@ Two subcommands wired as Claude Code hooks:
 ### crs binary
 
 Five subcommands:
+
 - `crs filter` — PostToolUse hook; compresses/suppresses output per filter rules
 - `crs rewrite` — PreToolUse hook; rewrites commands (e.g. force `--message-format json`);
   exit 1 = passthrough unchanged, exit 0 + JSON = rewritten
@@ -77,13 +79,13 @@ file system directly.
 
 ## Configuration files
 
-| File | Used by | Purpose |
-|------|---------|---------|
-| `~/.config/coursers/course-correct-rules.json` | `coursers pre/post`, `crs validate/probe/discover` | Block rules + failure-learning config |
-| `~/.config/coursers/course-correct-state.json` | `coursers post` | Global fallback failure-learning state |
-| `.ctx/course-correct-state.json` | `coursers post` | Project-local failure-learning state (wins over global) |
-| `.ctx/crs-filters.toml` | `crs filter/rewrite` | Project-local filter and rewrite rules |
-| `~/.config/crs/filters.toml` | `crs filter/rewrite` | Global fallback filter and rewrite rules |
+| File                                           | Used by                                            | Purpose                                                 |
+| ---------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
+| `~/.config/coursers/course-correct-rules.json` | `coursers pre/post`, `crs validate/probe/discover` | Block rules + failure-learning config                   |
+| `~/.config/coursers/course-correct-state.json` | `coursers post`                                    | Global fallback failure-learning state                  |
+| `.ctx/course-correct-state.json`               | `coursers post`                                    | Project-local failure-learning state (wins over global) |
+| `.ctx/crs-filters.toml`                        | `crs filter/rewrite`                               | Project-local filter and rewrite rules                  |
+| `~/.config/crs/filters.toml`                   | `crs filter/rewrite`                               | Global fallback filter and rewrite rules                |
 
 ## Hook wiring (settings.json)
 
@@ -91,16 +93,22 @@ file system directly.
 {
   "hooks": {
     "PreToolUse": [
-      { "matcher": "Bash", "hooks": [
-        { "type": "command", "command": "coursers pre" },
-        { "type": "command", "command": "crs rewrite" }
-      ]}
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "coursers pre" },
+          { "type": "command", "command": "crs rewrite" }
+        ]
+      }
     ],
     "PostToolUse": [
-      { "matcher": "Bash", "hooks": [
-        { "type": "command", "command": "coursers post" },
-        { "type": "command", "command": "crs filter" }
-      ]}
+      {
+        "matcher": "Bash",
+        "hooks": [
+          { "type": "command", "command": "coursers post" },
+          { "type": "command", "command": "crs filter" }
+        ]
+      }
     ]
   }
 }
@@ -118,8 +126,15 @@ op run --account=my.1password.com --env-file=/Users/joe/.secrets -- devkit counc
 # Run from repo root. No --repo flag. Output: ~/.dev-agents/coursers/ai-logs/
 ```
 
+## Coursers Rules Gotchas
+
+- `no-find-use-glob` rule matches any command containing `\bfind\s+[./~$"']` —
+  this includes git commit messages with phrases like "find .ctx". Exception added
+  for `git (commit|log|tag|stash)` including `git -C` form.
+
 ## HANDOFF Dependency Fields
 
 Use structured fields, not free-text notes, for dependency tracking:
+
 - `blocked_by: [id1, id2]` on the blocked item
 - `unblocks: [id1]` on each blocker

@@ -1,4 +1,6 @@
 /target
+.claude/
+!.claude/agents/coursers-companion.md
 
 # handoff-begin
 .ctx/*
@@ -8,3 +10,5 @@
 .ctx/HANDOFF.state.yaml
 .ctx/.initialized
 # handoff-end
+.worktrees/
+.DS_Store

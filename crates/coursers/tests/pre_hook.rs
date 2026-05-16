@@ -34,7 +34,11 @@ fn allowed_command_exits_zero() {
         &fixture("rules_basic.json"),
         &state,
     );
-    assert!(out.status.success(), "expected exit 0, got: {:?}", out.status);
+    assert!(
+        out.status.success(),
+        "expected exit 0, got: {:?}",
+        out.status
+    );
 }
 
 #[test]

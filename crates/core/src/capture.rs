@@ -125,6 +125,10 @@ impl InMemoryCaptureStore {
     pub fn records(&self) -> Vec<SuggestionRecord> {
         self.inner.borrow().clone()
     }
+
+    pub fn get_records(&self) -> Vec<SuggestionRecord> {
+        self.records()
+    }
 }
 
 #[cfg(any(test, feature = "testing"))]
@@ -473,5 +477,95 @@ mod tests {
     fn load_missing_file_returns_empty() {
         let s = SuggestionStore::new(PathBuf::from("/nonexistent/suggestions.jsonl"));
         assert!(s.load().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod prop_tests {
+    use super::*;
+    use proptest::prelude::*;
+    use tempfile::TempDir;
+
+    fn make_store(dir: &TempDir) -> SuggestionStore {
+        SuggestionStore::new(dir.path().join("suggestions.jsonl"))
+    }
+
+    proptest! {
+        #[test]
+        fn dedupe_key_trim_invariant(
+            s in "\\s*[^\n]*\\s*",
+            t in "\\s*[^\n]*\\s*",
+        ) {
+            let k1 = DedupeKey::from_parts(s.trim(), t.trim());
+            let k2 = DedupeKey::from_parts(&s, &t);
+            prop_assert_eq!(k1, k2);
+        }
+
+        #[test]
+        fn record_n_times_count_equals_n(n in 1usize..=20) {
+            let dir = TempDir::new().unwrap();
+            let store = make_store(&dir);
+            for _ in 0..n {
+                store.record(SuggestionRecord::new(
+                    "grep foo .", "rg foo .", "no-grep", "/tmp", None, "Bash",
+                ));
+            }
+            let records = store.load();
+            prop_assert_eq!(records.len(), 1);
+            prop_assert_eq!(records[0].count, n as u32);
+        }
+
+        #[test]
+        fn mark_accepted_never_decrements_count(n in 1usize..=10) {
+            let dir = TempDir::new().unwrap();
+            let store = make_store(&dir);
+            for _ in 0..n {
+                store.record(SuggestionRecord::new(
+                    "grep foo .", "rg foo .", "no-grep", "/tmp",
+                    Some("sess-1".to_string()), "Bash",
+                ));
+            }
+            let before = store.load()[0].count;
+            store.mark_accepted("sess-1", "rg foo .", 0);
+            let after = store.load()[0].count;
+            prop_assert_eq!(before, after);
+        }
+
+        #[test]
+        fn accepted_never_downgraded(calls in 1usize..=5) {
+            let dir = TempDir::new().unwrap();
+            let store = make_store(&dir);
+            store.record(SuggestionRecord::new(
+                "grep foo .", "rg foo .", "no-grep", "/tmp",
+                Some("sess-1".to_string()), "Bash",
+            ));
+            store.mark_accepted("sess-1", "rg foo .", 0);
+            for _ in 0..calls {
+                store.mark_accepted("other-sess", "rg foo .", 0);
+            }
+            prop_assert!(store.load()[0].accepted);
+        }
+    }
+
+    #[test]
+    fn suggestion_record_json_round_trip() {
+        use proptest::strategy::Strategy;
+        use proptest::test_runner::TestRunner;
+        let mut runner = TestRunner::default();
+        let strategy = (any::<String>(), any::<String>()).prop_map(|(orig, sug)| {
+            SuggestionRecord::new(&orig, &sug, "rule", "/cwd", None, "Bash")
+        });
+        runner
+            .run(&strategy, |record| {
+                let json = serde_json::to_string(&record).unwrap();
+                let back: SuggestionRecord = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(record.original, back.original);
+                prop_assert_eq!(record.suggestion, back.suggestion);
+                prop_assert_eq!(record.rule_id, back.rule_id);
+                prop_assert_eq!(record.accepted, back.accepted);
+                prop_assert_eq!(record.count, back.count);
+                Ok(())
+            })
+            .unwrap();
     }
 }

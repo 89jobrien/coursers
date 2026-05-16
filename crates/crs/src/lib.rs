@@ -2,18 +2,14 @@ pub mod jsonl_source;
 pub mod obfsck;
 pub mod rtk;
 
-use crs_core::filters::{FiltersConfig, FilterMode, FilterRule, find_rule};
+use crs_core::filters::{FilterMode, FilterRule, FiltersConfig, find_rule};
 use crs_core::rewrite::RewriteConfig;
 #[cfg(test)]
 use crs_core::rewrite::RewriteRule;
 
 /// Apply filter to output based on mode and exit code.
 /// Returns the (possibly modified) output string, or None to suppress entirely.
-pub fn apply_filter(
-    output: &str,
-    exit_code: i64,
-    rule: &FilterRule,
-) -> Option<String> {
+pub fn apply_filter(output: &str, exit_code: i64, rule: &FilterRule) -> Option<String> {
     match rule.mode {
         FilterMode::Passthrough => Some(output.to_string()),
         FilterMode::FailuresOnly => {
