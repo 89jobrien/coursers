@@ -371,47 +371,8 @@ fn now_iso8601() -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs();
-    // Format as ISO 8601 UTC without external deps.
-    let (y, mo, d, h, mi, s) = epoch_to_ymd_hms(secs);
+    let (y, mo, d, h, mi, s) = crate::date::unix_secs_to_ymd_hms(secs);
     format!("{y:04}-{mo:02}-{d:02}T{h:02}:{mi:02}:{s:02}Z")
-}
-
-fn epoch_to_ymd_hms(secs: u64) -> (u64, u64, u64, u64, u64, u64) {
-    let s = secs % 60;
-    let total_min = secs / 60;
-    let mi = total_min % 60;
-    let total_hours = total_min / 60;
-    let h = total_hours % 24;
-    let mut days = total_hours / 24;
-
-    // Epoch is 1970-01-01
-    let mut year = 1970u64;
-    loop {
-        let days_in_year = if is_leap(year) { 366 } else { 365 };
-        if days < days_in_year {
-            break;
-        }
-        days -= days_in_year;
-        year += 1;
-    }
-    let month_days: &[u64] = if is_leap(year) {
-        &[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    } else {
-        &[31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    };
-    let mut month = 1u64;
-    for &md in month_days {
-        if days < md {
-            break;
-        }
-        days -= md;
-        month += 1;
-    }
-    (year, month, days + 1, h, mi, s)
-}
-
-fn is_leap(year: u64) -> bool {
-    (year.is_multiple_of(4) && !year.is_multiple_of(100)) || year.is_multiple_of(400)
 }
 
 fn repo_from_cwd(cwd: &str) -> Option<String> {
