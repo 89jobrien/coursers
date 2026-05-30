@@ -32,3 +32,15 @@ proptest = "1"
 [[test]]
 name = "conformance_capture_store"
 required-features = ["testing"]
+
+[[test]]
+name = "conformance_state_store"
+required-features = ["testing"]
+
+[[test]]
+name = "conformance_rules_loader"
+required-features = ["testing"]
+
+[[test]]
+name = "conformance_command_source"
+required-features = ["testing"]
