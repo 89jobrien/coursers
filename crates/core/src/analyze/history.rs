@@ -191,6 +191,29 @@ fn days_ago(days: u32) -> String {
     crate::date::unix_secs_to_date_str(cutoff_secs)
 }
 
+#[cfg(kani)]
+mod kani_proofs {
+    use super::BYTES_PER_TOKEN;
+
+    /// Proof: BYTES_PER_TOKEN is positive (used as divisor in token estimation).
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn bytes_per_token_positive() {
+        assert!(BYTES_PER_TOKEN > 0, "BYTES_PER_TOKEN must be positive");
+    }
+
+    /// Proof: token estimation from byte count never overflows for reasonable sizes.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn token_estimate_no_overflow() {
+        let bytes: usize = kani::any();
+        // Realistic bound: up to 1GB of output
+        kani::assume(bytes <= 1_073_741_824);
+        let tokens = bytes / BYTES_PER_TOKEN;
+        assert!(tokens <= bytes, "tokens must be <= bytes");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

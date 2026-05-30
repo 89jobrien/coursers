@@ -328,6 +328,17 @@ pub fn apply_redaction(output: &str, filters: &ObfsckFilters) -> String {
     result
 }
 
+#[cfg(kani)]
+mod kani_proofs {
+    /// Proof: default_max_lines is always positive (used as truncation bound).
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn default_max_lines_positive() {
+        let m = super::default_max_lines();
+        assert!(m > 0, "default max_lines must be positive");
+    }
+}
+
 #[cfg(test)]
 mod redaction_tests {
     use super::*;

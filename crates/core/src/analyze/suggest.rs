@@ -76,6 +76,9 @@ fn regex_escape(s: &str) -> String {
         .collect()
 }
 
+// Note: regex_escape uses char iteration which exceeds Kani's unwind budget.
+// Property tests in tests/property_tests.rs and unit tests cover regex_escape.
+
 #[cfg(test)]
 mod tests {
     use super::*;

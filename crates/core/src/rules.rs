@@ -170,6 +170,42 @@ pub fn matched_rule_id_pipeline(command: &str, rules: &[Rule]) -> Option<String>
         .find_map(|seg| matched_rule_id(seg, rules))
 }
 
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    /// Proof: FailureLearning::default() produces valid config.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn failure_learning_defaults_valid() {
+        let fl = FailureLearning::default();
+        assert!(fl.enabled);
+        assert!(fl.block_threshold > 0, "threshold must be positive");
+        assert!(fl.window_seconds > 0, "window must be positive");
+        assert!(fl.max_tracked_commands > 0, "max_tracked must be positive");
+        assert!(
+            fl.cleanup_after_seconds >= fl.window_seconds,
+            "cleanup must be >= window"
+        );
+    }
+
+    /// Proof: default_block_threshold is always >= 1.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn block_threshold_at_least_one() {
+        let t = default_block_threshold();
+        assert!(t >= 1, "block_threshold must be at least 1");
+    }
+
+    /// Proof: default_window is always > 0.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn window_positive() {
+        let w = default_window();
+        assert!(w > 0, "window must be positive");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

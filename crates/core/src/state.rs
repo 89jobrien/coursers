@@ -150,17 +150,20 @@ pub fn check_learned(command: &str, state: &State, fl: &FailureLearning) -> Opti
 
 #[cfg(kani)]
 mod kani_proofs {
-    use super::*;
+    use super::{MIN_WINDOW_MINUTES, PREVIEW_MAX_CHARS};
+
+    /// Buffer size for kani proof tractability.
+    const KANI_BUF_LEN: usize = 10;
 
     /// Proof: preview truncation never exceeds PREVIEW_MAX_CHARS (bounded input).
     #[kani::proof]
     #[kani::unwind(15)]
     fn preview_length_bounded() {
         // Use a small buffer to keep tractable; the property is length-independent
-        let buf = [b'x'; 10];
+        let buf = [b'x'; KANI_BUF_LEN];
         let len: usize = kani::any();
-        kani::assume(len <= 10);
-        let cmd = std::str::from_utf8(&buf[..len]).unwrap();
+        kani::assume(len <= KANI_BUF_LEN);
+        let cmd = std::str::from_utf8(&buf[..len]).expect("ASCII-only buffer is valid UTF-8");
         let preview: String = cmd.chars().take(PREVIEW_MAX_CHARS).collect();
         assert!(preview.len() <= PREVIEW_MAX_CHARS);
     }
@@ -173,11 +176,18 @@ mod kani_proofs {
         let minutes = (window_secs / crate::date::SECS_PER_MIN).max(MIN_WINDOW_MINUTES);
         assert!(minutes >= 1, "window_minutes should never be zero");
     }
+
+    /// Proof: PREVIEW_MAX_CHARS is positive.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn preview_max_chars_positive() {
+        assert!(PREVIEW_MAX_CHARS > 0, "PREVIEW_MAX_CHARS must be positive");
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{FailureEntry, State, check_learned, command_key, now_secs, record_failure};
     use crate::rules::FailureLearning;
 
     fn fl(threshold: usize, window: u64) -> FailureLearning {
