@@ -1,24 +1,29 @@
-pub mod ast;
-pub mod capture;
+pub mod analyze;
 pub mod config;
 pub mod date;
-pub mod expand;
-pub mod filters;
-pub mod heat;
-pub mod history;
-pub mod insights;
+pub mod hook;
 pub mod loader;
 pub mod obfsck;
-pub mod pipeline;
+pub mod parse;
 pub mod replay;
-pub mod rewrite;
 pub mod rtk;
 pub mod rules;
 pub mod rx_prefix;
 pub mod state;
-pub mod stats;
 pub mod store;
-pub mod suggest;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
-pub mod tool_swap;
+
+// Re-exports for backward compatibility — external crates use `crs_core::filters`, etc.
+pub use analyze::capture;
+pub use analyze::heat;
+pub use analyze::history;
+pub use analyze::insights;
+pub use analyze::stats;
+pub use analyze::suggest;
+pub use hook::filters;
+pub use hook::rewrite;
+pub use hook::tool_swap;
+pub use parse::ast;
+pub use parse::expand;
+pub use parse::pipeline;
