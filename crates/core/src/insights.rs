@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+/// Number of entries to keep in "top N" aggregations.
+const TOP_N_LIMIT: usize = 10;
+
 // ── Facet deserialization ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
@@ -146,8 +149,8 @@ pub fn aggregate(facets: &[EnrichedFacet]) -> InsightsReport {
         }
     }
 
-    report.top_repos = sorted_top(repos, 10);
-    report.top_branches = sorted_top(branches, 10);
+    report.top_repos = sorted_top(repos, TOP_N_LIMIT);
+    report.top_branches = sorted_top(branches, TOP_N_LIMIT);
 
     report
 }

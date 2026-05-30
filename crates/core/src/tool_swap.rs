@@ -1,6 +1,9 @@
 use crate::ast::parse;
 use serde_json::{Value, json};
 
+/// Default line count for head/tail when no -n flag is given (matches coreutils).
+const DEFAULT_HEAD_TAIL_LINES: usize = 10;
+
 /// Config for tool-swap behaviour, loaded from `[tool_swap]` in crs-filters.toml.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(default)]
@@ -81,7 +84,7 @@ fn swap_cat(args: &[String], config: &ToolSwapConfig) -> ToolAction {
 // ---------------------------------------------------------------------------
 
 fn swap_head(args: &[String], config: &ToolSwapConfig) -> ToolAction {
-    let Some((n, file)) = parse_n_file(args, 10) else {
+    let Some((n, file)) = parse_n_file(args, DEFAULT_HEAD_TAIL_LINES) else {
         return ToolAction::Passthrough;
     };
 
@@ -102,7 +105,7 @@ fn swap_head(args: &[String], config: &ToolSwapConfig) -> ToolAction {
 // ---------------------------------------------------------------------------
 
 fn swap_tail(args: &[String], config: &ToolSwapConfig) -> ToolAction {
-    let Some((n, file)) = parse_n_file(args, 10) else {
+    let Some((n, file)) = parse_n_file(args, DEFAULT_HEAD_TAIL_LINES) else {
         return ToolAction::Passthrough;
     };
 
@@ -232,19 +235,28 @@ fn count_lines(path: &str) -> Option<usize> {
     Some(content.iter().filter(|&&b| b == b'\n').count())
 }
 
-/// Estimate token count from file size (bytes / 4).
+/// Approximate bytes per token (GPT/Claude tokenizer average).
+const BYTES_PER_TOKEN: u64 = 4;
+
+/// Fallback average bytes per line when sampling fails.
+const DEFAULT_AVG_BYTES_PER_LINE: usize = 80;
+
+/// Number of sample lines to read for avg-bytes-per-line estimation.
+const LINE_SAMPLE_SIZE: usize = 20;
+
+/// Estimate token count from file size.
 fn estimate_tokens_from_size(bytes: u64) -> usize {
-    (bytes / 4) as usize
+    (bytes / BYTES_PER_TOKEN) as usize
 }
 
-/// Sample avg bytes per line from up to 20 lines of a file.
+/// Sample avg bytes per line from up to `LINE_SAMPLE_SIZE` lines of a file.
 fn avg_bytes_per_line(path: &str) -> Option<usize> {
     use std::io::{BufRead, BufReader};
     let f = std::fs::File::open(path).ok()?;
     let reader = BufReader::new(f);
     let mut total_bytes = 0usize;
     let mut count = 0usize;
-    for line in reader.lines().take(20) {
+    for line in reader.lines().take(LINE_SAMPLE_SIZE) {
         let line = line.ok()?;
         total_bytes += line.len() + 1; // +1 for newline
         count += 1;
@@ -261,8 +273,8 @@ fn compute_line_limit(path: &str, token_limit: usize) -> Option<usize> {
     if estimate_tokens_from_size(size) <= token_limit {
         return None; // under budget — read whole file
     }
-    let avg = avg_bytes_per_line(path).unwrap_or(80);
-    let limit = (token_limit * 4) / avg.max(1);
+    let avg = avg_bytes_per_line(path).unwrap_or(DEFAULT_AVG_BYTES_PER_LINE);
+    let limit = (token_limit * BYTES_PER_TOKEN as usize) / avg.max(1);
     Some(limit.max(1))
 }
 
@@ -275,6 +287,46 @@ fn clamp_to_token_budget(n: usize, path: &str, token_limit: usize) -> usize {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    /// Proof: estimate_tokens_from_size is monotonic.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn estimate_tokens_monotonic() {
+        let a: u64 = kani::any();
+        let b: u64 = kani::any();
+        kani::assume(a <= b);
+        assert!(estimate_tokens_from_size(a) <= estimate_tokens_from_size(b));
+    }
+
+    /// Proof: parse_n_file returns default_n when no -n flag is present.
+    #[kani::proof]
+    #[kani::unwind(20)]
+    fn parse_n_file_default_when_no_flag() {
+        // A single non-flag argument should return (default_n, that_arg)
+        let args = vec!["somefile.txt".to_string()];
+        let result = parse_n_file(&args, DEFAULT_HEAD_TAIL_LINES);
+        assert!(result.is_some());
+        let (n, file) = result.unwrap();
+        assert!(n == DEFAULT_HEAD_TAIL_LINES);
+        assert!(file == "somefile.txt");
+    }
+
+    /// Proof: parse_n_file with -n flag returns the specified count.
+    #[kani::proof]
+    #[kani::unwind(20)]
+    fn parse_n_file_explicit_count() {
+        let args = vec!["-n".to_string(), "42".to_string(), "file.rs".to_string()];
+        let result = parse_n_file(&args, DEFAULT_HEAD_TAIL_LINES);
+        assert!(result.is_some());
+        let (n, file) = result.unwrap();
+        assert!(n == 42);
+        assert!(file == "file.rs");
+    }
+}
 
 #[cfg(test)]
 mod tests {

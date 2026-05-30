@@ -1,0 +1,50 @@
+# rustqual configuration for coursers workspace
+#
+# CLI dispatch functions in binary crates are untestable via unit tests
+# (integration tests are invisible to rustqual). Cross-crate pub API
+# in crs-core appears as DEAD_CODE since rustqual can't trace consumers.
+
+ignore_functions = [
+    "main",
+    "cmd_*",
+    "emit_*",
+    "print_*",
+    "format_tokens",
+    "load_rewrite_config",
+    "check_probe_match",
+    "find_most_recent_session",
+    "obfsck_audit_mcp",
+    "write_tools_yaml",
+    # serde default fns — trivial, no test needed
+    "default_true",
+    "default_max_lines",
+    # process adapter — tested via integration tests
+    "parse_test_count",
+    # expand_vars tests use with_env! macro — rustqual can't trace calls through it
+    "expand_vars_*",
+    # crs integration test — SUT is the rewrite pipeline, not a single fn
+    "rewrite_applies_*",
+    # config path fns — unwrap is intentional (no home dir = unrecoverable)
+    "rules_path",
+    "state_path_default",
+    # test helpers that use unsafe set_var (Rust 2024 edition requirement)
+    "env_var_overrides_*",
+    "default_rules_path_*",
+    "env_override_*",
+]
+
+# Test helpers and config init use unwrap idiomatically
+exclude_files = [
+    "crates/coursers/tests/common.rs",
+    "crates/core/tests/conformance_capture_store.rs",
+]
+
+[duplicates]
+# crs-core pub API is consumed by crs and coursers binaries;
+# rustqual only sees single-crate usage → false DEAD_CODE
+detect_dead_code = false
+
+[complexity]
+max_cognitive = 22
+max_cyclomatic = 16
+max_function_lines = 85

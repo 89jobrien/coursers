@@ -10,7 +10,7 @@ use crs_core::obfsck::{AuditHit, FilterSuggestion, ObfsckMcp};
 pub struct ProcessObfsckMcpClient;
 
 impl ProcessObfsckMcpClient {
-    /// Send one JSON-RPC request and return the parsed response value.
+    // qual:allow(iosp) reason: "I/O boundary — spawns subprocess"
     fn call(&self, request: &serde_json::Value) -> Option<serde_json::Value> {
         let mut child = Command::new("obfsck-mcp")
             .stdin(Stdio::piped())
@@ -86,6 +86,7 @@ pub(crate) fn parse_filter_suggestions(resp: &serde_json::Value) -> Vec<FilterSu
 }
 
 impl ObfsckMcp for ProcessObfsckMcpClient {
+    // qual:allow(iosp) reason: "I/O boundary — delegates to subprocess call"
     fn audit(&self, text: &str) -> Vec<AuditHit> {
         let req = serde_json::json!({
             "jsonrpc": "2.0",
@@ -103,6 +104,7 @@ impl ObfsckMcp for ProcessObfsckMcpClient {
         }
     }
 
+    // qual:allow(iosp) reason: "I/O boundary — delegates to subprocess call"
     fn generate_filters(&self, examples: &[String]) -> Vec<FilterSuggestion> {
         let req = serde_json::json!({
             "jsonrpc": "2.0",

@@ -36,6 +36,28 @@ pub struct HookSpecificOutput {
     pub permission_decision_reason: String,
 }
 
+/// Shared hook wiring: read stdin, load rules, state store, and capture store.
+#[allow(clippy::type_complexity)]
+pub fn hook_context() -> Option<(
+    HookPayload,
+    crs_core::loader::FsRulesLoader,
+    crs_core::store::FsStateStore,
+    crs_core::capture::SuggestionStore,
+)> {
+    use crs_core::capture::SuggestionStore;
+    use crs_core::loader::{FsRulesLoader, RulesLoader};
+    use crs_core::state::state_path;
+    use crs_core::store::FsStateStore;
+
+    let payload = read_stdin()?;
+    let loader = FsRulesLoader;
+    let config = loader.load();
+    let path = state_path(&config.failure_learning);
+    let store = FsStateStore { path };
+    let capture = SuggestionStore::new(SuggestionStore::default_path());
+    Some((payload, loader, store, capture))
+}
+
 pub fn read_stdin() -> Option<HookPayload> {
     use std::io::Read;
     let mut buf = String::new();

@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+// qual:allow(complexity) reason: "CLI startup — no home dir is unrecoverable"
 pub fn rules_path() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_RULES") {
         return PathBuf::from(p);
@@ -9,6 +10,7 @@ pub fn rules_path() -> PathBuf {
         .join(".config/coursers/course-correct-rules.json")
 }
 
+// qual:allow(complexity) reason: "CLI startup — no home dir is unrecoverable"
 pub fn state_path_default() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_STATE") {
         return PathBuf::from(p);

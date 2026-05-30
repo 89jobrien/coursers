@@ -24,6 +24,7 @@ toml = { workspace = true }
 walkdir = { workspace = true }
 dirs = { workspace = true }
 chrono = { workspace = true }
+shell-words = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

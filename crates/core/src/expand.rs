@@ -233,44 +233,43 @@ mod tests {
     }
 
     #[test]
-    fn expands_dollar_varname() {
-        with_env!(("_CRS_TEST_FOO", "/test/foo") => {
-            assert_eq!(expand_vars("echo $_CRS_TEST_FOO"), "echo /test/foo");
+    fn expand_vars_dollar_varname() {
+        let result = with_env!(("_CRS_TEST_FOO", "/test/foo") => {
+            expand_vars("echo $_CRS_TEST_FOO")
         });
+        assert_eq!(result, "echo /test/foo");
     }
 
     #[test]
-    fn expands_dollar_brace_varname() {
-        with_env!(("_CRS_TEST_BAR", "/test/bar") => {
-            assert_eq!(
-                expand_vars("op run --env-file=${_CRS_TEST_BAR}/.secrets"),
-                "op run --env-file=/test/bar/.secrets"
-            );
+    fn expand_vars_dollar_brace_varname() {
+        let result = with_env!(("_CRS_TEST_BAR", "/test/bar") => {
+            expand_vars("op run --env-file=${_CRS_TEST_BAR}/.secrets")
         });
+        assert_eq!(result, "op run --env-file=/test/bar/.secrets");
     }
 
     #[test]
-    fn expands_nu_env_style() {
-        with_env!(("_CRS_TEST_HOME", "/nu/home") => {
-            assert_eq!(
-                expand_vars("op run --env-file=$env._CRS_TEST_HOME/.secrets"),
-                "op run --env-file=/nu/home/.secrets"
-            );
+    fn expand_vars_nu_env_style() {
+        let result = with_env!(("_CRS_TEST_HOME", "/nu/home") => {
+            expand_vars("op run --env-file=$env._CRS_TEST_HOME/.secrets")
         });
+        assert_eq!(result, "op run --env-file=/nu/home/.secrets");
     }
 
     #[test]
-    fn expands_tilde_slash() {
-        with_env!(("HOME", "/home/joe") => {
-            assert_eq!(expand_vars("op run --env-file=~/.secrets"), "op run --env-file=/home/joe/.secrets");
+    fn expand_vars_tilde_slash() {
+        let result = with_env!(("HOME", "/home/joe") => {
+            expand_vars("op run --env-file=~/.secrets")
         });
+        assert_eq!(result, "op run --env-file=/home/joe/.secrets");
     }
 
     #[test]
-    fn expands_tilde_alone() {
-        with_env!(("HOME", "/home/joe") => {
-            assert_eq!(expand_vars("cd ~"), "cd /home/joe");
+    fn expand_vars_tilde_alone() {
+        let result = with_env!(("HOME", "/home/joe") => {
+            expand_vars("cd ~")
         });
+        assert_eq!(result, "cd /home/joe");
     }
 
     #[test]
@@ -323,12 +322,10 @@ mod tests {
     }
 
     #[test]
-    fn expands_multiple_vars_in_one_command() {
-        with_env!(("_CRS_TEST_A", "aaa"), ("_CRS_TEST_B", "bbb") => {
-            assert_eq!(
-                expand_vars("echo $_CRS_TEST_A $_CRS_TEST_B"),
-                "echo aaa bbb"
-            );
+    fn expand_vars_multiple_in_one_command() {
+        let result = with_env!(("_CRS_TEST_A", "aaa"), ("_CRS_TEST_B", "bbb") => {
+            expand_vars("echo $_CRS_TEST_A $_CRS_TEST_B")
         });
+        assert_eq!(result, "echo aaa bbb");
     }
 }

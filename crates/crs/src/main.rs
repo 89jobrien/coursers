@@ -242,35 +242,162 @@ const OP_PLUGIN_EXECUTABLES: &[&str] = &[
     "zcli",
 ];
 
+/// Shell keywords and builtins that should never become rx prefix candidates.
+const SHELL_NOISE_TOKENS: &[&str] = &[
+    "if", "else", "elif", "fi", "then", "for", "do", "done", "while", "until", "case", "esac",
+    "in", "select", "function", "true", "false", "return", "exit", "export", "set", "unset",
+    "local", "declare", "readonly", "shift", "break", "continue", "trap", "eval", "exec", "source",
+    "test", "[", "[[",
+];
+
+/// Returns false for tokens that are clearly not executable names:
+/// shell keywords, tokens containing `=`, `$`, `(`, `)`, `/`, quotes.
+fn is_plausible_executable(key: &str) -> bool {
+    if SHELL_NOISE_TOKENS.contains(&key) {
+        return false;
+    }
+    if key.contains('=')
+        || key.contains('$')
+        || key.contains('(')
+        || key.contains(')')
+        || key.contains('{')
+        || key.contains('}')
+        || key.contains('/')
+        || key.contains('\'')
+        || key.contains('"')
+    {
+        return false;
+    }
+    // Must start with a letter or underscore (not a digit or punctuation)
+    key.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+}
+
 fn is_op_plugin_prefix(prefix: &[String]) -> bool {
     matches!(prefix, [a, b, c, d] if a == "op" && b == "plugin" && c == "run" && d == "--")
 }
 
-fn apply_rx_learning(
+/// Extract the leading command word from a shell command string.
+fn command_key(cmd: &str) -> String {
+    shell_words::split(cmd.trim())
+        .ok()
+        .and_then(|tokens| tokens.into_iter().next())
+        .unwrap_or_else(|| cmd.trim().to_string())
+}
+
+/// Post-hook: handle the result of a Probing command.
+/// If the prefixed retry succeeded, confirm the mapping. Otherwise discard.
+fn handle_probe_result(
     command: &str,
     exit_code: i64,
     probe_store: &dyn crs_core::rx_prefix::ProbeStore,
     prefix_store: &dyn crs_core::rx_prefix::PrefixStore,
-) {
-    let probes = probe_store.load();
-    let matching: Vec<_> = probes
-        .iter()
-        .filter(|p| p.original_command == command)
-        .collect();
-    if matching.is_empty() {
-        return;
-    }
+    stats_store: &dyn crs_core::rx_prefix::StatsStore,
+) -> Option<String> {
+    use crs_core::rx_prefix::ProbeState;
+    let mut probes = probe_store.load();
+    let cmd = command.trim();
+
+    let probe_idx = probes.iter().position(|p| {
+        p.state == ProbeState::Probing
+            && format!("{} {}", p.prefix.join(" "), p.original_command.as_str()).trim() == cmd
+    });
+
+    let idx = probe_idx?;
+
+    let probe = probes.remove(idx);
+    let prefix_key = probe.prefix.join(" ");
+    let mut stats = stats_store.load();
+    stats.by_prefix.entry(prefix_key.clone()).or_default().tried += 1;
+
     if exit_code == 0 {
-        for probe in &matching {
-            if is_op_plugin_prefix(&probe.prefix)
-                && !OP_PLUGIN_EXECUTABLES.contains(&probe.key.as_str())
-            {
-                continue;
-            }
-            prefix_store.confirm_mapping(&probe.key, &probe.prefix);
+        if !is_op_plugin_prefix(&probe.prefix)
+            || OP_PLUGIN_EXECUTABLES.contains(&probe.key.as_str())
+        {
+            let _ = prefix_store.confirm_mapping(&probe.key, &probe.prefix);
         }
+        let _ = probe_store.write(&probes);
+
+        stats.global.probes_confirmed += 1;
+        stats.by_prefix.entry(prefix_key).or_default().confirmed += 1;
+        let cmd_stats = stats.by_command.entry(probe.key.clone()).or_default();
+        cmd_stats.confirmed_prefix = Some(probe.prefix.join(" "));
+        let _ = stats_store.save(&stats);
+
+        Some(format!(
+            "Prefix `{}` confirmed for `{}`.",
+            probe.prefix.join(" "),
+            probe.key,
+        ))
+    } else {
+        // Probe failed — discard it
+        let _ = probe_store.write(&probes);
+        stats.by_prefix.entry(prefix_key).or_default().failed += 1;
+        stats.global.probes_exhausted += 1;
+        let _ = stats_store.save(&stats);
+
+        Some(format!(
+            "Prefix `{}` failed for `{}`. No mapping saved.",
+            probe.prefix.join(" "),
+            probe.key,
+        ))
     }
-    probe_store.remove_matching(command);
+}
+
+/// Post-hook: when a bare command fails, create a Pending probe and suggest retry.
+fn handle_bare_failure(
+    command: &str,
+    probe_store: &dyn crs_core::rx_prefix::ProbeStore,
+    prefix_store: &dyn crs_core::rx_prefix::PrefixStore,
+    stats_store: &dyn crs_core::rx_prefix::StatsStore,
+) -> Option<String> {
+    use crs_core::rx_prefix::{OriginalCommand, ProbeEntry, ProbeState};
+
+    let config = prefix_store.load();
+    if config.candidate_prefixes.is_empty() {
+        return None;
+    }
+
+    let key = command_key(command);
+
+    // Filter: must be a plausible executable
+    if !is_plausible_executable(&key) {
+        return None;
+    }
+
+    // Filter: if the only candidate is op-plugin, key must be a known op plugin
+    let candidate = &config.candidate_prefixes[0];
+    if is_op_plugin_prefix(&candidate.prefix) && !OP_PLUGIN_EXECUTABLES.contains(&key.as_str()) {
+        return None;
+    }
+
+    // Don't duplicate probes for the same command
+    let existing = probe_store.load();
+    if existing
+        .iter()
+        .any(|p| p.original_command.as_str() == command)
+    {
+        return None;
+    }
+
+    let prefixed = format!("{} {}", candidate.prefix.join(" "), command);
+
+    let mut probes = existing;
+    probes.push(ProbeEntry {
+        key: key.clone(),
+        prefix: candidate.prefix.clone(),
+        success_when: candidate.success_when.clone(),
+        original_command: OriginalCommand::from(command),
+        state: ProbeState::Pending,
+        candidate_index: 0,
+    });
+    let _ = probe_store.write(&probes);
+
+    let mut stats = stats_store.load();
+    stats.global.probes_initiated += 1;
+    stats.by_command.entry(key).or_default().probes_initiated += 1;
+    let _ = stats_store.save(&stats);
+
+    Some(format!("Command failed. Retry with: {prefixed}"))
 }
 
 fn cmd_filter() {
@@ -327,19 +454,39 @@ fn cmd_filter() {
     let obfsck = crs_core::filters::load_obfsck_filters();
     let final_output = crs_core::filters::apply_redaction(&filtered_output, &obfsck);
 
-    // Post-hook rx learning: confirm or discard candidate prefix probes.
-    {
+    // Post-hook rx learning: reactive probe lifecycle.
+    let rx_message = {
         let probe_store = crs_core::rx_prefix::FileProbeStore {
             path: crs_core::rx_prefix::FileProbeStore::default_path(),
         };
         let prefix_store = crs_core::rx_prefix::FilePrefixStore {
             path: crs_core::rx_prefix::FilePrefixStore::default_path(),
         };
-        apply_rx_learning(&command, exit_code, &probe_store, &prefix_store);
-    }
+        let stats_store = crs_core::rx_prefix::FileStatsStore::new(
+            crs_core::rx_prefix::FileStatsStore::default_path(),
+        );
 
-    // Only emit a hook message if output changed (avoids noise on passthrough).
-    if final_output != output {
+        // 1. Check if this resolves a Probing attempt
+        if let Some(msg) = handle_probe_result(
+            &command,
+            exit_code,
+            &probe_store,
+            &prefix_store,
+            &stats_store,
+        ) {
+            Some(msg)
+        } else if exit_code != 0 {
+            // 2. Bare command failed — suggest a candidate prefix retry
+            handle_bare_failure(&command, &probe_store, &prefix_store, &stats_store)
+        } else {
+            None
+        }
+    };
+
+    // Emit output if changed, or system message if rx learning triggered.
+    if let Some(msg) = rx_message {
+        emit_system_message(&msg);
+    } else if final_output != output {
         emit_message(&final_output);
     }
 }
@@ -381,7 +528,18 @@ fn cmd_rewrite() {
         return;
     }
 
-    // 3. rx prefix injection
+    // 3. rx prefix: check if this is a Pending probe retry
+    {
+        let probe_store = crs_core::rx_prefix::FileProbeStore {
+            path: crs_core::rx_prefix::FileProbeStore::default_path(),
+        };
+        if check_probe_match(command, &probe_store) {
+            // Probe matched and transitioned to Probing — pass through unchanged
+            std::process::exit(1);
+        }
+    }
+
+    // 4. rx prefix injection (confirmed mappings only)
     let rx_config = {
         use crs_core::rx_prefix::PrefixStore as _;
         crs_core::rx_prefix::FilePrefixStore {
@@ -391,14 +549,6 @@ fn cmd_rewrite() {
     };
     let result = crs_core::rx_prefix::rewrite_command(command, &rx_config);
     if result.rewritten != command {
-        if !result.probes.is_empty() {
-            let probe_store = crs_core::rx_prefix::FileProbeStore {
-                path: crs_core::rx_prefix::FileProbeStore::default_path(),
-            };
-            let mut existing = probe_store.load();
-            existing.extend(result.probes);
-            probe_store.write(&existing);
-        }
         emit_rewrite(&result.rewritten);
         return;
     }
@@ -442,6 +592,46 @@ fn load_rewrite_config() -> crs_core::rewrite::RewriteConfig {
 struct RewriteToml {
     #[serde(flatten)]
     rewrite_config: crs_core::rewrite::RewriteConfig,
+}
+
+/// Emit a systemMessage to Claude (post-hook feedback for rx learning).
+fn emit_system_message(text: &str) {
+    let msg = serde_json::json!({
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "permissionDecision": "allow",
+            "systemMessage": text,
+        }
+    });
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+    writeln!(handle, "{}", msg).ok();
+    handle.flush().ok();
+}
+
+/// Pre-hook: check if `command` matches a Pending probe's expected retry.
+/// If so, transition to Probing and return true.
+fn check_probe_match(command: &str, probe_store: &dyn crs_core::rx_prefix::ProbeStore) -> bool {
+    use crs_core::rx_prefix::ProbeState;
+    let mut probes = probe_store.load();
+    let cmd = command.trim();
+
+    for probe in probes.iter_mut() {
+        if probe.state != ProbeState::Pending {
+            continue;
+        }
+        let expected = format!(
+            "{} {}",
+            probe.prefix.join(" "),
+            probe.original_command.as_str()
+        );
+        if cmd == expected.trim() {
+            probe.state = ProbeState::Probing;
+            let _ = probe_store.write(&probes);
+            return true;
+        }
+    }
+    false
 }
 
 fn emit_message(text: &str) {
@@ -1191,7 +1381,9 @@ fn print_insights_text(
 }
 
 fn cmd_audit(remove: Option<String>) {
-    use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, audit_state};
+    use crs_core::rx_prefix::{
+        FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _, audit_state,
+    };
 
     let prefix_store = FilePrefixStore {
         path: FilePrefixStore::default_path(),
@@ -1201,15 +1393,15 @@ fn cmd_audit(remove: Option<String>) {
     };
 
     if let Some(ref key) = remove {
-        if prefix_store.remove_mapping(key) {
-            println!("Removed mapping: {key}");
-        } else {
-            println!("Key not found: {key}");
+        match prefix_store.remove_mapping(key) {
+            Ok(true) => println!("Removed mapping: {key}"),
+            Ok(false) => println!("Key not found: {key}"),
+            Err(e) => eprintln!("Error removing mapping: {e}"),
         }
         return;
     }
 
-    let state = audit_state(&prefix_store, &probe_store);
+    let state = audit_state(&prefix_store);
 
     println!("Prefix Audit");
     println!("{}", "=".repeat(60));
@@ -1224,17 +1416,19 @@ fn cmd_audit(remove: Option<String>) {
         }
     }
 
-    println!("\nPending probes ({})", state.probes.len());
+    let probes = probe_store.load();
+    println!("\nPending probes ({})", probes.len());
     println!("{}", "-".repeat(40));
-    if state.probes.is_empty() {
+    if probes.is_empty() {
         println!("No pending probes.");
     } else {
-        for probe in &state.probes {
+        for probe in &probes {
             println!(
-                "  key={} prefix={} cmd={:?}",
+                "  key={} prefix={} state={:?} cmd={:?}",
                 probe.key,
                 probe.prefix.join(" "),
-                probe.original_command
+                probe.state,
+                probe.original_command.as_str(),
             );
         }
     }
@@ -1691,78 +1885,97 @@ mod cli_tests {
                 ],
             )]),
             candidate_prefixes: vec![],
-            learn_on_successful_fallback: false,
         };
         let result = rewrite_command("gh issue list", &config);
         assert_eq!(result.rewritten, "op plugin run -- gh issue list");
-        assert!(result.probes.is_empty());
+    }
+
+    fn make_stats_store(dir: &tempfile::TempDir) -> crs_core::rx_prefix::FileStatsStore {
+        crs_core::rx_prefix::FileStatsStore::new(dir.path().join("stats.toml"))
+    }
+
+    fn make_probing_entry(
+        key: &str,
+        prefix: &[&str],
+        cmd: &str,
+    ) -> crs_core::rx_prefix::ProbeEntry {
+        use crs_core::rx_prefix::{OriginalCommand, ProbeEntry, ProbeState, SuccessPredicate};
+        ProbeEntry {
+            key: key.to_string(),
+            prefix: prefix.iter().map(|s| s.to_string()).collect(),
+            success_when: SuccessPredicate::exit_zero(),
+            original_command: OriginalCommand::from(cmd),
+            state: ProbeState::Probing,
+            candidate_index: 0,
+        }
     }
 
     #[test]
-    fn rx_learning_confirms_mapping_on_success() {
-        use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeEntry};
+    fn probe_result_confirms_mapping_on_success() {
+        use crs_core::rx_prefix::{
+            FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _,
+        };
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
-        let probe_path = dir.path().join("rx-candidates.toml");
-        let prefixes_path = dir.path().join("prefixes.toml");
-
         let probe_store = FileProbeStore {
-            path: probe_path.clone(),
+            path: dir.path().join("candidates.toml"),
         };
-        probe_store.write(&[ProbeEntry {
-            key: "gh".to_string(),
-            prefix: vec![
-                "op".to_string(),
-                "plugin".to_string(),
-                "run".to_string(),
-                "--".to_string(),
-            ],
-            original_command: "gh issue list".to_string(),
-        }]);
+        let _ = probe_store.write(&[make_probing_entry(
+            "gh",
+            &["op", "plugin", "run", "--"],
+            "gh issue list",
+        )]);
 
         let prefix_store = FilePrefixStore {
-            path: prefixes_path.clone(),
+            path: dir.path().join("prefixes.toml"),
         };
-        apply_rx_learning("gh issue list", 0, &probe_store, &prefix_store);
-
-        let config = prefix_store.load();
-        assert_eq!(
-            config.mappings.get("gh"),
-            Some(&vec![
-                "op".to_string(),
-                "plugin".to_string(),
-                "run".to_string(),
-                "--".to_string(),
-            ])
+        let stats_store = make_stats_store(&dir);
+        let msg = handle_probe_result(
+            "op plugin run -- gh issue list",
+            0,
+            &probe_store,
+            &prefix_store,
+            &stats_store,
         );
+
+        assert!(msg.is_some());
+        assert!(msg.unwrap().contains("confirmed"));
         assert!(probe_store.load().is_empty());
+        assert!(prefix_store.load().mappings.contains_key("gh"));
     }
 
     #[test]
-    fn rx_learning_removes_probe_on_failure() {
-        use crs_core::rx_prefix::PrefixStore as _;
-        use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, ProbeEntry};
+    fn probe_result_discards_on_failure() {
+        use crs_core::rx_prefix::{
+            FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _,
+        };
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
-        let probe_path = dir.path().join("rx-candidates.toml");
-        let prefixes_path = dir.path().join("prefixes.toml");
-
         let probe_store = FileProbeStore {
-            path: probe_path.clone(),
+            path: dir.path().join("candidates.toml"),
         };
-        probe_store.write(&[ProbeEntry {
-            key: "gh".to_string(),
-            prefix: vec!["op".to_string()],
-            original_command: "gh issue list".to_string(),
-        }]);
+        let _ = probe_store.write(&[make_probing_entry(
+            "gh",
+            &["op", "plugin", "run", "--"],
+            "gh issue list",
+        )]);
 
         let prefix_store = FilePrefixStore {
-            path: prefixes_path.clone(),
+            path: dir.path().join("prefixes.toml"),
         };
-        apply_rx_learning("gh issue list", 1, &probe_store, &prefix_store);
+        let stats_store = make_stats_store(&dir);
+        let msg = handle_probe_result(
+            "op plugin run -- gh issue list",
+            1,
+            &probe_store,
+            &prefix_store,
+            &stats_store,
+        );
 
+        assert!(msg.is_some());
+        assert!(msg.unwrap().contains("failed"));
         assert!(probe_store.load().is_empty());
         assert!(prefix_store.load().mappings.is_empty());
     }
@@ -1781,39 +1994,29 @@ mod cli_tests {
 
     #[test]
     fn audit_state_empty_stores_returns_empty() {
-        use crs_core::rx_prefix::{FilePrefixStore, FileProbeStore, audit_state};
+        use crs_core::rx_prefix::{FilePrefixStore, audit_state};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
         let prefix_store = FilePrefixStore {
             path: dir.path().join("prefixes.toml"),
         };
-        let probe_store = FileProbeStore {
-            path: dir.path().join("rx-candidates.toml"),
-        };
 
-        let state = audit_state(&prefix_store, &probe_store);
+        let state = audit_state(&prefix_store);
         assert!(state.mappings.is_empty());
-        assert!(state.probes.is_empty());
     }
 
     #[test]
-    fn audit_state_returns_sorted_mappings_and_probes() {
-        use crs_core::rx_prefix::{
-            FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeEntry, ProbeStore as _,
-            audit_state,
-        };
+    fn audit_state_returns_sorted_mappings() {
+        use crs_core::rx_prefix::{FilePrefixStore, PrefixStore as _, audit_state};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
         let prefix_store = FilePrefixStore {
             path: dir.path().join("prefixes.toml"),
         };
-        let probe_store = FileProbeStore {
-            path: dir.path().join("rx-candidates.toml"),
-        };
 
-        prefix_store.confirm_mapping(
+        let _ = prefix_store.confirm_mapping(
             "gh",
             &[
                 "op".to_string(),
@@ -1822,22 +2025,78 @@ mod cli_tests {
                 "--".to_string(),
             ],
         );
-        prefix_store.confirm_mapping(
+        let _ = prefix_store.confirm_mapping(
             "cargo",
             &["dotenvx".to_string(), "run".to_string(), "--".to_string()],
         );
-        probe_store.write(&[ProbeEntry {
-            key: "gh".to_string(),
-            prefix: vec!["op".to_string()],
-            original_command: "gh issue list".to_string(),
-        }]);
 
-        let state = audit_state(&prefix_store, &probe_store);
+        let state = audit_state(&prefix_store);
         // Sorted: cargo before gh
         assert_eq!(state.mappings[0].0, "cargo");
         assert_eq!(state.mappings[1].0, "gh");
-        assert_eq!(state.probes.len(), 1);
-        assert_eq!(state.probes[0].key, "gh");
+    }
+
+    #[test]
+    fn is_plausible_executable_rejects_shell_noise() {
+        for token in &[
+            "if", "else", "fi", "for", "do", "done", "then", "case", "esac",
+        ] {
+            assert!(!is_plausible_executable(token), "should reject: {token}");
+        }
+    }
+
+    #[test]
+    fn is_plausible_executable_rejects_special_chars() {
+        assert!(!is_plausible_executable("code=$?"));
+        assert!(!is_plausible_executable("d=json.load(sys.stdin)"));
+        assert!(!is_plausible_executable("/usr/bin/foo"));
+        assert!(!is_plausible_executable("$HOME"));
+        assert!(!is_plausible_executable("'quoted'"));
+    }
+
+    #[test]
+    fn is_plausible_executable_accepts_real_commands() {
+        assert!(is_plausible_executable("cargo"));
+        assert!(is_plausible_executable("gh"));
+        assert!(is_plausible_executable("crs"));
+        assert!(is_plausible_executable("echo"));
+        assert!(is_plausible_executable("printf"));
+        assert!(is_plausible_executable("coursers"));
+    }
+
+    #[test]
+    fn probe_result_skips_non_op_plugin_with_op_prefix() {
+        use crs_core::rx_prefix::{
+            FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _,
+        };
+        use tempfile::TempDir;
+
+        let dir = TempDir::new().unwrap();
+        let probe_store = FileProbeStore {
+            path: dir.path().join("candidates.toml"),
+        };
+        // "crs" is NOT in OP_PLUGIN_EXECUTABLES
+        let _ = probe_store.write(&[make_probing_entry(
+            "crs",
+            &["op", "plugin", "run", "--"],
+            "crs rewrite",
+        )]);
+
+        let prefix_store = FilePrefixStore {
+            path: dir.path().join("prefixes.toml"),
+        };
+        let stats_store = make_stats_store(&dir);
+        // Even on success, should NOT confirm mapping for non-op-plugin
+        handle_probe_result(
+            "op plugin run -- crs rewrite",
+            0,
+            &probe_store,
+            &prefix_store,
+            &stats_store,
+        );
+
+        assert!(prefix_store.load().mappings.is_empty());
+        assert!(probe_store.load().is_empty());
     }
 
     #[test]
@@ -1848,7 +2107,7 @@ mod cli_tests {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("prefixes.toml");
         let store = FilePrefixStore { path: path.clone() };
-        store.confirm_mapping(
+        let _ = store.confirm_mapping(
             "gh",
             &[
                 "op".to_string(),
@@ -1858,19 +2117,19 @@ mod cli_tests {
             ],
         );
 
-        assert!(store.remove_mapping("gh"));
+        assert!(store.remove_mapping("gh").unwrap());
         assert!(store.load().mappings.is_empty());
     }
 
     #[test]
     fn remove_mapping_returns_false_on_miss() {
-        use crs_core::rx_prefix::FilePrefixStore;
+        use crs_core::rx_prefix::{FilePrefixStore, PrefixStore as _};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("prefixes.toml");
         let store = FilePrefixStore { path };
-        assert!(!store.remove_mapping("nonexistent"));
+        assert!(!store.remove_mapping("nonexistent").unwrap());
     }
 
     #[test]

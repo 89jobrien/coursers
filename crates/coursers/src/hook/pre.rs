@@ -21,8 +21,7 @@ pub(crate) fn extract_ls_path(command: &str) -> &str {
         .unwrap_or(".")
 }
 
-/// For the `no-ls-use-glob` rule, extract the target path from the `ls` command and append
-/// a file-tree listing so Claude gets useful context without needing to retry.
+// qual:allow(iosp) reason: "integration glue — dispatches to file_tree I/O"
 fn enrich_message(rule_id: &str, command: &str, base_msg: &str) -> String {
     if !should_enrich(rule_id) {
         return base_msg.to_string();
@@ -36,7 +35,7 @@ fn enrich_message(rule_id: &str, command: &str, base_msg: &str) -> String {
     )
 }
 
-/// Run `eza --tree --level 2 <path>`, falling back to a manual two-level walk.
+// qual:allow(iosp) reason: "I/O boundary — spawns eza/find subprocesses"
 fn file_tree(path: &str) -> String {
     use std::process::Command;
 
@@ -73,6 +72,7 @@ fn file_tree(path: &str) -> String {
     "(could not list directory)".to_string()
 }
 
+// qual:allow(iosp) reason: "integration root — orchestrates rule checks"
 pub fn run_with<L: RulesLoader, S: StateStore>(
     loader: &L,
     store: &S,
@@ -332,20 +332,8 @@ mod tests {
 }
 
 pub fn run() {
-    use crs_core::capture::SuggestionStore;
-    use crs_core::loader::FsRulesLoader;
-    use crs_core::state::state_path;
-    use crs_core::store::FsStateStore;
-
-    let Some(payload) = super::read_stdin() else {
+    let Some((payload, loader, store, capture)) = super::hook_context() else {
         return;
     };
-
-    let loader = FsRulesLoader;
-    let config = loader.load();
-    let path = state_path(&config.failure_learning);
-    let store = FsStateStore { path };
-    let capture = SuggestionStore::new(SuggestionStore::default_path());
-
     run_with(&loader, &store, &capture, &payload);
 }

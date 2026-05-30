@@ -1,3 +1,6 @@
+/// Approximate bytes per token (GPT/Claude tokenizer average).
+const BYTES_PER_TOKEN: usize = 4;
+
 /// Extracts the command stem (1–2 token prefix) used for frequency grouping.
 ///
 /// Rules:
@@ -147,7 +150,7 @@ pub fn discover(
         // Use real output length when available: bytes / 4 ≈ tokens.
         // Never fabricate a number — if output_bytes is absent, leave est_tokens at 0.
         if let Some(bytes) = rec.output_bytes {
-            entry.est_tokens += (bytes / 4) as u64;
+            entry.est_tokens += (bytes / BYTES_PER_TOKEN) as u64;
         }
     }
 

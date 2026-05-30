@@ -6,6 +6,15 @@
 
 use std::collections::HashMap;
 
+use crate::date::{SECS_PER_DAY, SECS_PER_HOUR};
+
+const HOURS_PER_DAY: u8 = 24;
+const DAYS_PER_WEEK: u8 = 7;
+/// Number of intensity levels for the ASCII grid (` ░▒▓█`).
+const INTENSITY_LEVELS: u64 = 4;
+/// 1970-01-01 was Thursday; offset to make Monday = 0.
+const EPOCH_WEEKDAY_OFFSET: u64 = 3;
+
 /// A cell value in the heatmap: number of blocks at (day, hour).
 ///
 /// day: 0 = Monday … 6 = Sunday
@@ -39,16 +48,16 @@ impl HeatMap {
 
         // Header
         out.push_str("     ");
-        for h in 0..24u8 {
+        for h in 0..HOURS_PER_DAY {
             out.push_str(&format!("{h:02} "));
         }
         out.push('\n');
 
-        for day in 0u8..7 {
+        for day in 0..DAYS_PER_WEEK {
             out.push_str(&format!("{} ", DAYS[day as usize]));
-            for hour in 0..24u8 {
+            for hour in 0..HOURS_PER_DAY {
                 let count = self.cells.get(&(day, hour)).copied().unwrap_or(0);
-                let intensity = count * 4 / max;
+                let intensity = count * INTENSITY_LEVELS / max;
                 let ch = match intensity {
                     0 => ' ',
                     1 => '░',
@@ -81,10 +90,41 @@ pub fn build(firings: &[(String, u64)]) -> HeatMap {
 /// Uses a simple integer calculation — no external crate needed.
 fn day_hour(unix_secs: u64) -> (u8, u8) {
     // 1970-01-01 was a Thursday → weekday index 3 (Mon=0)
-    let days = unix_secs / 86400;
-    let hour = ((unix_secs % 86400) / 3600) as u8;
-    let day = ((days + 3) % 7) as u8; // +3 because epoch = Thu
+    let days = unix_secs / SECS_PER_DAY;
+    let hour = ((unix_secs % SECS_PER_DAY) / SECS_PER_HOUR) as u8;
+    let day = ((days + EPOCH_WEEKDAY_OFFSET) % DAYS_PER_WEEK as u64) as u8;
     (day, hour)
+}
+
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    /// Proof: day_hour always returns day in 0..7.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn day_hour_day_range() {
+        let secs: u64 = kani::any();
+        let (day, _) = day_hour(secs);
+        assert!(day < DAYS_PER_WEEK, "day out of range: {day}");
+    }
+
+    /// Proof: day_hour always returns hour in 0..24.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn day_hour_hour_range() {
+        let secs: u64 = kani::any();
+        let (_, hour) = day_hour(secs);
+        assert!(hour < HOURS_PER_DAY, "hour out of range: {hour}");
+    }
+
+    /// Proof: epoch 0 is Thursday (day=3), hour=0.
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn day_hour_epoch_anchor() {
+        let (day, hour) = day_hour(0);
+        assert!(day == 3 && hour == 0, "epoch anchor failed");
+    }
 }
 
 #[cfg(test)]

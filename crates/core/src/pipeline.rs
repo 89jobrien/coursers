@@ -90,6 +90,47 @@ pub fn sequential_segments(cmd: &str) -> Vec<&str> {
     segments
 }
 
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    /// Proof: splitting on && produces non-empty, trimmed segments.
+    #[kani::proof]
+    #[kani::unwind(20)]
+    fn segments_nonempty_concrete() {
+        let inputs = [
+            "a && b",
+            "  a  &&  b  ",
+            "x; y; z",
+            "a || b && c; d",
+            "",
+            "   ",
+            "&&",
+            ";",
+        ];
+        for cmd in &inputs {
+            for seg in sequential_segments(cmd) {
+                assert!(!seg.is_empty(), "empty segment from: {cmd:?}");
+                assert_eq!(seg, seg.trim(), "untrimmed segment from: {cmd:?}");
+            }
+        }
+    }
+
+    /// Proof: idempotency — re-splitting a plain segment returns itself.
+    #[kani::proof]
+    #[kani::unwind(15)]
+    fn single_segment_idempotent() {
+        let singles = ["cargo build", "a", "hello world", "x-y.z"];
+        for s in &singles {
+            let segs = sequential_segments(s);
+            assert!(segs.len() == 1);
+            let re = sequential_segments(segs[0]);
+            assert!(re.len() == 1);
+            assert!(re[0] == segs[0]);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

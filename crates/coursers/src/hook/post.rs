@@ -88,21 +88,9 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
 }
 
 pub fn run() {
-    use crs_core::capture::SuggestionStore;
-    use crs_core::loader::FsRulesLoader;
-    use crs_core::state::state_path;
-    use crs_core::store::FsStateStore;
-
-    let Some(payload) = super::read_stdin() else {
+    let Some((payload, loader, store, capture)) = super::hook_context() else {
         return;
     };
-
-    let loader = FsRulesLoader;
-    let config = loader.load();
-    let path = state_path(&config.failure_learning);
-    let store = FsStateStore { path };
-    let capture = SuggestionStore::new(SuggestionStore::default_path());
-
     run_with(&loader, &store, &capture, &payload);
 }
 

@@ -240,6 +240,7 @@ impl SuggestionStore {
             .ok()
     }
 
+    // qual:allow(iosp) reason: "I/O boundary — file locking + append"
     fn do_record(&self, record: SuggestionRecord) {
         let Some(file) = self.lock_file() else { return };
         let mut lock = FdRwLock::new(file);
@@ -264,6 +265,7 @@ impl SuggestionStore {
         }
     }
 
+    // qual:allow(iosp) reason: "I/O boundary — file creation + write"
     fn append(&self, record: &SuggestionRecord) {
         if let Some(parent) = self.path.parent() {
             let _ = std::fs::create_dir_all(parent);
@@ -316,7 +318,7 @@ impl CaptureStore for SuggestionStore {
 
 /// Merge `record` into `records` if a duplicate exists.
 /// Returns `true` if a duplicate was found (caller must rewrite), `false` if new (caller appends).
-fn merge_duplicate(records: &mut Vec<SuggestionRecord>, record: &SuggestionRecord) -> bool {
+fn merge_duplicate(records: &mut [SuggestionRecord], record: &SuggestionRecord) -> bool {
     let key = DedupeKey::from_record(record);
     if let Some(existing) = records
         .iter_mut()
@@ -337,7 +339,7 @@ fn merge_duplicate(records: &mut Vec<SuggestionRecord>, record: &SuggestionRecor
 /// Mark all matching pending records as accepted.
 /// Returns `true` if any record was changed.
 fn apply_accepted(
-    records: &mut Vec<SuggestionRecord>,
+    records: &mut [SuggestionRecord],
     session_id: &str,
     command: &str,
     exit_code: i64,
@@ -385,6 +387,31 @@ fn repo_from_cwd(cwd: &str) -> Option<String> {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(kani)]
+mod kani_proofs {
+    use super::*;
+
+    /// Proof: DedupeKey::from_parts is deterministic.
+    #[kani::proof]
+    #[kani::unwind(25)]
+    fn dedupekey_deterministic() {
+        let orig = "cargo test";
+        let sugg = "cargo nextest run";
+        let k1 = DedupeKey::from_parts(orig, sugg);
+        let k2 = DedupeKey::from_parts(orig, sugg);
+        assert!(k1 == k2, "DedupeKey not deterministic");
+    }
+
+    /// Proof: DedupeKey normalizes whitespace — padded inputs equal trimmed inputs.
+    #[kani::proof]
+    #[kani::unwind(25)]
+    fn dedupekey_trim_invariant() {
+        let k1 = DedupeKey::from_parts("  cmd  ", " alt ");
+        let k2 = DedupeKey::from_parts("cmd", "alt");
+        assert!(k1 == k2, "trim normalization failed");
+    }
+}
 
 #[cfg(test)]
 mod tests {
