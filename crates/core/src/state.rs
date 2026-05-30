@@ -129,7 +129,13 @@ pub fn check_learned(command: &str, state: &State, fl: &FailureLearning) -> Opti
     let key = command_key(command);
     let entry = state.failures.get(&key)?;
 
-    if entry.timestamps.len() < fl.block_threshold {
+    let now = now_secs();
+    let recent = entry
+        .timestamps
+        .iter()
+        .filter(|&&t| now.saturating_sub(t) <= fl.window_seconds)
+        .count();
+    if recent < fl.block_threshold {
         return None;
     }
 
@@ -312,6 +318,30 @@ mod tests {
         let mut fl_cfg = fl(3, 300);
         fl_cfg.enabled = false;
         assert!(check_learned("grep foo .", &st, &fl_cfg).is_none());
+    }
+
+    #[test]
+    fn check_learned_ignores_stale_timestamps() {
+        // Regression: check_learned used entry.timestamps.len() without filtering
+        // by window, so stale timestamps (outside the 5-min window) could trigger
+        // a false block until cleanup (1 hour later).
+        let mut st = State::default();
+        let now = now_secs();
+        let key = command_key("grep foo .");
+        // 3 timestamps all outside the 300s window
+        st.failures.insert(
+            key,
+            FailureEntry {
+                command_preview: "grep foo .".to_string(),
+                timestamps: vec![now - 600, now - 500, now - 400],
+                last_seen: now as f64,
+            },
+        );
+        // threshold=3, window=300 — all 3 timestamps are older than 300s ago
+        assert!(
+            check_learned("grep foo .", &st, &fl(3, 300)).is_none(),
+            "stale timestamps outside window must not trigger a block"
+        );
     }
 
     #[test]

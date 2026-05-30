@@ -97,11 +97,6 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
 
     // 1. Predefined rules
     if let Some((rule_id, msg)) = rules::check_pipeline(command, &config.rules) {
-        if fl.enabled {
-            let st = store.load();
-            let st = state::record_failure(st, command, fl);
-            store.save(&st);
-        }
         crs_core::stats::record_block(&crs_core::stats::stats_path(), &rule_id);
 
         // Capture (original, suggestion) pair for fine-tuning dataset.
