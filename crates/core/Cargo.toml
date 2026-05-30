@@ -44,3 +44,15 @@ required-features = ["testing"]
 [[test]]
 name = "conformance_command_source"
 required-features = ["testing"]
+
+[[test]]
+name = "conformance_var_expander"
+
+[[test]]
+name = "conformance_obfsck_mcp"
+
+[[test]]
+name = "conformance_rtk_analysis"
+
+[[test]]
+name = "conformance_rtk_rewrite"
