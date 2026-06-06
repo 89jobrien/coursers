@@ -22,6 +22,7 @@ pub use analyze::insights;
 pub use analyze::stats;
 pub use analyze::suggest;
 pub use hook::filters;
+pub use hook::pipeline as hook_pipeline;
 pub use hook::rewrite;
 pub use hook::tool_swap;
 pub use parse::ast;

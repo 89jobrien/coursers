@@ -1,3 +1,4 @@
+// qual:allow(srp) reason: "CLI entry point — subcommand dispatch is inherently large"
 use clap::{Parser, Subcommand};
 use crs_lib::{FilterPayload, FilterResult, run_filter, run_rewrite};
 use serde::Deserialize;
@@ -95,6 +96,12 @@ enum Command {
         #[arg(short, long)]
         out: Option<String>,
     },
+    /// Run the generic hook pipeline for a Claude Code event
+    Hook {
+        /// The hook event: pre-tool-use, post-tool-use, session-start, session-end,
+        /// pre-compact, stop, subagent-stop
+        event: String,
+    },
     /// Show a heatmap of rule firings by hour-of-day and day-of-week
     Heat {
         /// Filter to a specific rule id
@@ -161,6 +168,7 @@ fn main() {
             format,
         } => cmd_history(limit, rule.as_deref(), &format),
         Command::Export { out } => cmd_export(out.as_deref()),
+        Command::Hook { event } => cmd_hook(&event),
         Command::Heat { rule } => cmd_heat(rule.as_deref()),
         Command::Replay { session, format } => cmd_replay(session.as_deref(), &format),
     }
@@ -299,6 +307,7 @@ fn handle_probe_result(
 
     let probe_idx = probes.iter().position(|p| {
         p.state == ProbeState::Probing
+            // qual:allow(dry) reason: "format pattern shared across CLI display fns"
             && format!("{} {}", p.prefix.join(" "), p.original_command.as_str()).trim() == cmd
     });
 
@@ -555,6 +564,127 @@ fn cmd_rewrite() {
 
     // No rewrite matched.
     std::process::exit(1);
+}
+
+fn cmd_hook(event_str: &str) {
+    use crs_core::hook_pipeline::{HookContext, HookEvent, load_config, run_pipeline};
+
+    let event = match event_str {
+        "pre-tool-use" => HookEvent::PreToolUse,
+        "post-tool-use" => HookEvent::PostToolUse,
+        "session-start" => HookEvent::SessionStart,
+        "session-end" => HookEvent::SessionEnd,
+        "pre-compact" => HookEvent::PreCompact,
+        "stop" => HookEvent::Stop,
+        "subagent-stop" => HookEvent::SubagentStop,
+        _ => {
+            eprintln!("crs hook: unknown event '{event_str}'");
+            std::process::exit(1);
+        }
+    };
+
+    let config = load_config();
+
+    // Parse stdin JSON (may be empty for lifecycle events like SessionStart).
+    let mut buf = String::new();
+    let _ = io::stdin().read_to_string(&mut buf);
+    let json: Option<Value> = serde_json::from_str(&buf).ok();
+
+    let tool_name = json
+        .as_ref()
+        .and_then(|j| j.get("tool_name"))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    // For Bash: target is the command. For Edit/Write: target is file_path.
+    let target = json
+        .as_ref()
+        .and_then(|j| j.get("tool_input"))
+        .and_then(|ti| {
+            ti.get("command")
+                .or_else(|| ti.get("file_path"))
+                .and_then(|v| v.as_str())
+        })
+        .map(String::from);
+
+    let exit_code = json
+        .as_ref()
+        .and_then(|j| j.get("tool_response"))
+        .and_then(|r| r.get("exit_code"))
+        .and_then(|v| v.as_i64());
+
+    let ctx = HookContext {
+        event: Some(event),
+        tool_name,
+        target,
+        exit_code,
+        raw_json: if buf.is_empty() { None } else { Some(buf) },
+    };
+
+    let result = run_pipeline(&config, &ctx);
+
+    // Emit response based on event type and result.
+    if let Some(deny_msg) = result.deny {
+        let resp = serde_json::json!({
+            "hookSpecificOutput": {
+                "hookEventName": event_str_for(event),
+                "permissionDecision": "deny",
+            },
+            "systemMessage": format!("[crs-hook] {deny_msg}"),
+        });
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        writeln!(handle, "{resp}").ok();
+        handle.flush().ok();
+        std::process::exit(2);
+    }
+
+    if let Some(ref rewritten) = result.rewrite {
+        let resp = serde_json::json!({
+            "hookSpecificOutput": {
+                "hookEventName": event_str_for(event),
+                "permissionDecision": "allow",
+                "permissionDecisionReason": "crs-hook: rewrite",
+                "updatedInput": { "command": rewritten },
+            }
+        });
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        writeln!(handle, "{resp}").ok();
+        handle.flush().ok();
+        return;
+    }
+
+    // Emit system messages if any.
+    if !result.messages.is_empty() {
+        let combined = result.messages.join("\n");
+        let resp = serde_json::json!({
+            "hookSpecificOutput": {
+                "hookEventName": event_str_for(event),
+                "permissionDecision": "allow",
+            },
+            "systemMessage": combined,
+        });
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        writeln!(handle, "{resp}").ok();
+        handle.flush().ok();
+    }
+
+    // No action — silent pass.
+}
+
+fn event_str_for(event: crs_core::hook_pipeline::HookEvent) -> &'static str {
+    use crs_core::hook_pipeline::HookEvent;
+    match event {
+        HookEvent::PreToolUse => "PreToolUse",
+        HookEvent::PostToolUse => "PostToolUse",
+        HookEvent::SessionStart => "SessionStart",
+        HookEvent::SessionEnd => "SessionEnd",
+        HookEvent::PreCompact => "PreCompact",
+        HookEvent::Stop => "Stop",
+        HookEvent::SubagentStop => "SubagentStop",
+    }
 }
 
 fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
@@ -1195,6 +1325,7 @@ fn cmd_stats() {
     }
 
     let total: u64 = stats.blocks.values().sum();
+    // qual:allow(dry) reason: "tabular format repeated across CLI display fns"
     println!("{:<32} {:>8}", "Rule", "Blocks");
     println!("{}", "-".repeat(42));
     for (rule_id, count) in sorted_blocks(&stats) {
@@ -1298,6 +1429,7 @@ fn print_insights_text(
         let mut h: Vec<_> = report.helpfulness.iter().collect();
         h.sort_by(|a, b| b.1.cmp(a.1));
         for (k, v) in &h {
+            // qual:allow(dry) reason: "tabular format repeated across CLI display fns"
             println!("  {:<28} {:>4}", k, v);
         }
         println!();
@@ -1490,15 +1622,15 @@ fn cmd_suggest(all: bool, since: u32, limit: usize, format: &str) {
 
 fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
     use crs_core::rules::load as load_rules;
-    use crs_core::state::{load as load_state, state_path};
     use crs_core::stats::{load as load_stats, stats_path};
+    use crs_core::store::{FsStateStore, StateStore, state_path};
 
     let rules_cfg = load_rules();
     let stats_p = stats_path();
     let stats = load_stats(&stats_p);
 
     let state_p = state_path(&rules_cfg.failure_learning);
-    let state = load_state(&state_p);
+    let state = FsStateStore { path: state_p }.load();
 
     // Build per-rule history from stats last_seen + failure state entries
     #[derive(serde::Serialize)]
@@ -1575,12 +1707,15 @@ fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
 
 fn cmd_export(out_path: Option<&str>) {
     use crs_core::rules::load as load_rules;
-    use crs_core::state::{load as load_state, state_path};
     use crs_core::stats::{load as load_stats, stats_path};
+    use crs_core::store::{FsStateStore, StateStore, state_path};
 
     let rules_cfg = load_rules();
     let stats = load_stats(&stats_path());
-    let state = load_state(&state_path(&rules_cfg.failure_learning));
+    let state = FsStateStore {
+        path: state_path(&rules_cfg.failure_learning),
+    }
+    .load();
 
     let snapshot = serde_json::json!({
         "exported_at": chrono::Local::now().to_rfc3339(),
@@ -1869,6 +2004,7 @@ mod cli_tests {
         assert_eq!(label_count, 1, "duplicate label must not be written twice");
     }
 
+    // qual:allow(test_quality) reason: "SUT is rewrite_command from rx_prefix, not a local fn"
     #[test]
     fn rewrite_applies_rx_prefix_when_prefixes_toml_present() {
         use crs_core::rx_prefix::{RxPrefixConfig, rewrite_command};
