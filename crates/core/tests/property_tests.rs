@@ -15,6 +15,7 @@ fn make_rule_with_exception(pattern: &str, exception: &str) -> Rule {
         pattern: pattern.to_string(),
         pattern_flags: String::new(),
         exceptions: vec![exception.to_string()],
+        target_commands: vec![],
         message: None,
     }
 }
@@ -45,6 +46,7 @@ proptest! {
             pattern: ".*".to_string(),  // matches everything
             pattern_flags: String::new(),
             exceptions: vec![],
+            target_commands: vec![],
             message: None,
         };
         prop_assert!(check(&command, &[rule]).is_none());

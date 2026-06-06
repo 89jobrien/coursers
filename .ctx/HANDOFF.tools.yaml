@@ -1,113 +1,115 @@
-generated: 2026-04-18
+generated: 2026-05-30
 since_days: 30
-sessions_scanned: 23
-total_commands: 580
+sessions_scanned: 13
+total_commands: 375
 top_supported:
-  - command: ls
-    count: 33
-    rule: no-ls-use-glob
-    est_savings_tokens: 538
-  - command: mkdir
-    count: 11
-    rule: no-mkdir-use-write
-    est_savings_tokens: 77
-  - command: cat
-    count: 10
-    rule: no-cat-use-read
-    est_savings_tokens: 6116
-  - command: python3
-    count: 10
-    rule: no-python3-use-uv
-    est_savings_tokens: 1520
   - command: grep
-    count: 9
+    count: 6
     rule: no-grep-use-tool
-    est_savings_tokens: 156
-  - command: ls /Users/joe/dev/coursers/.ctx/
+    est_savings_tokens: 58
+  - command: cat
     count: 3
-    rule: no-ls-use-glob
-    est_savings_tokens: 26
-  - command: cat /Users/joe/dev/coursers/.ctx/HANDOFF.state.yaml
-    count: 3
+    rule: no-cat-use-read
+    est_savings_tokens: 27
+  - command: find /Users/joe/dev
+    count: 2
+    rule: no-find-use-glob
+    rtk_equivalent: rtk find
+    est_savings_tokens: 59
+    est_savings_pct: 70
+  - command: cat ~/.config/rx/prefixes.toml
+    count: 1
+    rule: no-cat-use-read
+    est_savings_tokens: 9
+  - command: cat ~/.claude/settings.json
+    count: 1
+    rule: no-cat-use-read
+    est_savings_tokens: 9
+  - command: cat /Users/joe/dev/coursers/.ctx/candidates.toml
+    count: 1
     rule: no-cat-use-read
     rtk_equivalent: rtk read
-    est_savings_tokens: 8634
+    est_savings_tokens: 121
     est_savings_pct: 60
-  - command: cat /Users/joe/dev/coursers/crates/crs/src/main.rs
-    count: 3
+  - command: printf '{"tool_name":"Bash","tool_input":{"command":"cargo
+    count: 1
+    rule: no-grep-use-tool
+    est_savings_tokens: 9
+  - command: printf '{"tool_name":"Bash","tool_input":{"command":"cat
+    count: 1
     rule: no-cat-use-read
-    est_savings_tokens: 494
-  - command: ls /Users/joe/dev/coursers/.ctx/HANDOFF.state.yaml
-    count: 3
-    rule: no-ls-use-glob
-    est_savings_tokens: 27
-  - command: ls "/Users/joe/Documents/Obsidian
-    count: 3
-    rule: no-ls-use-glob
-    est_savings_tokens: 35
-  - command: ls /Users/joe/dev/coursers/.gitignore
-    count: 2
-    rule: no-ls-use-glob
-    est_savings_tokens: 20
-  - command: ls /Users/joe/dev/coursers/crates/crs/src/
-    count: 2
-    rule: no-ls-use-glob
-    est_savings_tokens: 44
-  - command: cat /Users/joe/.claude/settings.json
-    count: 2
+    est_savings_tokens: 9
+  - command: find /Users/joe
+    count: 1
+    rule: no-find-use-glob
+    est_savings_tokens: 9
+  - command: cat /private/tmp/claude-501/-Users-joe-dev-coursers/81e3ff00-cf14-4d00-91d1-9f74af0da061/tasks/bw13eb3t2.output
+    count: 1
     rule: no-cat-use-read
-    est_savings_tokens: 74
-  - command: ls /Users/joe/dev/obfsck/
-    count: 2
-    rule: no-ls-use-glob
-    est_savings_tokens: 106
-  - command: ls /Users/joe/dev/coursers/crates/
-    count: 2
-    rule: no-ls-use-glob
-    est_savings_tokens: 25
+    est_savings_tokens: 9
+  - command: cat >
+    count: 1
+    rule: no-cat-use-read
+    est_savings_tokens: 9
+  - command: find /Users/joe/.claude/plugins/hand
+    count: 1
+    rule: no-find-use-glob
+    est_savings_tokens: 9
+  - command: cat /Users/joe/dev/coursers/.gitignore
+    count: 1
+    rule: no-cat-use-read
+    est_savings_tokens: 9
+  - command: ls /Users/joe/dev/coursers/rustqual.toml
+    count: 1
+    rule: no-cat-use-read
+    est_savings_tokens: 9
+  - command: for f
+    count: 1
+    rule: no-head-tail-use-read
+    est_savings_tokens: 9
 top_unhandled:
   - base_command: git
-    count: 66
-    example: "git -C /Users/joe/dev/coursers diff --cached | obfsck --level minimal 2>&1 | tai..."
+    count: 57
+    example: "REPO=/Users/joe/dev/coursers\ngit -C \"$REPO\" add crates/core/src/date.rs\ngit -C \"..."
+  - base_command: gh issue
+    count: 29
+    example: "gh issue create --repo 89jobrien/coursers \\\n  --title \"refactor(date): name rema..."
+  - base_command: cargo nextest
+    count: 25
+    example: "cargo nextest run -p crs-core --manifest-path /Users/joe/dev/coursers/Cargo.toml..."
+  - base_command: cargo kani
+    count: 25
+    example: "cargo kani -p crs-core --harness no_empty_segments 2>&1 | tail -10"
+  - base_command: rustqual /Users/joe/dev/coursers
+    count: 25
+    example: "rustqual /Users/joe/dev/coursers 2>&1 | head -12"
   - base_command: cargo test
-    count: 49
-    example: "cargo test 2>&1 | tail -20"
-  - base_command: git add
-    count: 32
-    example: 'git add -A && git commit -m "feat: initial implementation — rule-based blockin...'
-  - base_command: cargo run
-    count: 17
-    example: "cargo run --bin crs -- validate 2>&1"
+    count: 21
+    example: "cargo test --workspace 2>&1 | tail -15"
   - base_command: cargo check
-    count: 16
-    example: "cargo check 2>&1 | tail -3"
+    count: 15
+    example: "cargo check --manifest-path /Users/joe/dev/coursers/Cargo.toml 2>&1"
   - base_command: cargo clippy
-    count: 15
-    example: "cargo clippy 2>&1"
-  - base_command: cd /Users/joe/dev/crux
-    count: 15
-    example: "cd /Users/joe/dev/crux && cargo publish -p cruxai 2>&1 | tail -10"
-  - base_command: git log
-    count: 13
-    example: 'git log --format="%ad %s" --date=format:"%H:%M" --since="24 hours ago"'
-  - base_command: cd /Users/joe/dev/slashcrux
-    count: 10
-    example: "cd /Users/joe/dev/slashcrux && git diff --cached -- Cargo.toml src/ | obfsck --l..."
-  - base_command: cargo build
-    count: 9
-    example: "cargo build --release 2>&1 | tail -2"
-  - base_command: for repo
+    count: 14
+    example: "cargo clippy --workspace -- -D warnings 2>&1 | tail -5"
+  - base_command: cargo fmt
     count: 8
-    example: "for repo in braid devkit devloop doob dotfiles harvestrs joe-dev joe-secrets kan..."
-  - base_command: op run
+    example: "cargo fmt --all --manifest-path /Users/joe/dev/coursers/Cargo.toml 2>&1\ngit -C /..."
+  - base_command: ls
+    count: 8
+    example: "ls /Users/joe/dev/coursers/crates/coursers/src/hook/"
+  - base_command: git add
     count: 7
-    example: "op run --account=my.1password.com --env-file=$HOME/.secrets -- devkit council --..."
-  - base_command: obfsck
-    count: 7
-    example: "obfsck --help 2>&1 | head -40"
-  - base_command: doob todo
-    count: 7
-    example: 'doob todo list --status pending --repo coursers 2>/dev/null | head -40 || echo "...'
-  - base_command: handoff-detect 2>/dev/null
-    count: 7
-    example: "handoff-detect 2>/dev/null || ls /Users/joe/dev/coursers/HANDOFF*.yaml 2>/dev/nu..."
+    example: "git add crates/core/Cargo.toml crates/core/src/rx_prefix.rs Cargo.toml && git co..."
+  - base_command: nu
+    count: 5
+    example: "nu -c 'source /Users/joe/.claude/hooks/nu/session/bazaar-plugin-audit.nu; main' ..."
+  - base_command: git diff
+    count: 4
+    example: "git diff --stat HEAD~1 HEAD"
+  - base_command: cargo qual
+    count: 4
+    example: "cargo qual . --suggestions 2>&1"
+  - base_command: cd /Users/joe/dev/prefixe
+    count: 4
+    example: "cd /Users/joe/dev/prefixe && git init -q && cargo check 2>&1"

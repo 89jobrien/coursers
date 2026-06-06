@@ -38,6 +38,7 @@ mod tests {
             pattern: r"\bgrep\b".to_string(),
             pattern_flags: String::new(),
             exceptions: vec![],
+            target_commands: vec![],
             message: Some("Use Grep tool".to_string()),
         };
         let config = RulesConfig {

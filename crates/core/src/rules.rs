@@ -1,5 +1,6 @@
 use regex::Regex;
 use serde::Deserialize;
+use shell_words;
 use std::fs;
 
 use crate::config::rules_path;
@@ -14,6 +15,11 @@ pub struct Rule {
     pub pattern_flags: String,
     #[serde(default)]
     pub exceptions: Vec<String>,
+    /// Command names this rule targets (e.g. `["grep", "rg"]`).
+    /// When non-empty, the rule only fires if argv[0] of at least one pipe
+    /// stage matches. When empty, falls back to raw regex matching.
+    #[serde(default)]
+    pub target_commands: Vec<String>,
     pub message: Option<String>,
 }
 
@@ -85,6 +91,45 @@ pub fn load() -> RulesConfig {
     })
 }
 
+/// Returns true if `target_commands` is non-empty and at least one pipe stage's
+/// argv[0] matches a target command name.  Returns true when `target_commands`
+/// is empty (legacy fallback — raw regex applies to the whole string).
+fn targets_match(command: &str, targets: &[String]) -> bool {
+    if targets.is_empty() {
+        return true; // no gate — legacy behaviour
+    }
+    let cmds = crate::pipeline::pipe_stage_commands(command);
+    cmds.iter().any(|c| targets.iter().any(|t| t == c))
+}
+
+/// Identify the pipe stage whose argv[0] triggered the rule, for use in deny
+/// messages.  Returns `None` if no specific stage matched (legacy rules).
+fn triggering_stage<'a>(command: &'a str, targets: &[String]) -> Option<&'a str> {
+    if targets.is_empty() {
+        return None;
+    }
+    let stages = crate::pipeline::pipe_stages(command);
+    for stage in stages {
+        let argv = shell_words::split(stage.trim()).unwrap_or_default();
+        if let Some(name) = argv.first()
+            && targets.iter().any(|t| t == name)
+        {
+            return Some(stage);
+        }
+    }
+    None
+}
+
+/// Build the regex for a rule, applying case-insensitive flag when needed.
+fn build_regex(rule: &Rule) -> Option<Regex> {
+    let pattern_str = if rule.pattern_flags.contains('i') || rule.pattern.contains("(?i)") {
+        format!("(?i){}", rule.pattern)
+    } else {
+        rule.pattern.clone()
+    };
+    Regex::new(&pattern_str).ok()
+}
+
 /// Returns the id of the first matching rule (respecting exceptions), None otherwise.
 /// Used by discover to attribute commands to the rule that would actually fire.
 pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
@@ -92,12 +137,10 @@ pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
         if !rule.enabled {
             continue;
         }
-        let pattern_str = if rule.pattern_flags.contains('i') || rule.pattern.contains("(?i)") {
-            format!("(?i){}", rule.pattern)
-        } else {
-            rule.pattern.clone()
-        };
-        let Ok(re) = Regex::new(&pattern_str) else {
+        if !targets_match(command, &rule.target_commands) {
+            continue;
+        }
+        let Some(re) = build_regex(rule) else {
             continue;
         };
         if !re.is_match(command) {
@@ -117,19 +160,24 @@ pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
 }
 
 /// Returns `(rule_id, deny_message)` if any rule matches, None otherwise.
+///
+/// When a rule has `target_commands`, the deny message is enriched with the
+/// specific pipe stage that triggered the block.
 pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
     for rule in rules {
         if !rule.enabled {
             continue;
         }
 
-        let pattern_str = if rule.pattern_flags.contains('i') || rule.pattern.contains("(?i)") {
-            format!("(?i){}", rule.pattern)
-        } else {
-            rule.pattern.clone()
-        };
+        // Gate: if the rule declares target commands, skip unless argv[0] of
+        // at least one pipe stage matches.  Regex + exceptions still run
+        // against the original full segment to preserve exception semantics
+        // (e.g. `\|\s*grep`).
+        if !targets_match(command, &rule.target_commands) {
+            continue;
+        }
 
-        let Ok(re) = Regex::new(&pattern_str) else {
+        let Some(re) = build_regex(rule) else {
             continue;
         };
         if !re.is_match(command) {
@@ -146,10 +194,18 @@ pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
             continue;
         }
 
-        let msg = rule
+        let base_msg = rule
             .message
             .clone()
             .unwrap_or_else(|| format!("Blocked by rule '{}'.", rule.id));
+
+        // Enrich message with the triggering stage when available
+        let msg = if let Some(stage) = triggering_stage(command, &rule.target_commands) {
+            format!("{base_msg}\n\nBlocked command: `{stage}`")
+        } else {
+            base_msg
+        };
+
         return Some((rule.id.clone(), msg));
     }
     None
@@ -217,7 +273,20 @@ mod tests {
             pattern: pattern.to_string(),
             pattern_flags: String::new(),
             exceptions: vec![],
+            target_commands: vec![],
             message: None,
+        }
+    }
+
+    fn make_targeted_rule(id: &str, pattern: &str, targets: Vec<&str>) -> Rule {
+        Rule {
+            id: id.to_string(),
+            enabled: true,
+            pattern: pattern.to_string(),
+            pattern_flags: String::new(),
+            exceptions: vec![],
+            target_commands: targets.into_iter().map(String::from).collect(),
+            message: Some(format!("Use the dedicated tool instead of {id}.")),
         }
     }
 
@@ -328,6 +397,7 @@ mod tests {
             pattern: r"(?:^|\s)nvm\b".to_string(),
             pattern_flags: String::new(),
             exceptions: vec![],
+            target_commands: vec!["nvm".to_string()],
             message: Some(
                 "Use `mise use node@<version>` instead of nvm. \
                  Example: `mise use node@20` or `mise use --global node@lts`."
@@ -371,5 +441,115 @@ mod tests {
     fn nvm_rule_id_is_correct() {
         let (rule_id, _) = check("nvm install 20", &[nvm_rule()]).unwrap();
         assert_eq!(rule_id, "no-nvm-use-mise");
+    }
+
+    // ── target_commands gating ────────────────────────────────────────────
+
+    fn grep_targeted_rule() -> Rule {
+        let mut r = make_targeted_rule("no-grep", r"\bgrep\b", vec!["grep", "rg"]);
+        r.exceptions = vec![r"\|\s*grep".to_string()];
+        r
+    }
+
+    fn find_targeted_rule() -> Rule {
+        make_targeted_rule("no-find", r#"\bfind\s+[./~$"']"#, vec!["find"])
+    }
+
+    fn cat_targeted_rule() -> Rule {
+        make_targeted_rule("no-cat", r"\bcat\s+[^|<]", vec!["cat"])
+    }
+
+    // ── true positives: targeted rules still block actual commands ────────
+
+    #[test]
+    fn targeted_grep_blocks_direct_invocation() {
+        let rules = vec![grep_targeted_rule()];
+        assert!(check("grep foo .", &rules).is_some());
+    }
+
+    #[test]
+    fn targeted_grep_blocks_in_pipeline_stage() {
+        // `grep` is argv[0] of the second pipe stage
+        let rules = vec![grep_targeted_rule()];
+        // Note: exception `\|\s*grep` will match here, so this is excepted.
+        // But a standalone `grep` still blocks:
+        assert!(check("grep -r pattern src/", &rules).is_some());
+    }
+
+    #[test]
+    fn targeted_find_blocks_direct_invocation() {
+        let rules = vec![find_targeted_rule()];
+        assert!(check("find . -name '*.rs'", &rules).is_some());
+    }
+
+    #[test]
+    fn targeted_cat_blocks_direct_invocation() {
+        let rules = vec![cat_targeted_rule()];
+        assert!(check("cat somefile.txt", &rules).is_some());
+    }
+
+    // ── false positives: these must NOT be blocked ───────────────────────
+
+    #[test]
+    fn targeted_grep_allows_word_in_commit_message() {
+        let rules = vec![grep_targeted_rule()];
+        assert!(check(r#"git commit -m "grep patterns are tricky""#, &rules).is_none());
+    }
+
+    #[test]
+    fn targeted_grep_allows_word_in_echo() {
+        let rules = vec![grep_targeted_rule()];
+        assert!(check(r#"echo "use grep for searching""#, &rules).is_none());
+    }
+
+    #[test]
+    fn targeted_grep_allows_word_in_test_name() {
+        let rules = vec![grep_targeted_rule()];
+        assert!(check("cargo test grep_test", &rules).is_none());
+    }
+
+    #[test]
+    fn targeted_find_allows_word_in_commit_message() {
+        let rules = vec![find_targeted_rule()];
+        assert!(check(r#"git commit -m "find .ctx stuff""#, &rules).is_none());
+    }
+
+    #[test]
+    fn targeted_find_allows_word_in_echo() {
+        let rules = vec![find_targeted_rule()];
+        assert!(check(r#"echo "could not find .config""#, &rules).is_none());
+    }
+
+    #[test]
+    fn targeted_cat_allows_word_in_echo() {
+        let rules = vec![cat_targeted_rule()];
+        assert!(check(r#"echo "use cat /dev/null trick""#, &rules).is_none());
+    }
+
+    // ── exception compatibility with targeted rules ──────────────────────
+
+    #[test]
+    fn targeted_grep_pipe_exception_still_works() {
+        // `| grep` exception applies against the full segment
+        let rules = vec![grep_targeted_rule()];
+        assert!(check("cargo test | grep passed", &rules).is_none());
+    }
+
+    // ── deny message includes triggering stage ───────────────────────────
+
+    #[test]
+    fn targeted_deny_message_includes_blocked_stage() {
+        let rules = vec![grep_targeted_rule()];
+        let (_, msg) = check("grep foo .", &rules).unwrap();
+        assert!(msg.contains("Blocked command: `grep foo .`"), "msg: {msg}");
+    }
+
+    // ── legacy rules (no target_commands) still work ─────────────────────
+
+    #[test]
+    fn legacy_rule_without_targets_still_matches() {
+        let rules = vec![make_rule("no-grep", r"\bgrep\b")];
+        // Legacy behaviour: matches the word anywhere in the string
+        assert!(check("echo grep is useful", &rules).is_some());
     }
 }

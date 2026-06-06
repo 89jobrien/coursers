@@ -169,6 +169,7 @@ mod tests {
                 pattern: pattern.to_string(),
                 pattern_flags: String::new(),
                 exceptions: vec![],
+                target_commands: vec![],
                 message: Some("blocked".to_string()),
             }],
             failure_learning: FailureLearning::default(),
@@ -275,6 +276,7 @@ mod tests {
                 pattern: r"\bgrep\b".to_string(),
                 pattern_flags: String::new(),
                 exceptions: vec![],
+                target_commands: vec![],
                 message: Some("blocked".to_string()),
             }],
             failure_learning: FailureLearning {

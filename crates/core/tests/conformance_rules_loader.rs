@@ -49,6 +49,7 @@ fn in_memory_loader_satisfies_contract_with_rules() {
                 pattern: r"\bgrep\b".to_string(),
                 pattern_flags: String::new(),
                 exceptions: vec![r"\| grep".to_string()],
+                target_commands: vec![],
                 message: Some("Use Grep tool".to_string()),
             },
             Rule {
@@ -57,6 +58,7 @@ fn in_memory_loader_satisfies_contract_with_rules() {
                 pattern: r"\bcat\b".to_string(),
                 pattern_flags: String::new(),
                 exceptions: vec![],
+                target_commands: vec![],
                 message: None,
             },
         ],
@@ -82,6 +84,7 @@ fn in_memory_loader_returns_exact_config() {
             pattern: ".*".to_string(),
             pattern_flags: "i".to_string(),
             exceptions: vec![],
+            target_commands: vec![],
             message: Some("blocked".to_string()),
         }],
         failure_learning: FailureLearning {

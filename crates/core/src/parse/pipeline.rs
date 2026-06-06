@@ -1,3 +1,96 @@
+/// Extract the command names (argv[0]) invoked across all pipe stages of a
+/// shell segment.
+///
+/// Splits on unquoted `|` (but not `||`), parses each stage with
+/// `shell_words::split`, and returns the first token of each stage.
+/// Returns an empty vec if nothing parses.
+pub fn pipe_stage_commands(segment: &str) -> Vec<String> {
+    let stages = pipe_stages(segment);
+    stages
+        .into_iter()
+        .filter_map(|s| {
+            let argv = shell_words::split(s.trim()).ok()?;
+            argv.into_iter().next()
+        })
+        .collect()
+}
+
+/// Split a shell segment on unquoted pipe (`|`) operators.
+///
+/// `||` is NOT treated as a pipe — it is left intact within the stage.
+/// Quote-aware: pipes inside single or double quotes are ignored.
+///
+/// Each stage is trimmed. Empty stages are dropped.
+pub fn pipe_stages(segment: &str) -> Vec<&str> {
+    #[derive(PartialEq)]
+    enum Q {
+        None,
+        Single,
+        Double,
+    }
+
+    let bytes = segment.as_bytes();
+    let mut stages: Vec<&str> = Vec::new();
+    let mut start = 0usize;
+    let mut i = 0usize;
+    let mut quote = Q::None;
+
+    while i < bytes.len() {
+        match quote {
+            Q::None => match bytes[i] {
+                b'\'' => {
+                    quote = Q::Single;
+                    i += 1;
+                }
+                b'"' => {
+                    quote = Q::Double;
+                    i += 1;
+                }
+                // `||` is a sequential operator, not a pipe
+                b'|' if i + 1 < bytes.len() && bytes[i + 1] == b'|' => {
+                    i += 2;
+                }
+                b'|' => {
+                    let stage = segment[start..i].trim();
+                    if !stage.is_empty() {
+                        stages.push(stage);
+                    }
+                    i += 1;
+                    start = i;
+                }
+                _ => {
+                    i += 1;
+                }
+            },
+            Q::Single => {
+                if bytes[i] == b'\'' {
+                    quote = Q::None;
+                }
+                i += 1;
+            }
+            Q::Double => match bytes[i] {
+                b'\\' if i + 1 < bytes.len() => {
+                    i += 2;
+                }
+                b'"' => {
+                    quote = Q::None;
+                    i += 1;
+                }
+                _ => {
+                    i += 1;
+                }
+            },
+        }
+    }
+
+    let stage = segment[start..].trim();
+    if !stage.is_empty() {
+        stages.push(stage);
+    }
+
+    stages
+}
+
 /// Split a shell command on sequential operators: `&&`, `||`, `;`.
 ///
 /// Pipe (`|`) is intentionally excluded — piped commands form a single logical
@@ -92,7 +185,7 @@ pub fn sequential_segments(cmd: &str) -> Vec<&str> {
 
 #[cfg(kani)]
 mod kani_proofs {
-    use super::*;
+    use super::sequential_segments;
 
     /// Proof: splitting on && produces non-empty, trimmed segments.
     #[kani::proof]
@@ -133,7 +226,7 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::sequential_segments;
 
     #[test]
     fn single_command_no_operators() {
@@ -264,6 +357,66 @@ mod tests {
     }
 
     // ── property tests ────────────────────────────────────────────────────
+
+    // ── pipe_stages tests ────────────────────────────────────────────────
+
+    use super::pipe_stage_commands;
+    use super::pipe_stages;
+
+    #[test]
+    fn pipe_single_command() {
+        assert_eq!(pipe_stages("cargo build"), vec!["cargo build"]);
+    }
+
+    #[test]
+    fn pipe_two_stages() {
+        assert_eq!(
+            pipe_stages("cargo test | grep passed"),
+            vec!["cargo test", "grep passed"]
+        );
+    }
+
+    #[test]
+    fn pipe_three_stages() {
+        assert_eq!(
+            pipe_stages("cat file | grep foo | wc -l"),
+            vec!["cat file", "grep foo", "wc -l"]
+        );
+    }
+
+    #[test]
+    fn pipe_or_not_split() {
+        // `||` is a sequential operator, not a pipe
+        assert_eq!(pipe_stages("a || b"), vec!["a || b"]);
+    }
+
+    #[test]
+    fn pipe_inside_double_quotes_not_split() {
+        assert_eq!(pipe_stages(r#"echo "a | b""#), vec![r#"echo "a | b""#]);
+    }
+
+    #[test]
+    fn pipe_inside_single_quotes_not_split() {
+        assert_eq!(pipe_stages("echo 'a | b'"), vec!["echo 'a | b'"]);
+    }
+
+    #[test]
+    fn pipe_stage_commands_extracts_argv0() {
+        assert_eq!(
+            pipe_stage_commands("cargo test | grep passed | wc -l"),
+            vec!["cargo", "grep", "wc"]
+        );
+    }
+
+    #[test]
+    fn pipe_stage_commands_single() {
+        assert_eq!(pipe_stage_commands("grep foo ."), vec!["grep"]);
+    }
+
+    #[test]
+    fn pipe_stage_commands_empty() {
+        assert!(pipe_stage_commands("").is_empty());
+    }
 
     use proptest::prelude::*;
 

@@ -26,6 +26,7 @@ use crate::state::State;
 /// let src = ws.command_source();
 /// let report = crs_core::history::discover(&src, &ws.rules, &ws.discover_opts());
 /// ```
+// qual:allow(srp) reason: "builder pattern for test fixtures"
 pub struct MockWorkspace {
     pub commands: Vec<CommandRecord>,
     pub rules: Vec<Rule>,
@@ -107,6 +108,7 @@ impl MockWorkspace {
             pattern: pattern.to_string(),
             pattern_flags: String::new(),
             exceptions: vec![],
+            target_commands: vec![],
             message: None,
         });
         self
@@ -120,6 +122,7 @@ impl MockWorkspace {
             pattern: pattern.to_string(),
             pattern_flags: String::new(),
             exceptions: vec![exception.to_string()],
+            target_commands: vec![],
             message: None,
         });
         self
