@@ -27,6 +27,7 @@ chrono = "0.4"
 shell-words = "1"
 prefixe = { path = "../prefixe/crates/prefixe" }
 fd-lock = "4"
+redb = "4.1"
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

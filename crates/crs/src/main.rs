@@ -102,6 +102,24 @@ enum Command {
         /// pre-compact, stop, subagent-stop
         event: String,
     },
+    /// Query the hook execution log
+    Log {
+        /// Max entries to show (default: 20)
+        #[arg(short, long, default_value = "20")]
+        limit: usize,
+        /// Filter by event name (e.g. "pre", "post", "stop")
+        #[arg(short, long)]
+        event: Option<String>,
+        /// Filter by outcome: pass, deny, rewrite, notify, side-effect
+        #[arg(short, long)]
+        outcome: Option<String>,
+        /// Output format: text or json
+        #[arg(short, long, default_value = "text")]
+        format: String,
+        /// Prune entries older than N hours
+        #[arg(long)]
+        prune_hours: Option<u64>,
+    },
     /// Show a heatmap of rule firings by hour-of-day and day-of-week
     Heat {
         /// Filter to a specific rule id
@@ -169,6 +187,19 @@ fn main() {
         } => cmd_history(limit, rule.as_deref(), &format),
         Command::Export { out } => cmd_export(out.as_deref()),
         Command::Hook { event } => cmd_hook(&event),
+        Command::Log {
+            limit,
+            event,
+            outcome,
+            format,
+            prune_hours,
+        } => cmd_log(
+            limit,
+            event.as_deref(),
+            outcome.as_deref(),
+            &format,
+            prune_hours,
+        ),
         Command::Heat { rule } => cmd_heat(rule.as_deref()),
         Command::Replay { session, format } => cmd_replay(session.as_deref(), &format),
     }
@@ -623,6 +654,13 @@ fn cmd_hook(event_str: &str) {
 
     let result = run_pipeline(&config, &ctx);
 
+    // Log to redb (fire-and-forget).
+    if let Ok(db) = crs_core::hook::log::open_db(&crs_core::hook::log::db_path()) {
+        let entry =
+            crs_core::hook::log::entry_from_pipeline(&ctx, &result, result.matched_rules.clone());
+        crs_core::hook::log::record(&db, &entry);
+    }
+
     // Emit response based on event type and result.
     if let Some(deny_msg) = result.deny {
         let resp = serde_json::json!({
@@ -672,6 +710,108 @@ fn cmd_hook(event_str: &str) {
     }
 
     // No action — silent pass.
+}
+
+fn cmd_log(
+    limit: usize,
+    event: Option<&str>,
+    outcome: Option<&str>,
+    format: &str,
+    prune_hours: Option<u64>,
+) {
+    use crs_core::hook::log::{LogQuery, count, db_path, open_db, prune, query};
+
+    let db_p = db_path();
+    let Ok(db) = open_db(&db_p) else {
+        eprintln!("crs log: cannot open {}", db_p.display());
+        std::process::exit(1);
+    };
+
+    if let Some(hours) = prune_hours {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let cutoff_ns = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64
+            - (hours * 3_600_000_000_000);
+        let removed = prune(&db, cutoff_ns);
+        println!(
+            "Pruned {removed} entries older than {hours}h. Remaining: {}",
+            count(&db)
+        );
+        return;
+    }
+
+    let q = LogQuery {
+        event: event.map(String::from),
+        outcome_kind: outcome.map(String::from),
+        limit,
+        ..Default::default()
+    };
+    let entries = query(&db, &q);
+
+    if format == "json" {
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        writeln!(
+            handle,
+            "{}",
+            serde_json::to_string_pretty(&entries).unwrap_or_default()
+        )
+        .ok();
+        return;
+    }
+
+    // Text format
+    if entries.is_empty() {
+        println!("No log entries. Total: {}", count(&db));
+        return;
+    }
+
+    println!(
+        "Hook log ({} entries, {} total):\n",
+        entries.len(),
+        count(&db)
+    );
+    for entry in &entries {
+        let ts_secs = entry.timestamp / 1_000_000_000;
+        let dt = chrono::DateTime::from_timestamp(ts_secs as i64, 0)
+            .map(|d| d.format("%H:%M:%S").to_string())
+            .unwrap_or_else(|| "?".into());
+
+        let outcome_str = match &entry.outcome {
+            crs_core::hook::log::Outcome::Pass => "PASS".to_string(),
+            crs_core::hook::log::Outcome::Deny { message } => {
+                format!("DENY: {}", &message[..message.len().min(60)])
+            }
+            crs_core::hook::log::Outcome::Rewrite { to } => {
+                format!("REWRITE: {}", &to[..to.len().min(60)])
+            }
+            crs_core::hook::log::Outcome::SideEffect { commands_run } => {
+                format!("RUN({commands_run})")
+            }
+            crs_core::hook::log::Outcome::Notify { count } => format!("NOTIFY({count})"),
+        };
+
+        let target_short = entry
+            .target
+            .as_deref()
+            .unwrap_or("-")
+            .chars()
+            .take(50)
+            .collect::<String>();
+
+        let rules = if entry.matched_rules.is_empty() {
+            String::new()
+        } else {
+            format!(" [{}]", entry.matched_rules.join(", "))
+        };
+
+        println!(
+            "{dt} {:<12} {:<50} {}{rules}",
+            entry.event, target_short, outcome_str
+        );
+    }
 }
 
 fn event_str_for(event: crs_core::hook_pipeline::HookEvent) -> &'static str {
