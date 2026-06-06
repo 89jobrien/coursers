@@ -809,11 +809,11 @@ fn cmd_log(
         let rules = if entry.matched_rules.is_empty() {
             String::new()
         } else {
-            format!(" [{}]", entry.matched_rules.join(", "))
+            format!("[{}]", entry.matched_rules.join(", "))
         };
 
         println!(
-            "{dt} {:<12} {:<50} {}{rules}",
+            "{dt} {rules} {:<12} {} {}",
             entry.event, target_short, outcome_str
         );
     }

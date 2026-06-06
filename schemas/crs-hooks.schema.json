@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/89jobrien/coursers/schemas/crs-hooks.schema.json",
+  "title": "crs-hooks",
+  "description": "Schema for crs hook pipeline config (crs-hooks.toml, plugins.d/*.toml)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "hooks": {
+      "type": "array",
+      "description": "Ordered list of hook rules evaluated top-to-bottom.",
+      "items": { "$ref": "#/$defs/HookRule" }
+    }
+  },
+  "$defs": {
+    "HookRule": {
+      "type": "object",
+      "required": ["event", "action"],
+      "unevaluatedProperties": false,
+      "properties": {
+        "event": { "$ref": "#/$defs/HookEvent" },
+        "matcher": {
+          "type": "string",
+          "description": "Tool name glob (e.g. \"Bash\", \"Edit|Write\", \"*\"). Only meaningful for PreToolUse/PostToolUse."
+        },
+        "pattern": {
+          "type": "string",
+          "description": "Regex matched against the command (Bash) or file_path (Edit/Write)."
+        },
+        "unless": {
+          "type": "string",
+          "description": "Skip this rule if the command/path contains this substring."
+        },
+        "when": { "$ref": "#/$defs/When" },
+        "label": {
+          "type": "string",
+          "description": "Human-readable label for logging and diagnostics."
+        }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/HookAction" }
+      ]
+    },
+    "HookEvent": {
+      "type": "string",
+      "enum": [
+        "pre-tool-use",
+        "post-tool-use",
+        "session-start",
+        "session-end",
+        "pre-compact",
+        "stop",
+        "subagent-stop"
+      ]
+    },
+    "When": {
+      "type": "string",
+      "enum": ["always", "on-success", "on-failure"],
+      "default": "always",
+      "description": "When a post-hook rule fires relative to exit code."
+    },
+    "HookAction": {
+      "discriminator": {
+        "propertyName": "action"
+      },
+      "oneOf": [
+        { "$ref": "#/$defs/DenyAction" },
+        { "$ref": "#/$defs/RewriteAction" },
+        { "$ref": "#/$defs/RunAction" },
+        { "$ref": "#/$defs/NotifyAction" }
+      ]
+    },
+    "DenyAction": {
+      "type": "object",
+      "required": ["action", "message"],
+      "properties": {
+        "action": { "const": "deny" },
+        "message": {
+          "type": "string",
+          "description": "Message shown to the agent when the tool call is blocked."
+        }
+      }
+    },
+    "RewriteAction": {
+      "type": "object",
+      "required": ["action"],
+      "properties": {
+        "action": { "const": "rewrite" },
+        "inject": {
+          "type": "string",
+          "description": "String to inject into the command."
+        },
+        "prepend": {
+          "type": "string",
+          "description": "String to prepend to the command."
+        },
+        "replace": {
+          "type": "string",
+          "description": "Regex substitution to replace the entire command."
+        }
+      },
+      "anyOf": [
+        { "required": ["inject"] },
+        { "required": ["prepend"] },
+        { "required": ["replace"] }
+      ]
+    },
+    "RunAction": {
+      "type": "object",
+      "required": ["action", "command"],
+      "properties": {
+        "action": { "const": "run" },
+        "command": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "description": "External command to run as a side-effect."
+        },
+        "capture": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, capture stdout and emit as a system message."
+        }
+      }
+    },
+    "NotifyAction": {
+      "type": "object",
+      "required": ["action", "template"],
+      "properties": {
+        "action": { "const": "notify" },
+        "template": {
+          "type": "string",
+          "description": "Message template. Supports {{tool_name}}, {{target}} placeholders."
+        }
+      }
+    }
+  }
+}
