@@ -10,7 +10,8 @@ pub fn pipe_stage_commands(segment: &str) -> Vec<String> {
         .into_iter()
         .filter_map(|s| {
             let argv = shell_words::split(s.trim()).ok()?;
-            argv.into_iter().next()
+            let name = argv.into_iter().next()?;
+            if name.is_empty() { None } else { Some(name) }
         })
         .collect()
 }
@@ -416,6 +417,63 @@ mod tests {
     #[test]
     fn pipe_stage_commands_empty() {
         assert!(pipe_stage_commands("").is_empty());
+    }
+
+    // ── regression: fuzz-found crash on empty quoted strings ─────────────
+
+    #[test]
+    fn pipe_stage_commands_empty_quoted_string() {
+        // Fuzz artifact: [34, 34] = `""` — shell_words parses to empty token
+        let cmds = pipe_stage_commands(r#""""#);
+        for cmd in &cmds {
+            assert!(
+                !cmd.is_empty(),
+                "empty command name from empty quoted string"
+            );
+        }
+    }
+
+    // ── pipe_stages property tests ──────────────────────────────────────
+
+    proptest! {
+        /// Pipe stages are always non-empty and trimmed.
+        #[test]
+        fn prop_pipe_stages_trimmed_and_nonempty(cmd in "[a-zA-Z0-9 |._/-]{1,60}") {
+            for stage in pipe_stages(&cmd) {
+                prop_assert!(!stage.is_empty());
+                prop_assert_eq!(stage, stage.trim());
+            }
+        }
+
+        /// Single pipe char produces exactly 2 stages (no quotes involved).
+        #[test]
+        fn prop_single_pipe_splits_two(
+            a in "[a-zA-Z0-9._/-]{1,15}",
+            b in "[a-zA-Z0-9._/-]{1,15}",
+        ) {
+            let cmd = format!("{a} | {b}");
+            let stages = pipe_stages(&cmd);
+            prop_assert_eq!(stages.len(), 2);
+        }
+
+        /// `||` never splits into pipe stages — it stays in one stage.
+        #[test]
+        fn prop_or_or_never_pipe_splits(
+            a in "[a-zA-Z0-9._/-]{1,15}",
+            b in "[a-zA-Z0-9._/-]{1,15}",
+        ) {
+            let cmd = format!("{a} || {b}");
+            let stages = pipe_stages(&cmd);
+            prop_assert_eq!(stages.len(), 1);
+        }
+
+        /// pipe_stage_commands returns only valid command names (no empty strings).
+        #[test]
+        fn prop_pipe_stage_commands_nonempty(cmd in "[a-zA-Z0-9 |._/-]{1,60}") {
+            for name in pipe_stage_commands(&cmd) {
+                prop_assert!(!name.is_empty());
+            }
+        }
     }
 
     use proptest::prelude::*;

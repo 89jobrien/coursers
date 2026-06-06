@@ -30,3 +30,13 @@ doc = false
 name = "fuzz_expand"
 path = "fuzz_targets/fuzz_expand.rs"
 doc = false
+
+[[bin]]
+name = "fuzz_pipe_stages"
+path = "fuzz_targets/fuzz_pipe_stages.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_rule_check"
+path = "fuzz_targets/fuzz_rule_check.rs"
+doc = false

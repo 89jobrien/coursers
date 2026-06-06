@@ -552,4 +552,85 @@ mod tests {
         // Legacy behaviour: matches the word anywhere in the string
         assert!(check("echo grep is useful", &rules).is_some());
     }
+
+    // ── property tests ───────────────────────────────────────────────────
+
+    use proptest::prelude::*;
+
+    /// Generate a command that does NOT contain any target command name as argv[0].
+    fn innocent_command() -> impl Strategy<Value = String> {
+        // Commands where argv[0] is never grep/rg/find/cat/sed/ls/sleep/cd
+        prop_oneof![
+            Just("cargo build --release".to_string()),
+            Just("git status --short".to_string()),
+            Just("echo hello world".to_string()),
+            Just("python3 -c 'print(1)'".to_string()),
+            Just("rustup show".to_string()),
+        ]
+    }
+
+    /// Wrap a command in a context where the blocked word appears but not as argv[0].
+    fn command_with_word_in_args(word: &'static str) -> impl Strategy<Value = String> {
+        prop_oneof![
+            Just(format!("git commit -m \"{word} patterns\"")),
+            Just(format!("echo \"use {word} for this\"")),
+            Just(format!("cargo test {word}_test")),
+            Just(format!("echo '{word} is a tool'")),
+        ]
+    }
+
+    proptest! {
+        /// Empty target_commands always returns true from targets_match (legacy).
+        #[test]
+        fn prop_empty_targets_always_match(cmd in "[a-zA-Z0-9 |._/-]{1,40}") {
+            prop_assert!(targets_match(&cmd, &[]));
+        }
+
+        /// A targeted rule never fires when the blocked command is only in arguments.
+        #[test]
+        fn prop_targeted_grep_never_fires_on_args(
+            cmd in command_with_word_in_args("grep")
+        ) {
+            let rules = vec![grep_targeted_rule()];
+            prop_assert!(check(&cmd, &rules).is_none(),
+                "False positive on: {cmd}");
+        }
+
+        /// A targeted rule never fires on innocent commands.
+        #[test]
+        fn prop_targeted_rules_pass_innocent_commands(cmd in innocent_command()) {
+            let rules = vec![
+                grep_targeted_rule(),
+                find_targeted_rule(),
+                cat_targeted_rule(),
+            ];
+            prop_assert!(check(&cmd, &rules).is_none(),
+                "False positive on: {cmd}");
+        }
+
+        /// check() and check_pipeline() agree on single-segment commands
+        /// (no &&, ||, or ;).
+        #[test]
+        fn prop_check_and_pipeline_agree_on_simple(
+            cmd in "[a-zA-Z0-9 |._/-]{1,40}"
+        ) {
+            let rules = vec![grep_targeted_rule()];
+            let direct = check(&cmd, &rules);
+            let pipeline = check_pipeline(&cmd, &rules);
+            prop_assert_eq!(direct.is_some(), pipeline.is_some(),
+                "Disagreement on: {}", cmd);
+        }
+
+        /// matched_rule_id and check always agree on whether a rule matches.
+        #[test]
+        fn prop_matched_rule_id_agrees_with_check(
+            cmd in "[a-zA-Z0-9 |._/-]{1,40}"
+        ) {
+            let rules = vec![grep_targeted_rule()];
+            let id = matched_rule_id(&cmd, &rules);
+            let chk = check(&cmd, &rules);
+            prop_assert_eq!(id.is_some(), chk.is_some(),
+                "Disagreement on: {}", cmd);
+        }
+    }
 }
