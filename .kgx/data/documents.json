@@ -1,0 +1,18 @@
+{
+  "documents": [
+    {
+      "id": "pipeline-feat-001",
+      "title": "Generic Hook Pipeline",
+      "source": "crates/core/src/hook/pipeline.rs",
+      "raw_content": "Generic hook pipeline for all Claude Code events. Defines HookEvent (PreToolUse, PostToolUse, SessionStart, SessionEnd, PreCompact, Stop, SubagentStop), HookAction (Deny, Rewrite, Run, Notify), When (Always, OnSuccess, OnFailure), and HookRule structs. Config loaded from ~/.config/crs/hooks.toml + plugins.d/*.toml + .ctx/crs-hooks.toml. run_pipeline() evaluates rules in order: first Deny wins, rewrites accumulate, side-effects fire. The crs hook <event> subcommand reads stdin JSON, builds HookContext, runs pipeline, emits deny/rewrite/messages. godmode.toml is the first plugin with 20 rules replacing 9 nu scripts.",
+      "chunks": [
+        {
+          "id": "ed25f3ab-6e76-4649-a461-ea9cdb6bce29",
+          "doc_id": "pipeline-feat-001",
+          "text": "Generic hook pipeline for all Claude Code events. Defines HookEvent (PreToolUse, PostToolUse, SessionStart, SessionEnd, PreCompact, Stop, SubagentStop), HookAction (Deny, Rewrite, Run, Notify), When (Always, OnSuccess, OnFailure), and HookRule structs. Config loaded from ~/.config/crs/hooks.toml + plugins.d/*.toml + .ctx/crs-hooks.toml. run_pipeline() evaluates rules in order: first Deny wins, rewrites accumulate, side-effects fire. The crs hook <event> subcommand reads stdin JSON, builds HookContext, runs pipeline, emits deny/rewrite/messages. godmode.toml is the first plugin with 20 rules replacing 9 nu scripts.",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}

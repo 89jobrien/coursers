@@ -1,0 +1,168 @@
+{
+  "nodes": [
+    {
+      "id": "e1b99ee4-7997-4225-a3ae-fde64066acc4",
+      "name": "HookAction",
+      "type": "enum",
+      "supporting_text": "Deny, Rewrite, Run, Notify actions",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "a5084a4b-cada-45d2-8dbe-b99535af9cfe",
+      "name": "HookContext",
+      "type": "struct",
+      "supporting_text": "event, tool_name, target, exit_code, raw_json",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "9bcdedcb-adb2-4eb9-b696-0b0c303c6481",
+      "name": "HookEvent",
+      "type": "enum",
+      "supporting_text": "PreToolUse, PostToolUse, SessionStart, SessionEnd, PreCompact, Stop, SubagentStop",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "ff0d0609-71e8-43e3-8035-330d542a4778",
+      "name": "HookPipelineConfig",
+      "type": "struct",
+      "supporting_text": "Root config with hooks: Vec<HookRule>",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "fd331ade-4695-4369-afd5-fe6007b567ab",
+      "name": "HookRule",
+      "type": "struct",
+      "supporting_text": "event, matcher, pattern, unless, when, action, label",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "50e875ec-58ea-495c-a990-fa9ab3bedb45",
+      "name": "PipelineResult",
+      "type": "struct",
+      "supporting_text": "deny, rewrite, messages",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "844d58d7-ac78-4955-b217-90013b916e8f",
+      "name": "crs hook",
+      "type": "subcommand",
+      "supporting_text": "Single binary entry point for all hook events",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "9bb668a2-aa47-409f-b5da-204ac0ba75f3",
+      "name": "godmode.toml",
+      "type": "config",
+      "supporting_text": "Plugin config at ~/.config/crs/plugins.d/ with 20 declarative rules",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "825c3140-7e74-4a2d-9be2-7a1d2d424776",
+      "name": "load_config",
+      "type": "function",
+      "supporting_text": "Merges global + plugins.d + project-local configs",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    },
+    {
+      "id": "be9b0008-6e4e-4aa3-ab2e-6834982efd06",
+      "name": "run_pipeline",
+      "type": "function",
+      "supporting_text": "Evaluates all matching rules against context",
+      "source_docs": [
+        "pipeline-feat-001"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "79ddb890-f4d6-42ac-940b-954756260468",
+      "source": "844d58d7-ac78-4955-b217-90013b916e8f",
+      "target": "be9b0008-6e4e-4aa3-ab2e-6834982efd06",
+      "type": "calls",
+      "confidence": 1.0,
+      "supporting_text": "cmd_hook calls run_pipeline with parsed HookContext",
+      "source_doc": "pipeline-feat-001"
+    },
+    {
+      "id": "5adc0892-8047-41a1-9976-66af04504120",
+      "source": "be9b0008-6e4e-4aa3-ab2e-6834982efd06",
+      "target": "ff0d0609-71e8-43e3-8035-330d542a4778",
+      "type": "reads",
+      "confidence": 1.0,
+      "supporting_text": "run_pipeline iterates config.hooks",
+      "source_doc": "pipeline-feat-001"
+    },
+    {
+      "id": "f8e90fc4-1237-400c-a5b1-8d70eab280d0",
+      "source": "ff0d0609-71e8-43e3-8035-330d542a4778",
+      "target": "fd331ade-4695-4369-afd5-fe6007b567ab",
+      "type": "contains",
+      "confidence": 1.0,
+      "supporting_text": "hooks: Vec<HookRule>",
+      "source_doc": "pipeline-feat-001"
+    },
+    {
+      "id": "cecb200a-ee10-4585-b0ba-41912f7b03cc",
+      "source": "fd331ade-4695-4369-afd5-fe6007b567ab",
+      "target": "e1b99ee4-7997-4225-a3ae-fde64066acc4",
+      "type": "has_field",
+      "confidence": 1.0,
+      "supporting_text": "action field on HookRule",
+      "source_doc": "pipeline-feat-001"
+    },
+    {
+      "id": "72b4748b-f738-4396-a746-539cca3566be",
+      "source": "fd331ade-4695-4369-afd5-fe6007b567ab",
+      "target": "9bcdedcb-adb2-4eb9-b696-0b0c303c6481",
+      "type": "has_field",
+      "confidence": 1.0,
+      "supporting_text": "event field determines when rule fires",
+      "source_doc": "pipeline-feat-001"
+    },
+    {
+      "id": "1c71aefd-29e8-453b-b8ae-1ef315e47e00",
+      "source": "825c3140-7e74-4a2d-9be2-7a1d2d424776",
+      "target": "ff0d0609-71e8-43e3-8035-330d542a4778",
+      "type": "produces",
+      "confidence": 1.0,
+      "supporting_text": "Merges all sources into single config",
+      "source_doc": "pipeline-feat-001"
+    },
+    {
+      "id": "5829aaf2-0460-4f34-a846-36861c9d163d",
+      "source": "9bb668a2-aa47-409f-b5da-204ac0ba75f3",
+      "target": "ff0d0609-71e8-43e3-8035-330d542a4778",
+      "type": "loaded_by",
+      "confidence": 1.0,
+      "supporting_text": "Plugin configs merged by load_config from plugins.d/",
+      "source_doc": "pipeline-feat-001"
+    },
+    {
+      "id": "1fce29b2-e48c-4a19-b91e-b733d9cc67ca",
+      "source": "be9b0008-6e4e-4aa3-ab2e-6834982efd06",
+      "target": "50e875ec-58ea-495c-a990-fa9ab3bedb45",
+      "type": "produces",
+      "confidence": 1.0,
+      "supporting_text": "Returns deny/rewrite/messages",
+      "source_doc": "pipeline-feat-001"
+    }
+  ]
+}
