@@ -654,11 +654,16 @@ fn cmd_hook(event_str: &str) {
 
     let result = run_pipeline(&config, &ctx);
 
-    // Log to redb (fire-and-forget).
-    if let Ok(db) = crs_core::hook::log::open_db(&crs_core::hook::log::db_path()) {
-        let entry =
-            crs_core::hook::log::entry_from_pipeline(&ctx, &result, result.matched_rules.clone());
-        crs_core::hook::log::record(&db, &entry);
+    // Log to redb only when a rule actually fired (skip silent passes).
+    if !result.matched_rules.is_empty() {
+        if let Ok(db) = crs_core::hook::log::open_db(&crs_core::hook::log::db_path()) {
+            let entry = crs_core::hook::log::entry_from_pipeline(
+                &ctx,
+                &result,
+                result.matched_rules.clone(),
+            );
+            crs_core::hook::log::record(&db, &entry);
+        }
     }
 
     // Emit response based on event type and result.
