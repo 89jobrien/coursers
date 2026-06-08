@@ -40,6 +40,24 @@ pub fn apply_filter(output: &str, exit_code: i64, rule: &FilterRule) -> Option<S
                 Some(format!("{kept}\n... ({omitted} lines omitted)"))
             }
         }
+        FilterMode::MatchLines => {
+            // On failure, pass full output — error context matters.
+            if exit_code != 0 {
+                return Some(output.to_string());
+            }
+            let Some(ref pat) = rule.match_pattern else {
+                return Some(output.to_string());
+            };
+            let Ok(re) = regex::Regex::new(pat) else {
+                return Some(output.to_string());
+            };
+            let matched: Vec<&str> = output.lines().filter(|l| re.is_match(l)).collect();
+            if matched.is_empty() {
+                None
+            } else {
+                Some(matched.join("\n"))
+            }
+        }
     }
 }
 
@@ -89,6 +107,7 @@ mod tests {
             pattern: "cargo nextest".to_string(),
             mode,
             max_lines,
+            match_pattern: None,
         }
     }
 
@@ -98,6 +117,7 @@ mod tests {
                 pattern: "cargo nextest".to_string(),
                 mode,
                 max_lines: 3,
+                match_pattern: None,
             }],
             ..Default::default()
         }
@@ -197,6 +217,102 @@ mod tests {
             }
             other => panic!("expected Replace, got {other:?}"),
         }
+    }
+
+    // --- MatchLines ---
+
+    fn match_rule(pat: Option<&str>) -> FilterRule {
+        FilterRule {
+            pattern: "cargo kani".to_string(),
+            mode: FilterMode::MatchLines,
+            max_lines: 50,
+            match_pattern: pat.map(str::to_string),
+        }
+    }
+
+    #[test]
+    fn match_lines_keeps_matching_lines() {
+        let rule = match_rule(Some("error|FAILED"));
+        let output = "running tests\nerror: something broke\nall done\nFAILED: harness";
+        let result = apply_filter(output, 0, &rule).unwrap();
+        assert!(result.contains("error: something broke"));
+        assert!(result.contains("FAILED: harness"));
+        assert!(!result.contains("running tests"));
+        assert!(!result.contains("all done"));
+    }
+
+    #[test]
+    fn match_lines_suppresses_when_no_matches_on_success() {
+        let rule = match_rule(Some("FAILED"));
+        let output = "running tests\nall passed\ndone";
+        assert_eq!(apply_filter(output, 0, &rule), None);
+    }
+
+    #[test]
+    fn match_lines_passthrough_on_failure() {
+        let rule = match_rule(Some("FAILED"));
+        let output = "running tests\nall passed\ndone";
+        let result = apply_filter(output, 1, &rule).unwrap();
+        assert_eq!(result, output);
+    }
+
+    #[test]
+    fn match_lines_passthrough_when_pattern_absent() {
+        let rule = match_rule(None);
+        let output = "some output";
+        assert_eq!(apply_filter(output, 0, &rule), Some(output.to_string()));
+    }
+
+    #[test]
+    fn match_lines_passthrough_on_invalid_regex() {
+        let rule = match_rule(Some("[invalid"));
+        let output = "some output";
+        assert_eq!(apply_filter(output, 0, &rule), Some(output.to_string()));
+    }
+
+    #[test]
+    fn match_lines_output_is_subset_of_input() {
+        let rule = match_rule(Some("keep"));
+        let output = "keep this\ndrop this\nkeep that\ndrop that";
+        let result = apply_filter(output, 0, &rule).unwrap();
+        for line in result.lines() {
+            assert!(
+                output.lines().any(|l| l == line),
+                "output line not found in input: {line:?}"
+            );
+        }
+    }
+
+    // Conformance: FilterRule with match-lines mode deserializes correctly.
+    #[test]
+    fn match_lines_rule_deserializes_from_toml() {
+        use crs_core::filters::FiltersConfig;
+        let toml = r#"
+[[filters]]
+pattern = "cargo kani"
+mode = "match-lines"
+match_pattern = "FAILED|error"
+"#;
+        let cfg: FiltersConfig = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.filters.len(), 1);
+        assert_eq!(cfg.filters[0].mode, FilterMode::MatchLines);
+        assert_eq!(
+            cfg.filters[0].match_pattern.as_deref(),
+            Some("FAILED|error")
+        );
+    }
+
+    #[test]
+    fn match_lines_rule_without_match_pattern_deserializes() {
+        use crs_core::filters::FiltersConfig;
+        let toml = r#"
+[[filters]]
+pattern = "cargo kani"
+mode = "match-lines"
+"#;
+        let cfg: FiltersConfig = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.filters[0].mode, FilterMode::MatchLines);
+        assert!(cfg.filters[0].match_pattern.is_none());
     }
 
     // --- run_rewrite ---

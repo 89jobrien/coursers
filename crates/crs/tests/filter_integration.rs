@@ -21,6 +21,19 @@ fn cfg_single(pattern: &str, mode: FilterMode, max_lines: usize) -> FiltersConfi
             pattern: pattern.to_string(),
             mode,
             max_lines,
+            match_pattern: None,
+        }],
+        ..Default::default()
+    }
+}
+
+fn cfg_match_lines(pattern: &str, match_pattern: &str) -> FiltersConfig {
+    FiltersConfig {
+        filters: vec![FilterRule {
+            pattern: pattern.to_string(),
+            mode: FilterMode::MatchLines,
+            max_lines: 50,
+            match_pattern: Some(match_pattern.to_string()),
         }],
         ..Default::default()
     }
@@ -117,6 +130,64 @@ fn filter_no_matching_rule_passthrough() {
     let cfg = cfg_single("cargo nextest", FilterMode::FailuresOnly, 50);
     let p = payload("doob todo list", "some output", 0);
     assert_eq!(run_filter(&p, &cfg), FilterResult::Passthrough);
+}
+
+// ---------------------------------------------------------------------------
+// match-lines mode
+// ---------------------------------------------------------------------------
+
+#[test]
+fn filter_match_lines_replaces_with_matching_lines() {
+    let cfg = cfg_match_lines("cargo kani", "FAILED|error");
+    let output = "running harness\nerror: overflow\nall done\nFAILED: check_bounds";
+    let p = payload("cargo kani --harness foo", output, 0);
+    match run_filter(&p, &cfg) {
+        FilterResult::Replace(text) => {
+            assert!(text.contains("error: overflow"));
+            assert!(text.contains("FAILED: check_bounds"));
+            assert!(!text.contains("running harness"));
+            assert!(!text.contains("all done"));
+        }
+        other => panic!("expected Replace, got {other:?}"),
+    }
+}
+
+#[test]
+fn filter_match_lines_suppresses_when_no_matches_on_success() {
+    let cfg = cfg_match_lines("cargo kani", "FAILED");
+    let p = payload("cargo kani --harness foo", "running\nall good\ndone", 0);
+    assert_eq!(run_filter(&p, &cfg), FilterResult::Suppress);
+}
+
+#[test]
+fn filter_match_lines_passthrough_on_failure() {
+    let cfg = cfg_match_lines("cargo kani", "FAILED");
+    let output = "running\nall good\ndone";
+    let p = payload("cargo kani --harness foo", output, 1);
+    assert_eq!(run_filter(&p, &cfg), FilterResult::Passthrough);
+}
+
+#[test]
+fn filter_match_lines_from_toml() {
+    use std::io::Write as _;
+    let mut f = tempfile::NamedTempFile::new().unwrap();
+    write!(
+        f,
+        r#"
+[[filters]]
+pattern = "cargo kani"
+mode = "match-lines"
+match_pattern = "FAILED|error"
+"#,
+    )
+    .unwrap();
+    let cfg = crs_core::filters::FiltersConfig::load_from(f.path());
+    let output = "Checking\nerror: bad\nDone";
+    let p = payload("cargo kani --harness foo", output, 0);
+    match run_filter(&p, &cfg) {
+        FilterResult::Replace(text) => assert!(text.contains("error: bad")),
+        other => panic!("expected Replace, got {other:?}"),
+    }
 }
 
 // ---------------------------------------------------------------------------

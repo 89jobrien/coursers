@@ -14,6 +14,8 @@ pub enum FilterMode {
     ErrorsOnly,
     /// Truncate to `max_lines` lines.
     Truncate,
+    /// Keep only lines matching `match_pattern`. On failure, pass full output.
+    MatchLines,
 }
 
 /// A single filter rule matching one or more commands.
@@ -25,6 +27,11 @@ pub struct FilterRule {
     /// Used with `Truncate` mode: maximum lines to keep.
     #[serde(default = "default_max_lines")]
     pub max_lines: usize,
+    /// Used with `MatchLines` mode: regex matched against each output line.
+    /// Lines that match are kept; non-matching lines are dropped.
+    /// If absent or invalid, the output is passed through unchanged.
+    #[serde(default)]
+    pub match_pattern: Option<String>,
 }
 
 fn default_max_lines() -> usize {
@@ -224,11 +231,13 @@ mode = "truncate"
                     pattern: "cargo nextest".to_string(),
                     mode: FilterMode::FailuresOnly,
                     max_lines: 50,
+                    match_pattern: None,
                 },
                 FilterRule {
                     pattern: "cargo".to_string(),
                     mode: FilterMode::Passthrough,
                     max_lines: 50,
+                    match_pattern: None,
                 },
             ],
             ..Default::default()
@@ -244,6 +253,7 @@ mode = "truncate"
                 pattern: "cargo".to_string(),
                 mode: FilterMode::Passthrough,
                 max_lines: 50,
+                match_pattern: None,
             }],
             ..Default::default()
         };
