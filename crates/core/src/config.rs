@@ -1,6 +1,9 @@
 use std::path::PathBuf;
 
-// qual:allow(complexity) reason: "CLI startup — no home dir is unrecoverable"
+/// Approximate bytes per token (GPT/Claude tokenizer average).
+/// Used by both `history` (discover token estimation) and `tool_swap` (budget clamping).
+pub const BYTES_PER_TOKEN: usize = 4;
+
 pub fn rules_path() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_RULES") {
         return PathBuf::from(p);
@@ -10,7 +13,6 @@ pub fn rules_path() -> PathBuf {
         .join(".config/coursers/course-correct-rules.json")
 }
 
-// qual:allow(complexity) reason: "CLI startup — no home dir is unrecoverable"
 pub fn state_path_default() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_STATE") {
         return PathBuf::from(p);
@@ -24,9 +26,21 @@ pub fn state_path_default() -> PathBuf {
         .join(".config/coursers/course-correct-state.json")
 }
 
+#[cfg(kani)]
+mod kani_proofs {
+    use super::BYTES_PER_TOKEN;
+
+    /// Proof: BYTES_PER_TOKEN is positive (used as divisor in token estimation).
+    #[kani::proof]
+    #[kani::unwind(1)]
+    fn bytes_per_token_positive() {
+        assert!(BYTES_PER_TOKEN > 0, "BYTES_PER_TOKEN must be positive");
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::rules_path;
     use std::sync::Mutex;
 
     // Serialize env-mutation tests to avoid races between parallel test threads.

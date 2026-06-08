@@ -155,8 +155,8 @@ pub fn load_config() -> HookPipelineConfig {
     config
 }
 
-fn find_project_hooks_toml() -> Option<PathBuf> {
-    let mut dir = std::env::current_dir().ok()?;
+fn find_hooks_toml_from(start: &std::path::Path) -> Option<PathBuf> {
+    let mut dir = start.to_path_buf();
     loop {
         let candidate = dir.join(".ctx/crs-hooks.toml");
         if candidate.exists() {
@@ -167,6 +167,10 @@ fn find_project_hooks_toml() -> Option<PathBuf> {
         }
     }
     None
+}
+
+fn find_project_hooks_toml() -> Option<PathBuf> {
+    find_hooks_toml_from(&std::env::current_dir().ok()?)
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +202,8 @@ pub struct PipelineResult {
     pub rewrite: Option<String>,
     /// System messages to emit (from Notify actions or captured Run output).
     pub messages: Vec<String>,
+    /// Labels of rules that matched (for logging).
+    pub matched_rules: Vec<String>,
 }
 
 /// Run all rules matching `ctx.event` against the given context.
@@ -253,6 +259,13 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
             }
             When::Always => {}
         }
+
+        // Track matched rule
+        let label = rule
+            .label
+            .clone()
+            .unwrap_or_else(|| format!("rule-{}", result.matched_rules.len()));
+        result.matched_rules.push(label);
 
         // Execute action
         match &rule.action {
@@ -417,6 +430,145 @@ fn run_side_effect(
         }
         _ => {} // fire-and-forget
     }
+}
+
+// ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+/// A diagnostic from hook config validation.
+#[derive(Debug)]
+pub struct HookDiagnostic {
+    pub level: DiagLevel,
+    pub rule_index: usize,
+    pub label: String,
+    pub message: String,
+}
+
+/// Severity level for diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiagLevel {
+    Error,
+    Warning,
+}
+
+/// Structural validation: catches configs that cannot work at runtime.
+pub fn validate_config(config: &HookPipelineConfig) -> Vec<HookDiagnostic> {
+    let mut diags = Vec::new();
+
+    for (i, rule) in config.hooks.iter().enumerate() {
+        let label = rule.label.clone().unwrap_or_else(|| format!("hooks[{i}]"));
+
+        // Pattern must compile
+        if let Some(ref pat) = rule.pattern {
+            if regex::Regex::new(pat).is_err() {
+                diags.push(HookDiagnostic {
+                    level: DiagLevel::Error,
+                    rule_index: i,
+                    label: label.clone(),
+                    message: format!("invalid regex pattern: {pat}"),
+                });
+            }
+        }
+
+        // Unless must compile
+        if let Some(ref pat) = rule.unless {
+            if regex::Regex::new(pat).is_err() {
+                diags.push(HookDiagnostic {
+                    level: DiagLevel::Error,
+                    rule_index: i,
+                    label: label.clone(),
+                    message: format!("invalid unless regex: {pat}"),
+                });
+            }
+        }
+
+        // Run action: command must not be empty
+        if let HookAction::Run { ref command, .. } = rule.action {
+            if command.is_empty() || command.iter().all(|c| c.trim().is_empty()) {
+                diags.push(HookDiagnostic {
+                    level: DiagLevel::Error,
+                    rule_index: i,
+                    label: label.clone(),
+                    message: "run action has empty command".into(),
+                });
+            }
+        }
+    }
+
+    // Sort: errors first
+    diags.sort_by_key(|d| match d.level {
+        DiagLevel::Error => 0,
+        DiagLevel::Warning => 1,
+    });
+    diags
+}
+
+/// Optional style/convention lint checks. Separate from `validate_config` so
+/// callers can opt in to stricter analysis.
+pub fn lint_config(config: &HookPipelineConfig) -> Vec<HookDiagnostic> {
+    let mut diags = Vec::new();
+
+    for (i, rule) in config.hooks.iter().enumerate() {
+        let label = rule.label.clone().unwrap_or_else(|| format!("hooks[{i}]"));
+
+        // deny-by-default: deny without pattern catches everything
+        if matches!(rule.action, HookAction::Deny { .. }) && rule.pattern.is_none() {
+            diags.push(HookDiagnostic {
+                level: DiagLevel::Warning,
+                rule_index: i,
+                label: label.clone(),
+                message: "deny-by-default: deny rule has no pattern, blocks all matching commands for this event"
+                    .into(),
+            });
+        }
+
+        // Notify with empty template is useless
+        if let HookAction::Notify { ref template } = rule.action {
+            if template.trim().is_empty() {
+                diags.push(HookDiagnostic {
+                    level: DiagLevel::Error,
+                    rule_index: i,
+                    label: label.clone(),
+                    message: "notify action has empty template".into(),
+                });
+            }
+        }
+
+        // Label namespacing convention: should contain '/'
+        if let Some(ref l) = rule.label {
+            if !l.contains('/') {
+                diags.push(HookDiagnostic {
+                    level: DiagLevel::Warning,
+                    rule_index: i,
+                    label: label.clone(),
+                    message:
+                        "label should use namespace/name convention (e.g. \"guardian/force-push\")"
+                            .into(),
+                });
+            }
+        }
+    }
+
+    diags
+}
+
+/// Collect all config source file paths that would be loaded.
+pub fn config_source_paths() -> Vec<(String, PathBuf)> {
+    let mut sources = Vec::new();
+
+    if let Some(home) = dirs::home_dir() {
+        let global = home.join(".config/crs/hooks.toml");
+        if global.exists() {
+            sources.push(("global".into(), global));
+        }
+    }
+
+    if let Some(path) = find_project_hooks_toml() {
+        sources.push(("project".into(), path));
+    }
+
+    sources
 }
 
 // ---------------------------------------------------------------------------
@@ -735,5 +887,12 @@ prepend = "WRAPPED=1"
         } else {
             panic!("expected Rewrite action");
         }
+    }
+
+    #[test]
+    fn find_hooks_toml_from_root_returns_none() {
+        // Starting at / must not panic and must return None — no .ctx/crs-hooks.toml at root.
+        let result = find_hooks_toml_from(std::path::Path::new("/"));
+        assert!(result.is_none());
     }
 }

@@ -7,6 +7,13 @@ use crs_core::state::FailureEntry;
 use crs_core::store::{FsStateStore, InMemoryStateStore, StateStore};
 use tempfile::TempDir;
 
+/// Test timestamp: base entry in timestamps vec.
+const TS_BASE: u64 = 100;
+/// Test timestamp: first entry's last_seen.
+const TS_FIRST: u64 = 200;
+/// Test timestamp: second entry's last_seen.
+const TS_SECOND: u64 = 300;
+
 // ---------------------------------------------------------------------------
 // Contract assertion
 // ---------------------------------------------------------------------------
@@ -25,8 +32,8 @@ fn assert_state_store_contract(store: &impl StateStore) {
         "key-a".to_string(),
         FailureEntry {
             command_preview: "echo hello".to_string(),
-            timestamps: vec![100, 200],
-            last_seen: 200.0,
+            timestamps: vec![TS_BASE, TS_FIRST],
+            last_seen: TS_FIRST as f64,
         },
     );
     store.save(&state);
@@ -41,8 +48,8 @@ fn assert_state_store_contract(store: &impl StateStore) {
         .get("key-a")
         .expect("contract 2: key must exist");
     assert_eq!(entry.command_preview, "echo hello");
-    assert_eq!(entry.timestamps, vec![100, 200]);
-    assert_eq!(entry.last_seen, 200.0);
+    assert_eq!(entry.timestamps, vec![TS_BASE, TS_FIRST]);
+    assert_eq!(entry.last_seen, TS_FIRST as f64);
 
     // 3. save() overwrites previous state (not append)
     let mut state2 = store.load();
@@ -51,8 +58,8 @@ fn assert_state_store_contract(store: &impl StateStore) {
         "key-b".to_string(),
         FailureEntry {
             command_preview: "cargo build".to_string(),
-            timestamps: vec![300],
-            last_seen: 300.0,
+            timestamps: vec![TS_SECOND],
+            last_seen: TS_SECOND as f64,
         },
     );
     store.save(&state2);

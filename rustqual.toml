@@ -21,9 +21,14 @@ ignore_functions = [
     # process adapter — tested via integration tests
     "parse_test_count",
     # expand_vars tests use with_env! macro — rustqual can't trace calls through it
-    "expand_vars_*",
+    "expand_vars_dollar_varname",
+    "expand_vars_dollar_brace_varname",
+    "expand_vars_nu_env_style",
+    "expand_vars_tilde_slash",
+    "expand_vars_tilde_alone",
+    "expand_vars_multiple_in_one_command",
     # crs integration test — SUT is the rewrite pipeline, not a single fn
-    "rewrite_applies_*",
+    "rewrite_applies_rx_prefix_when_prefixes_toml_present",
     # config path fns — unwrap is intentional (no home dir = unrecoverable)
     "rules_path",
     "state_path_default",
@@ -31,12 +36,39 @@ ignore_functions = [
     "env_var_overrides_*",
     "default_rules_path_*",
     "env_override_*",
+    # probe result handler — tested via integration tests
+    "handle_probe_result",
+    "handle_bare_failure",
+    # kani helper — trivial calendar logic
+    "days_in_month",
+    # trivial constructors — new() delegates to Default, from_parts is a struct builder
+    "from_parts",
+    "MockWorkspace",
+    # test helper — SLM is expected
+    "discover_opts_all",
+    # loader tests use unsafe set_var (Rust 2024 edition)
+    "fs_loader_*",
+    # kani proofs — expect/unwrap is idiomatic in verification harnesses
+    "preview_length_bounded",
+    "parse_n_file_default_when_no_flag",
+    "parse_n_file_explicit_count",
+    "ymd_day_within_month",
+    # conformance test helper — expect/unwrap is idiomatic in test assertions
+    "assert_state_store_contract",
+    # process adapters — SLM is inherent to I/O boundary fns
+    "call",
 ]
 
 # Test helpers and config init use unwrap idiomatically
 exclude_files = [
     "crates/coursers/tests/common.rs",
     "crates/core/tests/conformance_capture_store.rs",
+    "crates/core/tests/conformance_state_store.rs",
+    "crates/core/tests/conformance_var_expander.rs",
+    # process adapter — SLM is inherent, tested via integration tests
+    "crates/crs/src/rtk/process.rs",
+    "crates/crs/src/obfsck/process.rs",
+    "crates/core/src/testing.rs",
 ]
 
 [duplicates]

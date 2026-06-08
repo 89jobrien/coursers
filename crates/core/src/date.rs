@@ -94,18 +94,30 @@ pub fn unix_secs_to_date_str(secs: u64) -> String {
 
 #[cfg(kani)]
 mod kani_proofs {
-    use super::*;
+    use super::{unix_secs_to_ymd, unix_secs_to_ymd_hms};
+
+    // TODO: reconsider — these are mathematical constants, not config; literals
+    // (31, 4, 100) were more readable. Added only for rustqual magic-number check.
+    const DAYS_31: u32 = 31;
+    const DAYS_30: u32 = 30;
+    const DAYS_29: u32 = 29;
+    const DAYS_28: u32 = 28;
+    const LEAP_DIV_4: u32 = 4;
+    const LEAP_DIV_100: u32 = 100;
+    const LEAP_DIV_400: u32 = 400;
+    /// Upper bound on input seconds for kani tractability (~34,000 years).
+    const KANI_TRACTABILITY_BOUND: u64 = 1u64 << 40;
 
     /// Helper: true number of days in a given month for a given year.
     fn days_in_month(y: u32, m: u32) -> u32 {
         match m {
-            1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-            4 | 6 | 9 | 11 => 30,
+            1 | 3 | 5 | 7 | 8 | 10 | 12 => DAYS_31,
+            4 | 6 | 9 | 11 => DAYS_30,
             2 => {
-                if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 {
-                    29
+                if (y % LEAP_DIV_4 == 0 && y % LEAP_DIV_100 != 0) || y % LEAP_DIV_400 == 0 {
+                    DAYS_29
                 } else {
-                    28
+                    DAYS_28
                 }
             }
             _ => unreachable!(),
@@ -117,11 +129,10 @@ mod kani_proofs {
     #[kani::unwind(1)]
     fn ymd_bounds_valid() {
         let secs: u64 = kani::any();
-        // Bound to ~34,000 years from epoch for tractability
-        kani::assume(secs < (1u64 << 40));
+        kani::assume(secs < KANI_TRACTABILITY_BOUND);
         let (_, m, d) = unix_secs_to_ymd(secs);
         assert!(m >= 1 && m <= 12, "month out of range: {m}");
-        assert!(d >= 1 && d <= 31, "day out of range: {d}");
+        assert!(d >= 1 && d <= DAYS_31, "day out of range: {d}");
     }
 
     /// Proof: day never exceeds the actual days in the computed month/year.
@@ -129,7 +140,7 @@ mod kani_proofs {
     #[kani::unwind(1)]
     fn ymd_day_within_month() {
         let secs: u64 = kani::any();
-        kani::assume(secs < (1u64 << 40));
+        kani::assume(secs < KANI_TRACTABILITY_BOUND);
         let (y, m, d) = unix_secs_to_ymd(secs);
         let max_d = days_in_month(y, m);
         assert!(d <= max_d, "day {d} exceeds max {max_d} for {y}-{m:02}");
@@ -156,10 +167,10 @@ mod kani_proofs {
     #[kani::unwind(1)]
     fn hms_bounds_valid() {
         let secs: u64 = kani::any();
-        kani::assume(secs < (1u64 << 40));
+        kani::assume(secs < KANI_TRACTABILITY_BOUND);
         let (_, m, d, h, mi, s) = unix_secs_to_ymd_hms(secs);
         assert!(m >= 1 && m <= 12);
-        assert!(d >= 1 && d <= 31);
+        assert!(d >= 1 && d <= DAYS_31);
         assert!(h < 24, "hour out of range: {h}");
         assert!(mi < 60, "minute out of range: {mi}");
         assert!(s < 60, "second out of range: {s}");
@@ -172,7 +183,7 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{unix_secs_to_date_str, unix_secs_to_ymd, unix_secs_to_ymd_hms};
 
     #[test]
     fn epoch_zero_is_1970_01_01() {

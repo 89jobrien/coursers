@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 
-use crate::state::{State, load as fs_load, save as fs_save};
+use crate::config::state_path_default;
+use crate::rules::FailureLearning;
+use crate::state::State;
 
 pub trait StateStore {
     fn load(&self) -> State;
@@ -8,18 +10,52 @@ pub trait StateStore {
     fn path(&self) -> &Path;
 }
 
+/// Resolve the state file path from `FailureLearning` config.
+pub fn state_path(fl: &FailureLearning) -> PathBuf {
+    fl.state_file
+        .as_deref()
+        .map(|p| {
+            if let Some(rest) = p.strip_prefix("~/") {
+                dirs::home_dir().unwrap_or_default().join(rest)
+            } else {
+                PathBuf::from(p)
+            }
+        })
+        .unwrap_or_else(state_path_default)
+}
+
 /// Reads/writes state JSON to a real file path.
 pub struct FsStateStore {
     pub path: PathBuf,
 }
 
+impl FsStateStore {
+    /// Load state from a file path. Returns default on missing or malformed file.
+    fn load_from(path: &Path) -> State {
+        std::fs::read_to_string(path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Atomically save state to a file path via tmp+rename.
+    fn save_to(path: &Path, state: &State) {
+        let tmp = path.with_extension("json.tmp");
+        if let Ok(json) = serde_json::to_string_pretty(state)
+            && std::fs::write(&tmp, json).is_ok()
+        {
+            let _ = std::fs::rename(&tmp, path);
+        }
+    }
+}
+
 impl StateStore for FsStateStore {
     fn load(&self) -> State {
-        fs_load(&self.path)
+        Self::load_from(&self.path)
     }
 
     fn save(&self, state: &State) {
-        fs_save(&self.path, state);
+        Self::save_to(&self.path, state);
     }
 
     fn path(&self) -> &Path {

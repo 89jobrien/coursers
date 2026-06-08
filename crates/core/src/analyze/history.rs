@@ -1,5 +1,4 @@
-/// Approximate bytes per token (GPT/Claude tokenizer average).
-const BYTES_PER_TOKEN: usize = 4;
+use crate::config::BYTES_PER_TOKEN;
 
 /// Extracts the command stem (1–2 token prefix) used for frequency grouping.
 ///
@@ -194,13 +193,6 @@ fn days_ago(days: u32) -> String {
 #[cfg(kani)]
 mod kani_proofs {
     use super::BYTES_PER_TOKEN;
-
-    /// Proof: BYTES_PER_TOKEN is positive (used as divisor in token estimation).
-    #[kani::proof]
-    #[kani::unwind(1)]
-    fn bytes_per_token_positive() {
-        assert!(BYTES_PER_TOKEN > 0, "BYTES_PER_TOKEN must be positive");
-    }
 
     /// Proof: token estimation from byte count never overflows for reasonable sizes.
     #[kani::proof]

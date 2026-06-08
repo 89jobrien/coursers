@@ -1,11 +1,8 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::config::state_path_default;
 use crate::rules::FailureLearning;
 
 /// Max characters to store in the command preview field.
@@ -38,36 +35,6 @@ pub fn now_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_secs()
-}
-
-pub fn load(path: &Path) -> State {
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
-}
-
-pub fn save(path: &Path, state: &State) {
-    let tmp = path.with_extension("json.tmp");
-    if let Ok(json) = serde_json::to_string_pretty(state)
-        && fs::write(&tmp, json).is_ok()
-    {
-        let _ = fs::rename(&tmp, path);
-    }
-}
-
-pub fn state_path(fl: &FailureLearning) -> std::path::PathBuf {
-    fl.state_file
-        .as_deref()
-        .map(|p| {
-            // Expand ~ manually
-            if let Some(rest) = p.strip_prefix("~/") {
-                dirs::home_dir().unwrap_or_default().join(rest)
-            } else {
-                std::path::PathBuf::from(p)
-            }
-        })
-        .unwrap_or_else(state_path_default)
 }
 
 /// Records a failed command into state. Returns new state.

@@ -50,6 +50,50 @@ impl FiltersConfig {
     }
 }
 
+// ---------------------------------------------------------------------------
+// FiltersLoader trait (port)
+// ---------------------------------------------------------------------------
+
+/// Port: abstracts how filter configuration is loaded.
+pub trait FiltersLoader {
+    fn load(&self) -> FiltersConfig;
+    fn filters_path(&self) -> Option<PathBuf>;
+}
+
+/// Loads filters from the filesystem using the standard hierarchy:
+/// 1. `CRS_FILTERS` env var
+/// 2. `.ctx/crs-filters.toml` walking up from CWD
+/// 3. `~/.config/crs/filters.toml` (global fallback)
+pub struct FsFiltersLoader;
+
+impl FiltersLoader for FsFiltersLoader {
+    fn load(&self) -> FiltersConfig {
+        self.filters_path()
+            .map(|p| FiltersConfig::load_from(&p))
+            .unwrap_or_default()
+    }
+
+    fn filters_path(&self) -> Option<PathBuf> {
+        filters_path()
+    }
+}
+
+/// In-memory filters loader for tests. Returns the config it was constructed with.
+#[cfg(any(test, feature = "testing"))]
+#[derive(Clone)]
+pub struct InMemoryFiltersLoader(pub FiltersConfig);
+
+#[cfg(any(test, feature = "testing"))]
+impl FiltersLoader for InMemoryFiltersLoader {
+    fn load(&self) -> FiltersConfig {
+        self.0.clone()
+    }
+
+    fn filters_path(&self) -> Option<PathBuf> {
+        None
+    }
+}
+
 /// Resolve the active filters config using the hierarchy:
 /// 1. `CRS_FILTERS` env var (explicit override)
 /// 2. `.ctx/crs-filters.toml` walking up from CWD to filesystem root
@@ -81,9 +125,7 @@ pub fn filters_path() -> Option<PathBuf> {
 
 /// Load the active filters config (project-local wins over global).
 pub fn load() -> FiltersConfig {
-    filters_path()
-        .map(|p| FiltersConfig::load_from(&p))
-        .unwrap_or_default()
+    FsFiltersLoader.load()
 }
 
 /// Find the first matching filter rule for `command`.

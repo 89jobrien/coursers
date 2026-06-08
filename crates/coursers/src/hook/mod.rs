@@ -46,8 +46,8 @@ pub fn hook_context() -> Option<(
 )> {
     use crs_core::capture::SuggestionStore;
     use crs_core::loader::{FsRulesLoader, RulesLoader};
-    use crs_core::state::state_path;
     use crs_core::store::FsStateStore;
+    use crs_core::store::state_path;
 
     let payload = read_stdin()?;
     let loader = FsRulesLoader;

@@ -98,7 +98,7 @@ fn day_hour(unix_secs: u64) -> (u8, u8) {
 
 #[cfg(kani)]
 mod kani_proofs {
-    use super::*;
+    use super::{DAYS_PER_WEEK, HOURS_PER_DAY, day_hour};
 
     /// Proof: day_hour always returns day in 0..7.
     #[kani::proof]
@@ -129,7 +129,7 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{HeatMap, build, day_hour};
 
     #[test]
     fn empty_heatmap_has_no_cells() {

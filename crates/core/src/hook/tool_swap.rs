@@ -1,8 +1,45 @@
+// qual:allow(srp) reason: "single tool-swap concern with helper fns"
 use crate::ast::parse;
+use crate::config::BYTES_PER_TOKEN;
 use serde_json::{Value, json};
 
 /// Default line count for head/tail when no -n flag is given (matches coreutils).
 const DEFAULT_HEAD_TAIL_LINES: usize = 10;
+
+/// Port: abstracts file metadata queries needed by tool-swap decisions.
+/// Enables unit testing swap logic without real files.
+pub trait FileInfo {
+    /// File size in bytes, or None if unreadable.
+    fn file_size(&self, path: &str) -> Option<u64>;
+    /// Count newlines in a file, or None if unreadable.
+    fn count_lines(&self, path: &str) -> Option<usize>;
+    /// Average bytes per line from a sample, or None if unreadable.
+    fn avg_bytes_per_line(&self, path: &str) -> Option<usize>;
+}
+
+/// Production adapter: reads real filesystem.
+pub struct RealFileInfo;
+
+/// In-memory file info for tests. Returns preconfigured values.
+#[cfg(any(test, feature = "testing"))]
+pub struct FakeFileInfo {
+    pub size: Option<u64>,
+    pub lines: Option<usize>,
+    pub avg_bpl: Option<usize>,
+}
+
+#[cfg(any(test, feature = "testing"))]
+impl FileInfo for FakeFileInfo {
+    fn file_size(&self, _path: &str) -> Option<u64> {
+        self.size
+    }
+    fn count_lines(&self, _path: &str) -> Option<usize> {
+        self.lines
+    }
+    fn avg_bytes_per_line(&self, _path: &str) -> Option<usize> {
+        self.avg_bpl
+    }
+}
 
 /// Config for tool-swap behaviour, loaded from `[tool_swap]` in crs-filters.toml.
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -38,17 +75,24 @@ pub enum ToolAction {
     },
 }
 
+/// Attempt to swap `cmd` to a Claude Code tool call using real filesystem.
+/// Convenience wrapper that uses `RealFileInfo`.
+pub fn apply(cmd: &str, config: &ToolSwapConfig) -> ToolAction {
+    apply_with(cmd, config, &RealFileInfo)
+}
+
 /// Attempt to swap `cmd` to a Claude Code tool call.
 /// Returns `Passthrough` if no swap applies.
-pub fn apply(cmd: &str, config: &ToolSwapConfig) -> ToolAction {
+/// Accepts a `FileInfo` impl for testability.
+pub fn apply_with(cmd: &str, config: &ToolSwapConfig, fi: &impl FileInfo) -> ToolAction {
     let Some(parsed) = parse(cmd) else {
         return ToolAction::Passthrough;
     };
 
     match parsed.name() {
-        "cat" => swap_cat(parsed.args(), config),
-        "head" => swap_head(parsed.args(), config),
-        "tail" => swap_tail(parsed.args(), config),
+        "cat" => swap_cat(parsed.args(), config, fi),
+        "head" => swap_head(parsed.args(), config, fi),
+        "tail" => swap_tail(parsed.args(), config, fi),
         "find" => swap_find(parsed.args(), config),
         _ => ToolAction::Passthrough,
     }
@@ -58,8 +102,7 @@ pub fn apply(cmd: &str, config: &ToolSwapConfig) -> ToolAction {
 // cat
 // ---------------------------------------------------------------------------
 
-fn swap_cat(args: &[String], config: &ToolSwapConfig) -> ToolAction {
-    // Only handle single-file, no-flag cat. Flags or multiple files → passthrough.
+fn swap_cat(args: &[String], config: &ToolSwapConfig, fi: &impl FileInfo) -> ToolAction {
     let file = match args {
         [f] if !f.starts_with('-') => f.as_str(),
         _ => return ToolAction::Passthrough,
@@ -68,8 +111,7 @@ fn swap_cat(args: &[String], config: &ToolSwapConfig) -> ToolAction {
     let file_path = expand_path(file);
     let mut input = json!({ "file_path": file_path });
 
-    // If file exists and is over token budget, add a line limit.
-    if let Some(limit) = compute_line_limit(&file_path, config.cat_token_limit) {
+    if let Some(limit) = compute_line_limit(&file_path, config.cat_token_limit, fi) {
         input["limit"] = json!(limit);
     }
 
@@ -83,13 +125,13 @@ fn swap_cat(args: &[String], config: &ToolSwapConfig) -> ToolAction {
 // head
 // ---------------------------------------------------------------------------
 
-fn swap_head(args: &[String], config: &ToolSwapConfig) -> ToolAction {
+fn swap_head(args: &[String], config: &ToolSwapConfig, fi: &impl FileInfo) -> ToolAction {
     let Some((n, file)) = parse_n_file(args, DEFAULT_HEAD_TAIL_LINES) else {
         return ToolAction::Passthrough;
     };
 
     let file_path = expand_path(&file);
-    let limit = clamp_to_token_budget(n, &file_path, config.cat_token_limit);
+    let limit = clamp_to_token_budget(n, &file_path, config.cat_token_limit, fi);
 
     ToolAction::SwapTool {
         tool_name: "Read".to_string(),
@@ -104,7 +146,7 @@ fn swap_head(args: &[String], config: &ToolSwapConfig) -> ToolAction {
 // tail
 // ---------------------------------------------------------------------------
 
-fn swap_tail(args: &[String], config: &ToolSwapConfig) -> ToolAction {
+fn swap_tail(args: &[String], config: &ToolSwapConfig, fi: &impl FileInfo) -> ToolAction {
     let Some((n, file)) = parse_n_file(args, DEFAULT_HEAD_TAIL_LINES) else {
         return ToolAction::Passthrough;
     };
@@ -115,10 +157,9 @@ fn swap_tail(args: &[String], config: &ToolSwapConfig) -> ToolAction {
 
     let file_path = expand_path(&file);
 
-    // Count lines in file to compute offset.
-    let total_lines = count_lines(&file_path).unwrap_or(0);
+    let total_lines = fi.count_lines(&file_path).unwrap_or(0);
     let offset = total_lines.saturating_sub(n);
-    let limit = clamp_to_token_budget(n, &file_path, config.cat_token_limit);
+    let limit = clamp_to_token_budget(n, &file_path, config.cat_token_limit, fi);
 
     ToolAction::SwapTool {
         tool_name: "Read".to_string(),
@@ -229,15 +270,6 @@ fn expand_path(path: &str) -> String {
     path.to_string()
 }
 
-/// Count lines in a file by reading it. Returns None if file unreadable.
-fn count_lines(path: &str) -> Option<usize> {
-    let content = std::fs::read(path).ok()?;
-    Some(content.iter().filter(|&&b| b == b'\n').count())
-}
-
-/// Approximate bytes per token (GPT/Claude tokenizer average).
-const BYTES_PER_TOKEN: u64 = 4;
-
 /// Fallback average bytes per line when sampling fails.
 const DEFAULT_AVG_BYTES_PER_LINE: usize = 80;
 
@@ -246,41 +278,53 @@ const LINE_SAMPLE_SIZE: usize = 20;
 
 /// Estimate token count from file size.
 fn estimate_tokens_from_size(bytes: u64) -> usize {
-    (bytes / BYTES_PER_TOKEN) as usize
+    (bytes / BYTES_PER_TOKEN as u64) as usize
 }
 
-/// Sample avg bytes per line from up to `LINE_SAMPLE_SIZE` lines of a file.
-fn avg_bytes_per_line(path: &str) -> Option<usize> {
-    use std::io::{BufRead, BufReader};
-    let f = std::fs::File::open(path).ok()?;
-    let reader = BufReader::new(f);
-    let mut total_bytes = 0usize;
-    let mut count = 0usize;
-    for line in reader.lines().take(LINE_SAMPLE_SIZE) {
-        let line = line.ok()?;
-        total_bytes += line.len() + 1; // +1 for newline
-        count += 1;
+impl FileInfo for RealFileInfo {
+    fn file_size(&self, path: &str) -> Option<u64> {
+        std::fs::metadata(path).ok().map(|m| m.len())
     }
-    if count == 0 {
+
+    fn count_lines(&self, path: &str) -> Option<usize> {
+        let content = std::fs::read(path).ok()?;
+        Some(content.iter().filter(|&&b| b == b'\n').count())
+    }
+
+    fn avg_bytes_per_line(&self, path: &str) -> Option<usize> {
+        use std::io::{BufRead, BufReader};
+        let f = std::fs::File::open(path).ok()?;
+        let reader = BufReader::new(f);
+        let mut total_bytes = 0usize;
+        let mut count = 0usize;
+        for line in reader.lines().take(LINE_SAMPLE_SIZE) {
+            let line = line.ok()?;
+            total_bytes += line.len() + 1;
+            count += 1;
+        }
+        if count == 0 {
+            return None;
+        }
+        Some(total_bytes.div_ceil(count))
+    }
+}
+
+/// If the file exceeds the token budget, return a line limit. Otherwise None.
+fn compute_line_limit(path: &str, token_limit: usize, fi: &impl FileInfo) -> Option<usize> {
+    let size = fi.file_size(path)?;
+    if estimate_tokens_from_size(size) <= token_limit {
         return None;
     }
-    Some(total_bytes.div_ceil(count))
-}
-
-/// If the file exceeds the token budget, return a line limit. Otherwise None (read whole file).
-fn compute_line_limit(path: &str, token_limit: usize) -> Option<usize> {
-    let size = std::fs::metadata(path).ok()?.len();
-    if estimate_tokens_from_size(size) <= token_limit {
-        return None; // under budget — read whole file
-    }
-    let avg = avg_bytes_per_line(path).unwrap_or(DEFAULT_AVG_BYTES_PER_LINE);
-    let limit = (token_limit * BYTES_PER_TOKEN as usize) / avg.max(1);
+    let avg = fi
+        .avg_bytes_per_line(path)
+        .unwrap_or(DEFAULT_AVG_BYTES_PER_LINE);
+    let limit = (token_limit * BYTES_PER_TOKEN) / avg.max(1);
     Some(limit.max(1))
 }
 
 /// Clamp requested N lines to token budget.
-fn clamp_to_token_budget(n: usize, path: &str, token_limit: usize) -> usize {
-    let max = compute_line_limit(path, token_limit).unwrap_or(n);
+fn clamp_to_token_budget(n: usize, path: &str, token_limit: usize, fi: &impl FileInfo) -> usize {
+    let max = compute_line_limit(path, token_limit, fi).unwrap_or(n);
     n.min(max)
 }
 
@@ -290,7 +334,7 @@ fn clamp_to_token_budget(n: usize, path: &str, token_limit: usize) -> usize {
 
 #[cfg(kani)]
 mod kani_proofs {
-    use super::*;
+    use super::{DEFAULT_HEAD_TAIL_LINES, estimate_tokens_from_size, parse_n_file};
 
     /// Proof: estimate_tokens_from_size is monotonic.
     #[kani::proof]
@@ -310,7 +354,7 @@ mod kani_proofs {
         let args = vec!["somefile.txt".to_string()];
         let result = parse_n_file(&args, DEFAULT_HEAD_TAIL_LINES);
         assert!(result.is_some());
-        let (n, file) = result.unwrap();
+        let (n, file) = result.expect("no-flag case returns Some");
         assert!(n == DEFAULT_HEAD_TAIL_LINES);
         assert!(file == "somefile.txt");
     }
@@ -322,7 +366,7 @@ mod kani_proofs {
         let args = vec!["-n".to_string(), "42".to_string(), "file.rs".to_string()];
         let result = parse_n_file(&args, DEFAULT_HEAD_TAIL_LINES);
         assert!(result.is_some());
-        let (n, file) = result.unwrap();
+        let (n, file) = result.expect("explicit -n case returns Some");
         assert!(n == 42);
         assert!(file == "file.rs");
     }
@@ -330,7 +374,7 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{ToolAction, ToolSwapConfig, apply};
     use std::io::Write as _;
 
     fn cfg() -> ToolSwapConfig {

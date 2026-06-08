@@ -1,3 +1,4 @@
+// qual:allow(srp) reason: "single expand_vars concern"
 /// Port: abstracts how shell variable references are resolved in a command string.
 pub trait VarExpander {
     fn expand(&self, command: &str) -> String;
@@ -215,7 +216,7 @@ fn read_bare_name(s: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::expand_vars;
     use std::sync::Mutex;
 
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -232,6 +233,7 @@ mod tests {
         }};
     }
 
+    // qual:allow(test_quality) reason: "SUT called through with_env! macro — invisible to rustqual"
     #[test]
     fn expand_vars_dollar_varname() {
         let result = with_env!(("_CRS_TEST_FOO", "/test/foo") => {
@@ -240,6 +242,7 @@ mod tests {
         assert_eq!(result, "echo /test/foo");
     }
 
+    // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
     fn expand_vars_dollar_brace_varname() {
         let result = with_env!(("_CRS_TEST_BAR", "/test/bar") => {
@@ -248,6 +251,7 @@ mod tests {
         assert_eq!(result, "op run --env-file=/test/bar/.secrets");
     }
 
+    // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
     fn expand_vars_nu_env_style() {
         let result = with_env!(("_CRS_TEST_HOME", "/nu/home") => {
@@ -256,6 +260,7 @@ mod tests {
         assert_eq!(result, "op run --env-file=/nu/home/.secrets");
     }
 
+    // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
     fn expand_vars_tilde_slash() {
         let result = with_env!(("HOME", "/home/joe") => {
@@ -264,6 +269,7 @@ mod tests {
         assert_eq!(result, "op run --env-file=/home/joe/.secrets");
     }
 
+    // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
     fn expand_vars_tilde_alone() {
         let result = with_env!(("HOME", "/home/joe") => {
@@ -321,6 +327,7 @@ mod tests {
         );
     }
 
+    // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
     fn expand_vars_multiple_in_one_command() {
         let result = with_env!(("_CRS_TEST_A", "aaa"), ("_CRS_TEST_B", "bbb") => {

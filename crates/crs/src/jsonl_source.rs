@@ -42,8 +42,9 @@ impl CommandSource for JsonlCommandSource {
 /// Parse a single JSONL session file.
 ///
 /// Two-pass over the lines:
-///   Pass 1 — collect assistant tool_use records: tool_use_id → (command, cwd, session_id, ts)
-///   Pass 2 — collect user tool_result records:   tool_use_id → output_bytes
+// TODO(#41): pick one arrow style (-> vs the unicode arrow used elsewhere)
+///   Pass 1 -- collect assistant tool_use records: tool_use_id -> (command, cwd, session_id, ts)
+///   Pass 2 -- collect user tool_result records:   tool_use_id -> output_bytes
 ///
 /// Then join on tool_use_id to produce CommandRecord values with real output_bytes.
 fn parse_file(
@@ -56,9 +57,9 @@ fn parse_file(
         Err(_) => return vec![],
     };
 
-    // tool_use_id → (command, cwd, session_id, timestamp)
+    // tool_use_id -> (command, cwd, session_id, timestamp)
     let mut bash_calls: HashMap<String, (String, String, String, Option<String>)> = HashMap::new();
-    // tool_use_id → output byte count
+    // tool_use_id -> output byte count
     let mut output_sizes: HashMap<String, usize> = HashMap::new();
 
     for line in content.lines() {
@@ -69,104 +70,11 @@ fn parse_file(
 
         match v.get("type").and_then(|t| t.as_str()) {
             Some("assistant") => {
-                let cwd = v
-                    .get("cwd")
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                if !all_projects
-                    && let Some(ref cd) = current_dir
-                    && cwd != cd.to_string_lossy().as_ref()
-                {
-                    continue;
-                }
-                let session_id = v
-                    .get("sessionId")
-                    .or_else(|| v.get("session_id"))
-                    .and_then(|s| s.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let timestamp = v
-                    .get("timestamp")
-                    .and_then(|t| t.as_str())
-                    .map(|s| s.to_string());
-
-                if let Some(content_arr) = v
-                    .get("message")
-                    .and_then(|m| m.get("content"))
-                    .and_then(|c| c.as_array())
-                {
-                    for block in content_arr {
-                        if block.get("type").and_then(|t| t.as_str()) != Some("tool_use") {
-                            continue;
-                        }
-                        if block.get("name").and_then(|n| n.as_str()) != Some("Bash") {
-                            continue;
-                        }
-                        let Some(cmd) = block
-                            .get("input")
-                            .and_then(|i| i.get("command"))
-                            .and_then(|c| c.as_str())
-                        else {
-                            continue;
-                        };
-                        // Prefer the tool_use id for output-size correlation.
-                        // If absent (e.g. test fixtures), generate a unique key so commands
-                        // are still collected but won't match any tool_result.
-                        let id = block
-                            .get("id")
-                            .and_then(|i| i.as_str())
-                            .map(|s| s.to_string())
-                            .unwrap_or_else(|| {
-                                format!("__no_id_{}_{}", cmd.len(), bash_calls.len())
-                            });
-                        bash_calls.insert(
-                            id,
-                            (
-                                cmd.to_string(),
-                                cwd.clone(),
-                                session_id.clone(),
-                                timestamp.clone(),
-                            ),
-                        );
-                    }
-                }
+                parse_assistant_block(&v, all_projects, &current_dir, &mut bash_calls);
             }
-
             Some("user") => {
-                // tool_result blocks live inside message.content[]
-                let Some(content_arr) = v
-                    .get("message")
-                    .and_then(|m| m.get("content"))
-                    .and_then(|c| c.as_array())
-                else {
-                    continue;
-                };
-
-                for block in content_arr {
-                    if block.get("type").and_then(|t| t.as_str()) != Some("tool_result") {
-                        continue;
-                    }
-                    let Some(id) = block.get("tool_use_id").and_then(|i| i.as_str()) else {
-                        continue;
-                    };
-                    // content may be a string or an array of content blocks
-                    let byte_len = match block.get("content") {
-                        Some(Value::String(s)) => s.len(),
-                        Some(Value::Array(arr)) => arr
-                            .iter()
-                            .filter_map(|item| {
-                                item.get("text").and_then(|t| t.as_str()).map(|s| s.len())
-                            })
-                            .sum(),
-                        _ => 0,
-                    };
-                    if byte_len > 0 {
-                        output_sizes.insert(id.to_string(), byte_len);
-                    }
-                }
+                parse_user_block(&v, &mut output_sizes);
             }
-
             _ => {}
         }
     }
@@ -183,4 +91,107 @@ fn parse_file(
             },
         )
         .collect()
+}
+
+/// Extract Bash tool_use commands from an assistant message block.
+fn parse_assistant_block(
+    v: &Value,
+    all_projects: bool,
+    current_dir: &Option<PathBuf>,
+    bash_calls: &mut HashMap<String, (String, String, String, Option<String>)>,
+) {
+    let cwd = v
+        .get("cwd")
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string();
+    if !all_projects
+        && let Some(cd) = current_dir
+        && cwd != cd.to_string_lossy().as_ref()
+    {
+        return;
+    }
+    let session_id = v
+        .get("sessionId")
+        .or_else(|| v.get("session_id"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("")
+        .to_string();
+    let timestamp = v
+        .get("timestamp")
+        .and_then(|t| t.as_str())
+        .map(|s| s.to_string());
+
+    let Some(content_arr) = v
+        .get("message")
+        .and_then(|m| m.get("content"))
+        .and_then(|c| c.as_array())
+    else {
+        return;
+    };
+
+    for block in content_arr {
+        if block.get("type").and_then(|t| t.as_str()) != Some("tool_use") {
+            continue;
+        }
+        if block.get("name").and_then(|n| n.as_str()) != Some("Bash") {
+            continue;
+        }
+        let Some(cmd) = block
+            .get("input")
+            .and_then(|i| i.get("command"))
+            .and_then(|c| c.as_str())
+        else {
+            continue;
+        };
+        // Prefer the tool_use id for output-size correlation.
+        // If absent (e.g. test fixtures), generate a unique key so commands
+        // are still collected but won't match any tool_result.
+        let id = block
+            .get("id")
+            .and_then(|i| i.as_str())
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("__no_id_{}_{}", cmd.len(), bash_calls.len()));
+        bash_calls.insert(
+            id,
+            (
+                cmd.to_string(),
+                cwd.clone(),
+                session_id.clone(),
+                timestamp.clone(),
+            ),
+        );
+    }
+}
+
+/// Extract output byte counts from user tool_result blocks.
+fn parse_user_block(v: &Value, output_sizes: &mut HashMap<String, usize>) {
+    let Some(content_arr) = v
+        .get("message")
+        .and_then(|m| m.get("content"))
+        .and_then(|c| c.as_array())
+    else {
+        return;
+    };
+
+    for block in content_arr {
+        if block.get("type").and_then(|t| t.as_str()) != Some("tool_result") {
+            continue;
+        }
+        let Some(id) = block.get("tool_use_id").and_then(|i| i.as_str()) else {
+            continue;
+        };
+        // content may be a string or an array of content blocks
+        let byte_len = match block.get("content") {
+            Some(Value::String(s)) => s.len(),
+            Some(Value::Array(arr)) => arr
+                .iter()
+                .filter_map(|item| item.get("text").and_then(|t| t.as_str()).map(|s| s.len()))
+                .sum(),
+            _ => 0,
+        };
+        if byte_len > 0 {
+            output_sizes.insert(id.to_string(), byte_len);
+        }
+    }
 }

@@ -1,3 +1,4 @@
+// qual:allow(srp) reason: "store + record + dedup are cohesive domain types"
 //! Suggestion capture for fine-tuning dataset collection.
 //!
 //! When `coursers pre` blocks a command, it logs a `SuggestionRecord` pairing
@@ -58,6 +59,7 @@ pub struct SuggestionParams {
 }
 
 impl SuggestionRecord {
+    // qual:allow(srp) reason: "6 params delegated to SuggestionParams builder"
     pub fn new(
         original: impl Into<String>,
         suggestion: impl Into<String>,
@@ -185,6 +187,7 @@ impl CaptureStore for InMemoryCaptureStore {
 // Store
 // ---------------------------------------------------------------------------
 
+// qual:allow(srp) reason: "LCOM4=3 is acceptable for I/O store with load/save/append"
 pub struct SuggestionStore {
     pub path: PathBuf,
 }
@@ -390,7 +393,7 @@ fn repo_from_cwd(cwd: &str) -> Option<String> {
 
 #[cfg(kani)]
 mod kani_proofs {
-    use super::*;
+    use super::DedupeKey;
 
     /// Proof: DedupeKey::from_parts is deterministic.
     #[kani::proof]
@@ -415,7 +418,7 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{CaptureStore, InMemoryCaptureStore, PathBuf, SuggestionRecord, SuggestionStore};
     use tempfile::TempDir;
 
     #[test]
@@ -528,7 +531,7 @@ mod tests {
 
 #[cfg(test)]
 mod prop_tests {
-    use super::*;
+    use super::{DedupeKey, SuggestionRecord, SuggestionStore};
     use proptest::prelude::*;
     use tempfile::TempDir;
 

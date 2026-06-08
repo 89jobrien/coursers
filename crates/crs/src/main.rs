@@ -102,6 +102,8 @@ enum Command {
         /// pre-compact, stop, subagent-stop
         event: String,
     },
+    /// Validate hook pipeline config — check patterns, action constraints, missing labels
+    ValidateHooks,
     /// Query the hook execution log
     Log {
         /// Max entries to show (default: 20)
@@ -187,6 +189,7 @@ fn main() {
         } => cmd_history(limit, rule.as_deref(), &format),
         Command::Export { out } => cmd_export(out.as_deref()),
         Command::Hook { event } => cmd_hook(&event),
+        Command::ValidateHooks => cmd_validate_hooks(),
         Command::Log {
             limit,
             event,
@@ -595,6 +598,55 @@ fn cmd_rewrite() {
 
     // No rewrite matched.
     std::process::exit(1);
+}
+
+fn cmd_validate_hooks() {
+    use crs_core::hook_pipeline::{
+        DiagLevel, HookPipelineConfig, config_source_paths, lint_config, load_config,
+        validate_config,
+    };
+
+    let sources = config_source_paths();
+    let config = load_config();
+
+    println!("Sources:");
+    // TODO(#43): load_from per-source + load_config reads each file twice; cache or reuse
+    for (origin, path) in &sources {
+        let count = HookPipelineConfig::load_from(path).hooks.len();
+        println!("  {origin}: {} ({count} rules)", path.display());
+    }
+    println!("\nTotal rules: {}\n", config.hooks.len());
+
+    let mut diags = validate_config(&config);
+    diags.extend(lint_config(&config));
+    diags.sort_by_key(|d| match d.level {
+        DiagLevel::Error => 0,
+        DiagLevel::Warning => 1,
+    });
+
+    if diags.is_empty() {
+        println!("All rules valid.");
+        return;
+    }
+
+    let errors = diags.iter().filter(|d| d.level == DiagLevel::Error).count();
+    let warnings = diags
+        .iter()
+        .filter(|d| d.level == DiagLevel::Warning)
+        .count();
+
+    for d in &diags {
+        let level = match d.level {
+            DiagLevel::Error => "ERROR",
+            DiagLevel::Warning => "WARN ",
+        };
+        println!("{level} [{:>2}] {}: {}", d.rule_index, d.label, d.message);
+    }
+    println!("\n{errors} error(s), {warnings} warning(s)");
+
+    if errors > 0 {
+        std::process::exit(1);
+    }
 }
 
 fn cmd_hook(event_str: &str) {
