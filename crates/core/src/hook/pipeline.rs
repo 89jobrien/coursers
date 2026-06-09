@@ -460,39 +460,39 @@ pub fn validate_config(config: &HookPipelineConfig) -> Vec<HookDiagnostic> {
         let label = rule.label.clone().unwrap_or_else(|| format!("hooks[{i}]"));
 
         // Pattern must compile
-        if let Some(ref pat) = rule.pattern {
-            if regex::Regex::new(pat).is_err() {
-                diags.push(HookDiagnostic {
-                    level: DiagLevel::Error,
-                    rule_index: i,
-                    label: label.clone(),
-                    message: format!("invalid regex pattern: {pat}"),
-                });
-            }
+        if let Some(ref pat) = rule.pattern
+            && regex::Regex::new(pat).is_err()
+        {
+            diags.push(HookDiagnostic {
+                level: DiagLevel::Error,
+                rule_index: i,
+                label: label.clone(),
+                message: format!("invalid regex pattern: {pat}"),
+            });
         }
 
         // Unless must compile
-        if let Some(ref pat) = rule.unless {
-            if regex::Regex::new(pat).is_err() {
-                diags.push(HookDiagnostic {
-                    level: DiagLevel::Error,
-                    rule_index: i,
-                    label: label.clone(),
-                    message: format!("invalid unless regex: {pat}"),
-                });
-            }
+        if let Some(ref pat) = rule.unless
+            && regex::Regex::new(pat).is_err()
+        {
+            diags.push(HookDiagnostic {
+                level: DiagLevel::Error,
+                rule_index: i,
+                label: label.clone(),
+                message: format!("invalid unless regex: {pat}"),
+            });
         }
 
         // Run action: command must not be empty
-        if let HookAction::Run { ref command, .. } = rule.action {
-            if command.is_empty() || command.iter().all(|c| c.trim().is_empty()) {
-                diags.push(HookDiagnostic {
-                    level: DiagLevel::Error,
-                    rule_index: i,
-                    label: label.clone(),
-                    message: "run action has empty command".into(),
-                });
-            }
+        if let HookAction::Run { ref command, .. } = rule.action
+            && (command.is_empty() || command.iter().all(|c| c.trim().is_empty()))
+        {
+            diags.push(HookDiagnostic {
+                level: DiagLevel::Error,
+                rule_index: i,
+                label: label.clone(),
+                message: "run action has empty command".into(),
+            });
         }
     }
 
@@ -524,29 +524,29 @@ pub fn lint_config(config: &HookPipelineConfig) -> Vec<HookDiagnostic> {
         }
 
         // Notify with empty template is useless
-        if let HookAction::Notify { ref template } = rule.action {
-            if template.trim().is_empty() {
-                diags.push(HookDiagnostic {
-                    level: DiagLevel::Error,
-                    rule_index: i,
-                    label: label.clone(),
-                    message: "notify action has empty template".into(),
-                });
-            }
+        if let HookAction::Notify { ref template } = rule.action
+            && template.trim().is_empty()
+        {
+            diags.push(HookDiagnostic {
+                level: DiagLevel::Error,
+                rule_index: i,
+                label: label.clone(),
+                message: "notify action has empty template".into(),
+            });
         }
 
         // Label namespacing convention: should contain '/'
-        if let Some(ref l) = rule.label {
-            if !l.contains('/') {
-                diags.push(HookDiagnostic {
-                    level: DiagLevel::Warning,
-                    rule_index: i,
-                    label: label.clone(),
-                    message:
-                        "label should use namespace/name convention (e.g. \"guardian/force-push\")"
-                            .into(),
-                });
-            }
+        if let Some(ref l) = rule.label
+            && !l.contains('/')
+        {
+            diags.push(HookDiagnostic {
+                level: DiagLevel::Warning,
+                rule_index: i,
+                label: label.clone(),
+                message:
+                    "label should use namespace/name convention (e.g. \"guardian/force-push\")"
+                        .into(),
+            });
         }
     }
 

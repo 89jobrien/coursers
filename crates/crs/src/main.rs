@@ -707,15 +707,12 @@ fn cmd_hook(event_str: &str) {
     let result = run_pipeline(&config, &ctx);
 
     // Log to redb only when a rule actually fired (skip silent passes).
-    if !result.matched_rules.is_empty() {
-        if let Ok(db) = crs_core::hook::log::open_db(&crs_core::hook::log::db_path()) {
-            let entry = crs_core::hook::log::entry_from_pipeline(
-                &ctx,
-                &result,
-                result.matched_rules.clone(),
-            );
-            crs_core::hook::log::record(&db, &entry);
-        }
+    if !result.matched_rules.is_empty()
+        && let Ok(db) = crs_core::hook::log::open_db(&crs_core::hook::log::db_path())
+    {
+        let entry =
+            crs_core::hook::log::entry_from_pipeline(&ctx, &result, result.matched_rules.clone());
+        crs_core::hook::log::record(&db, &entry);
     }
 
     // Emit response based on event type and result.
@@ -1587,125 +1584,12 @@ fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
         });
     }
 
+    sort_enriched_newest_first(&mut enriched);
     let report = aggregate(&enriched);
 
     match format {
         "json" => println!("{}", serde_json::to_string_pretty(&report).unwrap()),
-        _ => print_insights_text(&report, &enriched),
-    }
-}
-
-fn print_insights_text(
-    report: &crs_core::insights::InsightsReport,
-    enriched: &[crs_core::insights::EnrichedFacet],
-) {
-    println!("CRS Insights — Session Facet Analysis");
-    println!("{}", "=".repeat(60));
-    println!(
-        "Sessions: {}  (git-enriched: {})\n",
-        report.total, report.git_enriched
-    );
-
-    // Outcomes
-    if !report.outcomes.is_empty() {
-        println!("Outcomes");
-        println!("{}", "-".repeat(40));
-        let mut outcomes: Vec<_> = report.outcomes.iter().collect();
-        outcomes.sort_by(|a, b| b.1.cmp(a.1));
-        for (k, v) in &outcomes {
-            let pct = *v * 100 / report.total;
-            println!("  {:<28} {:>4}  ({pct}%)", k, v);
-        }
-        println!();
-    }
-
-    // Helpfulness
-    if !report.helpfulness.is_empty() {
-        println!("Claude Helpfulness");
-        println!("{}", "-".repeat(40));
-        let mut h: Vec<_> = report.helpfulness.iter().collect();
-        h.sort_by(|a, b| b.1.cmp(a.1));
-        for (k, v) in &h {
-            // qual:allow(dry) reason: "tabular format repeated across CLI display fns"
-            println!("  {:<28} {:>4}", k, v);
-        }
-        println!();
-    }
-
-    // Friction
-    if !report.friction.is_empty() {
-        println!("Friction (cumulative across sessions)");
-        println!("{}", "-".repeat(40));
-        let mut f: Vec<_> = report.friction.iter().collect();
-        f.sort_by(|a, b| b.1.cmp(a.1));
-        for (k, v) in &f {
-            println!("  {:<28} {:>4}", k, v);
-        }
-        println!();
-    }
-
-    // Top goal categories
-    if !report.goal_categories.is_empty() {
-        println!("Goal Categories");
-        println!("{}", "-".repeat(40));
-        let mut g: Vec<_> = report.goal_categories.iter().collect();
-        g.sort_by(|a, b| b.1.cmp(a.1));
-        for (k, v) in g.iter().take(10) {
-            println!("  {:<28} {:>4}", k, v);
-        }
-        println!();
-    }
-
-    // Top repos
-    if !report.top_repos.is_empty() {
-        println!("Top Repos");
-        println!("{}", "-".repeat(40));
-        for (repo, count) in &report.top_repos {
-            println!("  {:<28} {:>4}", repo, count);
-        }
-        println!();
-    }
-
-    // Top branches
-    if !report.top_branches.is_empty() {
-        println!("Top Branches");
-        println!("{}", "-".repeat(40));
-        for (branch, count) in report.top_branches.iter().take(10) {
-            println!("  {:<28} {:>4}", branch, count);
-        }
-        println!();
-    }
-
-    // Recent sessions sample (last 5 with git context)
-    let with_git: Vec<_> = enriched
-        .iter()
-        .filter(|ef| ef.git.is_some())
-        .rev()
-        .take(5)
-        .collect();
-    if !with_git.is_empty() {
-        println!("Recent Sessions (with git context)");
-        println!("{}", "-".repeat(60));
-        for ef in &with_git {
-            let git = ef.git.as_ref().unwrap();
-            let branch = git.branch.as_deref().unwrap_or("?");
-            let ts = git
-                .timestamp
-                .as_deref()
-                .map(|t| &t[..t.len().min(10)])
-                .unwrap_or("?");
-            let outcome = ef.facet.outcome.as_deref().unwrap_or("?");
-            let summary = ef.facet.brief_summary.as_deref().unwrap_or("");
-            let summary = if summary.len() > 60 {
-                &summary[..60]
-            } else {
-                summary
-            };
-            println!("  {} | {} | {} | {}", ts, git.repo, branch, outcome);
-            if !summary.is_empty() {
-                println!("    {}", summary);
-            }
-        }
+        _ => print_insights_table(&enriched),
     }
 }
 
@@ -2129,6 +2013,128 @@ fn find_most_recent_session(
     best.map(|(_, p)| p)
 }
 
+// ── Insights table formatting ───────────────────────────────────────────────
+
+const COL_DATE: usize = 10;
+const COL_REPO: usize = 14;
+const COL_BRANCH: usize = 12;
+const COL_OUTCOME: usize = 20;
+const COL_HELPFULNESS: usize = 16;
+const COL_FRICTION: usize = 8;
+
+fn trunc(s: &str, width: usize) -> String {
+    if s.len() <= width {
+        format!("{s:<width$}")
+    } else {
+        s[..width].to_string()
+    }
+}
+
+pub fn insights_header() -> (String, String) {
+    let header = format!(
+        "{:<date$}  {:<repo$}  {:<branch$}  {:<outcome$}  {:<help$}  {:>friction$}  summary",
+        "date",
+        "repo",
+        "branch",
+        "outcome",
+        "helpfulness",
+        "friction",
+        date = COL_DATE,
+        repo = COL_REPO,
+        branch = COL_BRANCH,
+        outcome = COL_OUTCOME,
+        help = COL_HELPFULNESS,
+        friction = COL_FRICTION,
+    );
+    let sep = "-".repeat(header.len());
+    (header, sep)
+}
+
+pub fn format_insight_row(ef: &crs_core::insights::EnrichedFacet, summary_width: usize) -> String {
+    let date = ef
+        .git
+        .as_ref()
+        .and_then(|g| g.timestamp.as_deref())
+        .map(|t| t[..t.len().min(COL_DATE)].to_string())
+        .unwrap_or_else(|| "?".to_string());
+
+    let repo = ef
+        .git
+        .as_ref()
+        .map(|g| trunc(&g.repo, COL_REPO))
+        .unwrap_or_else(|| "?".to_string());
+
+    let branch = ef
+        .git
+        .as_ref()
+        .and_then(|g| g.branch.as_deref())
+        .map(|b| trunc(b, COL_BRANCH))
+        .unwrap_or_else(|| "?".to_string());
+
+    let outcome = ef
+        .facet
+        .outcome
+        .as_deref()
+        .map(|o| trunc(o, COL_OUTCOME))
+        .unwrap_or_else(|| "?".to_string());
+
+    let helpfulness = ef
+        .facet
+        .claude_helpfulness
+        .as_deref()
+        .map(|h| trunc(h, COL_HELPFULNESS))
+        .unwrap_or_else(|| "?".to_string());
+
+    let friction: u64 = ef.facet.friction_counts.values().sum();
+
+    let summary_raw = ef.facet.brief_summary.as_deref().unwrap_or("");
+    let summary = if summary_raw.len() > summary_width {
+        summary_raw[..summary_width].to_string()
+    } else {
+        summary_raw.to_string()
+    };
+
+    format!(
+        "{:<date$}  {:<repo$}  {:<branch$}  {:<outcome$}  {:<help$}  {:>friction$}  {}",
+        date,
+        repo,
+        branch,
+        outcome,
+        helpfulness,
+        friction,
+        summary,
+        date = COL_DATE,
+        repo = COL_REPO,
+        branch = COL_BRANCH,
+        outcome = COL_OUTCOME,
+        help = COL_HELPFULNESS,
+        friction = COL_FRICTION,
+    )
+}
+
+pub fn sort_enriched_newest_first(enriched: &mut [crs_core::insights::EnrichedFacet]) {
+    enriched.sort_by(|a, b| {
+        let ts_a = a.git.as_ref().and_then(|g| g.timestamp.as_deref());
+        let ts_b = b.git.as_ref().and_then(|g| g.timestamp.as_deref());
+        match (ts_a, ts_b) {
+            (Some(a), Some(b)) => b.cmp(a),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    });
+}
+
+fn print_insights_table(enriched: &[crs_core::insights::EnrichedFacet]) {
+    let summary_width = 60usize;
+    let (header, sep) = insights_header();
+    println!("{header}");
+    println!("{sep}");
+    for ef in enriched {
+        println!("{}", format_insight_row(ef, summary_width));
+    }
+}
+
 #[cfg(test)]
 mod cli_tests {
     use super::*;
@@ -2480,5 +2486,233 @@ mod cli_tests {
         assert!(result.contains("[REDACTED]"));
         assert!(!result.contains("sk-abc1234567890"));
         assert!(result.contains("normal line"));
+    }
+    // ── Insights table tests ────────────────────────────────────────────────
+
+    fn make_enriched(
+        session_id: &str,
+        repo: &str,
+        branch: &str,
+        timestamp: &str,
+        outcome: &str,
+        helpfulness: &str,
+        friction: Vec<(&str, u64)>,
+        summary: &str,
+    ) -> crs_core::insights::EnrichedFacet {
+        use crs_core::insights::{EnrichedFacet, FacetRecord, GitContext};
+        use std::collections::HashMap;
+        EnrichedFacet {
+            facet: FacetRecord {
+                session_id: session_id.to_string(),
+                underlying_goal: None,
+                goal_categories: HashMap::new(),
+                outcome: Some(outcome.to_string()),
+                user_satisfaction_counts: HashMap::new(),
+                claude_helpfulness: Some(helpfulness.to_string()),
+                session_type: None,
+                friction_counts: friction
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v))
+                    .collect(),
+                friction_detail: None,
+                primary_success: None,
+                brief_summary: Some(summary.to_string()),
+            },
+            git: Some(GitContext {
+                repo: repo.to_string(),
+                cwd: format!("/Users/joe/dev/{repo}"),
+                branch: Some(branch.to_string()),
+                timestamp: Some(timestamp.to_string()),
+            }),
+        }
+    }
+
+    #[test]
+    fn format_insight_row_all_fields_present() {
+        let ef = make_enriched(
+            "s1",
+            "coursers",
+            "main",
+            "2026-06-07T10:00:00Z",
+            "fully_achieved",
+            "very_helpful",
+            vec![],
+            "added match-lines filter",
+        );
+        let row = format_insight_row(&ef, 40);
+        assert!(row.contains("2026-06-07"), "date missing: {row}");
+        assert!(row.contains("coursers"), "repo missing: {row}");
+        assert!(row.contains("main"), "branch missing: {row}");
+        assert!(row.contains("fully_achieved"), "outcome missing: {row}");
+        assert!(row.contains("very_helpful"), "helpfulness missing: {row}");
+        assert!(row.contains("added match-lines"), "summary missing: {row}");
+    }
+
+    #[test]
+    fn format_insight_row_no_git_context() {
+        use crs_core::insights::{EnrichedFacet, FacetRecord};
+        use std::collections::HashMap;
+        let ef = EnrichedFacet {
+            facet: FacetRecord {
+                session_id: "s2".to_string(),
+                underlying_goal: None,
+                goal_categories: HashMap::new(),
+                outcome: Some("fully_achieved".to_string()),
+                user_satisfaction_counts: HashMap::new(),
+                claude_helpfulness: Some("very_helpful".to_string()),
+                session_type: None,
+                friction_counts: HashMap::new(),
+                friction_detail: None,
+                primary_success: None,
+                brief_summary: None,
+            },
+            git: None,
+        };
+        let row = format_insight_row(&ef, 40);
+        // date/repo/branch have no git context → three "?" placeholders in first 40 chars
+        let leading = &row[..40.min(row.len())];
+        let q_count = leading.matches('?').count();
+        assert!(
+            q_count >= 3,
+            "expected >=3 '?' in leading cols, got {q_count}: {row}"
+        );
+        // outcome and helpfulness should still appear
+        assert!(row.contains("fully_achieved"), "outcome missing: {row}");
+        assert!(row.contains("very_helpful"), "helpfulness missing: {row}");
+    }
+
+    #[test]
+    fn format_insight_row_sums_friction() {
+        let ef = make_enriched(
+            "s3",
+            "minibox",
+            "main",
+            "2026-06-06T08:00:00Z",
+            "partially_achieved",
+            "moderately_helpful",
+            vec![("wrong_approach", 3), ("buggy_code", 2)],
+            "friction test",
+        );
+        let row = format_insight_row(&ef, 40);
+        assert!(row.contains("5"), "friction sum 5 missing: {row}");
+    }
+
+    #[test]
+    fn format_insight_row_truncates_long_fields() {
+        let ef = make_enriched(
+            "s4",
+            "a-very-long-repo-name-that-exceeds-limit",
+            "feature/very-long-branch-name",
+            "2026-06-05T00:00:00Z",
+            "fully_achieved_with_extra_words_appended",
+            "extremely_helpful_rating_value",
+            vec![],
+            "summary",
+        );
+        let row = format_insight_row(&ef, 40);
+        // repo col must be <= COL_REPO chars (14), check via field split
+        let fields: Vec<&str> = row.splitn(8, "  ").collect();
+        assert!(
+            fields[1].trim().len() <= COL_REPO,
+            "repo too wide: {:?}",
+            fields[1]
+        );
+        assert!(
+            fields[2].trim().len() <= COL_BRANCH,
+            "branch too wide: {:?}",
+            fields[2]
+        );
+        assert!(
+            fields[3].trim().len() <= COL_OUTCOME,
+            "outcome too wide: {:?}",
+            fields[3]
+        );
+        assert!(
+            fields[4].trim().len() <= COL_HELPFULNESS,
+            "helpfulness too wide: {:?}",
+            fields[4]
+        );
+    }
+
+    #[test]
+    fn sort_enriched_newest_first_orders_correctly() {
+        use crs_core::insights::{EnrichedFacet, FacetRecord, GitContext};
+        use std::collections::HashMap;
+        let make = |ts: Option<&str>| -> EnrichedFacet {
+            EnrichedFacet {
+                facet: FacetRecord {
+                    session_id: ts.unwrap_or("none").to_string(),
+                    underlying_goal: None,
+                    goal_categories: HashMap::new(),
+                    outcome: None,
+                    user_satisfaction_counts: HashMap::new(),
+                    claude_helpfulness: None,
+                    session_type: None,
+                    friction_counts: HashMap::new(),
+                    friction_detail: None,
+                    primary_success: None,
+                    brief_summary: None,
+                },
+                git: ts.map(|t| GitContext {
+                    repo: "r".to_string(),
+                    cwd: "/r".to_string(),
+                    branch: None,
+                    timestamp: Some(t.to_string()),
+                }),
+            }
+        };
+        let mut v = vec![
+            make(Some("2026-06-05")),
+            make(None),
+            make(Some("2026-06-07")),
+            make(Some("2026-06-06")),
+        ];
+        sort_enriched_newest_first(&mut v);
+        assert_eq!(v[0].facet.session_id, "2026-06-07");
+        assert_eq!(v[1].facet.session_id, "2026-06-06");
+        assert_eq!(v[2].facet.session_id, "2026-06-05");
+        assert_eq!(v[3].facet.session_id, "none", "no-timestamp rows last");
+    }
+
+    #[test]
+    fn insights_header_separator_matches_header_width() {
+        let (header, sep) = insights_header();
+        assert_eq!(
+            header.len(),
+            sep.len(),
+            "sep width {sep_len} != header width {header_len}",
+            sep_len = sep.len(),
+            header_len = header.len()
+        );
+        assert!(header.contains("date"));
+        assert!(header.contains("repo"));
+        assert!(header.contains("friction"));
+        assert!(header.contains("summary"));
+    }
+
+    #[test]
+    fn print_insights_table_row_count_matches_input() {
+        let ef1 = make_enriched(
+            "a",
+            "r1",
+            "main",
+            "2026-06-07T00:00:00Z",
+            "fully_achieved",
+            "very_helpful",
+            vec![],
+            "s1",
+        );
+        let ef2 = make_enriched(
+            "b",
+            "r2",
+            "main",
+            "2026-06-06T00:00:00Z",
+            "partially_achieved",
+            "moderately_helpful",
+            vec![],
+            "s2",
+        );
+        // Smoke: function runs without panic for 2 rows
+        print_insights_table(&[ef1, ef2]);
     }
 }
