@@ -1,0 +1,15 @@
+[scenario]
+name = "cargo-test-filtered"
+description = "cargo test output is suppressed on success"
+coursers_rules_json = """{"rules":[]}"""
+crs_filters_toml = """
+[[filters]]
+pattern = "cargo test"
+mode = "failures-only"
+"""
+
+[filter]
+command = "cargo test --release"
+output = "running 42 tests\ntest result: ok. 42 passed"
+exit_code = 0
+expected_result = "suppress"

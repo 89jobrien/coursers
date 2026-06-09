@@ -1,0 +1,12 @@
+[scenario]
+name = "learned-failure-blocks"
+description = "3 post failures cause coursers pre to block the same command"
+coursers_rules_json = """{"rules":[]}"""
+
+[post_failures]
+command = "e2e-smoke-unique-abc987"
+count = 3
+
+[pre]
+command = "e2e-smoke-unique-abc987"
+expected_verdict = "block"

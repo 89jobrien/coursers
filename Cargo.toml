@@ -3,8 +3,9 @@ members = [
     "crates/core",
     "crates/coursers",
     "crates/crs",
+    "crates/e2e",
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 version = "0.1.0"

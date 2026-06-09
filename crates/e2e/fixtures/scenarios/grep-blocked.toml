@@ -1,0 +1,10 @@
+[scenario]
+name = "grep-blocked"
+description = "grep is blocked by coursers pre"
+coursers_rules_json = """
+{"rules":[{"id":"no-grep","pattern":"\\\\bgrep\\\\b","message":"Use the Grep tool instead of shell grep.","exceptions":[]}]}
+"""
+
+[pre]
+command = "grep foo ."
+expected_verdict = "block"

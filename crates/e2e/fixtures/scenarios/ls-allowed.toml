@@ -1,0 +1,19 @@
+[scenario]
+name = "ls-allowed"
+description = "ls is not blocked; crs filter suppresses output on exit 0"
+coursers_rules_json = """{"rules":[]}"""
+crs_filters_toml = """
+[[filters]]
+pattern = "ls"
+mode = "failures-only"
+"""
+
+[pre]
+command = "ls -la"
+expected_verdict = "allow"
+
+[filter]
+command = "ls -la"
+output = "total 8\n-rw-r--r-- 1 user group 0 Jan 1 Cargo.toml"
+exit_code = 0
+expected_result = "suppress"
