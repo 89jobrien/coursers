@@ -32,6 +32,10 @@ pub struct FilterRule {
     /// If absent or invalid, the output is passed through unchanged.
     #[serde(default)]
     pub match_pattern: Option<String>,
+    // TODO(match-lines-flags): add `match_flags: Option<String>` for regex flag control
+    // (e.g. "i" for case-insensitive). Blocked on deciding whether to expose raw flag
+    // strings or a typed enum. Defer until a concrete use case requires it.
+    // See: https://docs.rs/regex/latest/regex/#grouping-and-flags
 }
 
 fn default_max_lines() -> usize {
