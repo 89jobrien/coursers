@@ -1,0 +1,232 @@
+{
+  "_comment": "EXAMPLE FILE — copy to ~/.config/coursers/course-correct-rules.json to activate. This is the author's working ruleset; edit to suit your workflow. See README for schema docs.",
+  "_install": "cp config/course-correct-rules.example.json ~/.config/coursers/course-correct-rules.json",
+  "_version": 1,
+
+  "rules": [
+    {
+      "id": "no-grep-use-tool",
+      "enabled": true,
+      "description": "Use the Grep tool instead of grep/rg in Bash",
+      "pattern": "\\bgrep\\b|\\brg\\b",
+      "pattern_flags": "",
+      "target_commands": ["grep", "rg"],
+      "exceptions": [
+        "\\|\\s*grep",
+        "\\|\\s*rg\\b",
+        "2>/dev/null.*grep",
+        "grep.*--include",
+        "grep.*--exclude",
+        "grep.*-P\\b",
+        "grep.*-A[0-9 ]",
+        "grep.*-B[0-9 ]",
+        "grep.*-C[0-9 ]",
+        "grep.*--color",
+        "docker\\s+(run|exec)\\b",
+        "nu\\s+-c\\b",
+        "nu\\s+[^-]"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use the Grep tool instead. Example: Grep(pattern='<your pattern>', path='<dir or file>'). Pipelines (`| grep`) are allowed and auto-rewritten to rg."
+    },
+    {
+      "id": "no-sed-n-use-read",
+      "enabled": false,
+      "_todo": "stub: block 'sed -n <range>p file' pattern and redirect to Read tool with offset/limit. Enable once Read offset/limit parameter syntax is confirmed stable (currently broken with string-typed params in this environment).",
+      "description": "Use the Read tool instead of sed -n for line-range reads",
+      "pattern": "\\bsed\\s+-n\\s+['\"]?[0-9]",
+      "pattern_flags": "",
+      "target_commands": ["sed"],
+      "exceptions": [
+        "\\|\\s*sed"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use Read(file_path='<path>', offset=N, limit=N) instead of sed -n for line-range reads."
+    },
+    {
+      "id": "no-cat-use-read",
+      "enabled": true,
+      "description": "Use the Read tool instead of cat for reading files",
+      "pattern": "\\bcat\\s+[^|<]",
+      "pattern_flags": "",
+      "target_commands": ["cat"],
+      "exceptions": [
+        "cat\\s+<<",
+        "cat\\s+<<<",
+        "\\|\\s*cat",
+        "cat\\s+-n\\b",
+        "cat\\s+-A\\b",
+        "cat\\s+/dev/",
+        "docker\\s+(run|exec)\\b",
+        "nu\\s+-c\\b",
+        "nu\\s+[^-]"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use the Read tool. Example: Read(file_path='<path>'). Heredocs and pipelines are allowed."
+    },
+    {
+      "id": "no-head-tail-use-read",
+      "enabled": true,
+      "description": "Use the Read tool with offset/limit instead of head/tail",
+      "pattern": "\\b(head|tail)\\s+-[0-9n]",
+      "pattern_flags": "",
+      "target_commands": ["head", "tail"],
+      "exceptions": [
+        "\\|\\s*(head|tail)",
+        "tail\\s+-f\\b",
+        "tail\\s+--follow",
+        "docker\\s+(run|exec)\\b"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use Read(file_path='<path>', offset=N, limit=N) or `tail` in pipelines. `tail -f` is allowed."
+    },
+    {
+      "id": "no-find-use-glob",
+      "enabled": true,
+      "description": "Use the Glob tool instead of find for file discovery",
+      "pattern": "\\bfind\\s+[./~$\"']",
+      "pattern_flags": "",
+      "target_commands": ["find"],
+      "exceptions": [
+        "find\\s+.*-exec",
+        "find\\s+.*-delete",
+        "find\\s+.*-newer",
+        "find\\s+.*-mtime",
+        "find\\s+.*-atime",
+        "find\\s+.*-ctime",
+        "find\\s+.*-size",
+        "find\\s+.*-perm",
+        "find\\s+.*-empty",
+        "find\\s+.*-maxdepth\\s+0",
+        "find\\s+.*-L\\b",
+        "\\bgit\\s+(-C\\s+\\S+\\s+)?(commit|log|tag|stash)"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use the Glob tool. Example: Glob(pattern='**/*.rs', path='<dir>'). Use find only for -exec/-delete/-mtime."
+    },
+    {
+      "id": "no-npm-use-bun",
+      "enabled": true,
+      "description": "Use bun/bunx instead of npm/npx",
+      "pattern": "\\b(npm|npx)\\s",
+      "pattern_flags": "",
+      "target_commands": ["npm", "npx"],
+      "exceptions": [
+        "npm\\s+publish\\b",
+        "npm\\s+pack\\b",
+        "npm\\s+version\\b",
+        "npm\\s+owner\\b",
+        "npm\\s+access\\b",
+        "npm\\s+audit\\s+fix",
+        "npm\\s+--workspaces",
+        "npx\\s+--yes\\s+create-",
+        "npx\\s+create-"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use `bun`/`bunx`. Examples: `bun install`, `bun run build`, `bunx tsc`."
+    },
+    {
+      "id": "no-nvm-use-mise",
+      "enabled": true,
+      "description": "Use mise instead of nvm for Node.js version management",
+      "pattern": "(?:^|\\s)nvm\\b",
+      "pattern_flags": "",
+      "target_commands": ["nvm"],
+      "exceptions": [],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use `mise use node@<version>` instead."
+    },
+    {
+      "id": "no-pip-use-uv",
+      "enabled": true,
+      "description": "Use uv instead of pip/pip3 for package management",
+      "pattern": "\\bpip3?\\s+(install|uninstall|upgrade|download)\\b",
+      "pattern_flags": "",
+      "target_commands": ["pip", "pip3"],
+      "exceptions": [
+        "pip\\s+install\\s+--target",
+        "pip\\s+install\\s+--prefix",
+        "pip\\s+install\\s+--root",
+        "pip\\s+install\\s+--isolated"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use `uv add <pkg>` or `uv pip install <pkg>`."
+    },
+    {
+      "id": "no-sleep-find-work",
+      "enabled": true,
+      "description": "Do not sleep — find productive work or use run_in_background",
+      "pattern": "\\bsleep\\s+",
+      "pattern_flags": "",
+      "target_commands": ["sleep"],
+      "exceptions": [],
+      "exception_policy": "allow_if_any_match",
+      "message": "Do not sleep. If waiting for a background task, use `run_in_background` and you will be notified when it completes. If polling, run the check command directly (e.g. `gh run view`). If blocked, find other work to do in the meantime."
+    },
+    {
+      "id": "no-ls-use-glob",
+      "enabled": true,
+      "description": "Use the Glob tool instead of ls for directory listing",
+      "pattern": "\\bls\\s",
+      "pattern_flags": "",
+      "target_commands": ["ls"],
+      "exceptions": [
+        "\\|\\s*ls",
+        "docker\\s+(run|exec)\\b",
+        "nu\\s+-c\\b",
+        "nu\\s+[^-]"
+      ],
+      "_todo": "comment-false-positive: add '^\\\\s*#' exception to stop comment lines like '# ls foo' from firing this rule. Same fix needed for no-cat-use-read. Implement once confirmed the rules engine matches full command string including leading whitespace.",
+      "exception_policy": "allow_if_any_match",
+      "message": "Use the Glob tool for file discovery. Example: Glob(pattern='*', path='<dir>') or Glob(pattern='**/*.rs'). Glob returns sorted results with no token overhead from formatting."
+    },
+    {
+      "id": "no-sed-use-edit",
+      "enabled": true,
+      "description": "Use the Edit tool instead of sed for in-place file edits",
+      "pattern": "\\bsed\\s+(-i|--in-place)",
+      "pattern_flags": "",
+      "target_commands": ["sed"],
+      "exceptions": [
+        "\\|\\s*sed",
+        "docker\\s+(run|exec)\\b"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Use the Edit tool for file modifications. Example: Edit(file_path='<path>', old_string='...', new_string='...'). Edit provides better diffing, review, and undo. Piped sed for text transformation is fine."
+    },
+    {
+      "id": "no-bash-use-nu",
+      "enabled": true,
+      "description": "All Bash tool calls must use nu -c — wrap every command in nu",
+      "pattern": ".",
+      "pattern_flags": "",
+      "target_commands": [],
+      "exceptions": [
+        "^nu\\b"
+      ],
+      "exception_policy": "allow_if_any_match",
+      "message": "Wrap this in `nu -c \"...\"`. All Bash tool calls must use Nushell. Example: Bash(nu -c \"<command>\")."
+    },
+    {
+      "id": "no-cd-use-absolute-paths",
+      "enabled": true,
+      "description": "Do not cd — use absolute paths or git -C instead",
+      "pattern": "\\bcd\\s+",
+      "pattern_flags": "",
+      "target_commands": ["cd"],
+      "exceptions": [],
+      "exception_policy": "allow_if_any_match",
+      "message": "Do not change directories. Use absolute paths in commands, `git -C <path>` for git operations, or pass `path` parameters to tools (Glob, Grep, Read). Changing directory loses working directory state and breaks hooks that depend on cwd."
+    }
+  ],
+
+  "failure_learning": {
+    "enabled": true,
+    "block_threshold": 3,
+    "window_seconds": 300,
+    "state_file": "~/.config/coursers/course-correct-state.json",
+    "max_tracked_commands": 200,
+    "cleanup_after_seconds": 3600,
+    "message_template": "[course-correct] This exact command has failed {count} times in the last {window} minutes. Consider a different approach — check the path/syntax, use a dedicated tool, or break the command into smaller steps.\n\nFailing command: {preview}"
+  }
+}
