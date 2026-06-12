@@ -1,30 +1,70 @@
 project: coursers
 id: coursers
-updated: 20260609.095004
-items: []
+updated: 2026-06-11
+items:
+  - id: uncommitted-work
+    doob_uuid: 38ece75f-06d7-4038-b0fb-2140ca4b0264
+    name: uncommitted-work
+    priority: P1
+    status: open
+    title: Uncommitted changes (15 files)
+    description: |-
+      Working tree has uncommitted changes:
+      .ctx/HANDOFF.coursers.coursers.yaml
+      .ctx/HANDOFF.tools.yaml
+      .gitignore
+      CLAUDE.md
+      Cargo.lock
+      Cargo.toml
+      crates/crs/Cargo.toml
+      crates/crs/src/lib.rs
+      crates/crs/src/main.rs
+      .codex/
+      .sccignore
+      AGENTS.md
+      crates/crs/src/nu_check/
+      crates/crs/tests/nu_check_binary.rs
+      docs/plans/
+    files:
+      - .ctx/HANDOFF.coursers.coursers.yaml
+      - .ctx/HANDOFF.tools.yaml
+      - .gitignore
+      - CLAUDE.md
+      - Cargo.lock
+      - Cargo.toml
+      - crates/crs/Cargo.toml
+      - crates/crs/src/lib.rs
+      - crates/crs/src/main.rs
+      - .codex/
+      - .sccignore
+      - AGENTS.md
+      - crates/crs/src/nu_check/
+      - crates/crs/tests/nu_check_binary.rs
+      - docs/plans/
+    completed: null
+    extra: []
 log:
-  - date: 20260609.095004
-    session: 2
-    summary: Tackled GitHub issues #42 #44 #45 #46 via parallel subagents; fixed pre-commit hook unbound-variable bug; committed hook pipeline validation + matched-rules tracking + cleanup.
-    commits:
-      - sha: ec6629e
-        branch: main
-      - sha: b1dc4b5
-        branch: main
-  - date: 20260428.162104
-    session: 1
-    summary: "Valerie triage session: completed 8 stale P5 todos (linuxbox rename already done, doob update --priority already works, coursers-10 discrepancy already resolved). Hardened enrich-handoff.sh + .nu: yaml_quote helper, jq --arg escaping, silent exit 0 → exit 1 with stderr diagnostics. Marked enrichment plan as partial (tasks 3-6 unexecuted). Merged fix/enrich-hardening → main, pushed. 199 tests pass."
+  - date: "null"
+    summary: Tackled GitHub issues
     commits: []
+    session: 2
+  - date: "20260612.011633"
+    summary: done=16 running=0 pending=2 blocked=0
+    commits: []
+  - date: 20260609::162110
+    summary: |
+      match-lines filter mode, clippy cleanup, nu_libs centralization. Added FilterMode::MatchLines with configurable match_pattern field (fail-open, passthrough on error). 12 new tests. Global filters for cargo kani, rustqual, cargo install. Fixed 8 pre-existing clippy warnings across pipeline.rs and main.rs. Added no-bash-use-nu block rule. Added no-sed-n-use-read stub (disabled). Centralized hook boilerplate into nu_libs lib/hooks/mod.nu and lib/rust/workspace.nu — 5 hooks refactored. Project-local crs-filters.toml for minibox and crux (local-only, gitignored).
+    commits: []
+    session: 3
   - date: "20260424"
-    session: null
-    summary: "Activity detected on 2026-04-24. Recent commits continue feature work on discover command and rules engine. Previous session (2026-04-23) closed issues #2 and #5 with --min-count flag and version manager block rule."
+    summary: |
+      Activity detected on 2026-04-24. Recent commits continue feature work on discover command and rules engine. Previous session (2026-04-23) closed issues #2 and #5 with --min-count flag and version manager block rule.
     commits: []
   - date: "20260423"
-    session: null
-    summary: "5 new crs subcommands: suggest, history, export, heat, replay (TDD, 142→153 tests). feat(rules): no-nvm-use-mise block rule — fires on nvm install/use/alias, redirects to mise use node@<version>. Added to live config + validate known-list. 7 unit tests. feat(discover): --min-count N flag filters low-frequency entries; default 1 (show all). 4 unit tests. Closes GH #2 (P1) and #5 (P1). Commits: edcf5a0, 42730bf."
+    summary: |
+      5 new crs subcommands: suggest, history, export, heat, replay (TDD, 142→153 tests). feat(rules): no-nvm-use-mise block rule. feat(discover): --min-count N flag. Closes GH #2 (P1) and #5 (P1). Commits: edcf5a0, 42730bf.
     commits: []
   - date: "20260418"
-    session: null
-    summary: handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues (2×P1, 3×P2), 0 local TODOs. VarExpander trait + with_env! macro refactor committed (5d8cfa2). Backlog sweep closed 7 stale issues across devkit/slash/dotfiles. mcpipe CRLF fix and harvestrs PathBuf fix shipped.
+    summary: |
+      handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues. VarExpander trait + with_env! macro refactor committed (5d8cfa2).
     commits: []
-notes: null
