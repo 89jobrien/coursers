@@ -130,33 +130,30 @@ fn build_regex(rule: &Rule) -> Option<Regex> {
     Regex::new(&pattern_str).ok()
 }
 
+/// Returns the first rule that matches `command` (enabled, target gate, regex, no exception).
+/// Shared by `matched_rule_id` and `check` to avoid duplicating iteration logic.
+///
+/// TODO(comment-line-fps): `no-ls-use-glob` and `no-cat-use-read` produce false
+/// positives on comment lines — e.g. `# use cat to see X` or doc strings mentioning
+/// `ls`. Add an exception pattern for `#.*\b(ls|cat)\b` or gate those rules on
+/// `target_commands` so they only fire when `ls`/`cat` is argv[0].
+fn find_matching_rule<'a>(command: &str, rules: &'a [Rule]) -> Option<&'a Rule> {
+    rules.iter().find(|rule| {
+        rule.enabled
+            && targets_match(command, &rule.target_commands)
+            && build_regex(rule).is_some_and(|re| re.is_match(command))
+            && !rule.exceptions.iter().any(|exc| {
+                Regex::new(exc)
+                    .map(|re| re.is_match(command))
+                    .unwrap_or(false)
+            })
+    })
+}
+
 /// Returns the id of the first matching rule (respecting exceptions), None otherwise.
 /// Used by discover to attribute commands to the rule that would actually fire.
 pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
-    for rule in rules {
-        if !rule.enabled {
-            continue;
-        }
-        if !targets_match(command, &rule.target_commands) {
-            continue;
-        }
-        let Some(re) = build_regex(rule) else {
-            continue;
-        };
-        if !re.is_match(command) {
-            continue;
-        }
-        let excepted = rule.exceptions.iter().any(|exc| {
-            Regex::new(exc)
-                .map(|re| re.is_match(command))
-                .unwrap_or(false)
-        });
-        if excepted {
-            continue;
-        }
-        return Some(rule.id.clone());
-    }
-    None
+    find_matching_rule(command, rules).map(|r| r.id.clone())
 }
 
 /// Returns `(rule_id, deny_message)` if any rule matches, None otherwise.
@@ -164,51 +161,17 @@ pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
 /// When a rule has `target_commands`, the deny message is enriched with the
 /// specific pipe stage that triggered the block.
 pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
-    for rule in rules {
-        if !rule.enabled {
-            continue;
-        }
-
-        // Gate: if the rule declares target commands, skip unless argv[0] of
-        // at least one pipe stage matches.  Regex + exceptions still run
-        // against the original full segment to preserve exception semantics
-        // (e.g. `\|\s*grep`).
-        if !targets_match(command, &rule.target_commands) {
-            continue;
-        }
-
-        let Some(re) = build_regex(rule) else {
-            continue;
-        };
-        if !re.is_match(command) {
-            continue;
-        }
-
-        // Check exceptions — allow if any exception matches
-        let excepted = rule.exceptions.iter().any(|exc| {
-            Regex::new(exc)
-                .map(|re| re.is_match(command))
-                .unwrap_or(false)
-        });
-        if excepted {
-            continue;
-        }
-
-        let base_msg = rule
-            .message
-            .clone()
-            .unwrap_or_else(|| format!("Blocked by rule '{}'.", rule.id));
-
-        // Enrich message with the triggering stage when available
-        let msg = if let Some(stage) = triggering_stage(command, &rule.target_commands) {
-            format!("{base_msg}\n\nBlocked command: `{stage}`")
-        } else {
-            base_msg
-        };
-
-        return Some((rule.id.clone(), msg));
-    }
-    None
+    let rule = find_matching_rule(command, rules)?;
+    let base_msg = rule
+        .message
+        .clone()
+        .unwrap_or_else(|| format!("Blocked by rule '{}'.", rule.id));
+    let msg = if let Some(stage) = triggering_stage(command, &rule.target_commands) {
+        format!("{base_msg}\n\nBlocked command: `{stage}`")
+    } else {
+        base_msg
+    };
+    Some((rule.id.clone(), msg))
 }
 
 /// Pipeline-aware variant of `check`. Splits `command` on sequential operators
@@ -551,6 +514,99 @@ mod tests {
         let rules = vec![make_rule("no-grep", r"\bgrep\b")];
         // Legacy behaviour: matches the word anywhere in the string
         assert!(check("echo grep is useful", &rules).is_some());
+    }
+
+    // ── no-sleep-find-work rule ───────────────────────────────────────────
+
+    fn sleep_rule() -> Rule {
+        Rule {
+            id: "no-sleep-find-work".to_string(),
+            enabled: true,
+            pattern: r"\bsleep\s+".to_string(),
+            pattern_flags: String::new(),
+            exceptions: vec![],
+            target_commands: vec!["sleep".to_string()],
+            message: Some(
+                "Do not sleep. If waiting for a background task, use `run_in_background` \
+                 and you will be notified when it completes. If polling, run the check \
+                 command directly (e.g. `gh run view`). If blocked, find other work."
+                    .to_string(),
+            ),
+        }
+    }
+
+    #[test]
+    fn sleep_rule_blocks_bare_sleep() {
+        assert!(check("sleep 5", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_blocks_long_duration() {
+        assert!(check("sleep 30", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_blocks_fractional_sleep() {
+        assert!(check("sleep 0.5", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_blocks_named_duration() {
+        // macOS sleep accepts `sleep 1m`, `sleep 1h`
+        assert!(check("sleep 1m", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_blocks_sleep_then_command() {
+        // sleep as first segment of a sequential pipeline
+        assert!(check_pipeline("sleep 3 && cargo test", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_blocks_sleep_after_command() {
+        assert!(check_pipeline("cargo build && sleep 2", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_id_is_correct() {
+        let (id, _) = check("sleep 5", &[sleep_rule()]).unwrap();
+        assert_eq!(id, "no-sleep-find-work");
+    }
+
+    #[test]
+    fn sleep_rule_message_mentions_background() {
+        let (_, msg) = check("sleep 5", &[sleep_rule()]).unwrap();
+        assert!(
+            msg.contains("run_in_background") || msg.contains("background"),
+            "message must mention run_in_background, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn sleep_rule_allows_sleep_word_in_test_name() {
+        // target_commands=["sleep"] means argv[0] must be "sleep"; cargo is argv[0] here
+        assert!(check("cargo test sleep_test", &[sleep_rule()]).is_none());
+    }
+
+    #[test]
+    fn sleep_rule_allows_sleep_in_echo() {
+        assert!(check(r#"echo "sleep 5""#, &[sleep_rule()]).is_none());
+    }
+
+    #[test]
+    fn sleep_rule_allows_sleep_in_commit_message() {
+        assert!(check(r#"git commit -m "remove sleep from test""#, &[sleep_rule()]).is_none());
+    }
+
+    #[test]
+    fn sleep_rule_allows_sleep_in_ssh_remote() {
+        // argv[0] is "ssh", not "sleep" — target_commands gate prevents false positive
+        assert!(check("ssh host 'sleep 5'", &[sleep_rule()]).is_none());
+    }
+
+    #[test]
+    fn sleep_rule_allows_sleep_in_grep_arg() {
+        assert!(check("grep sleep main.rs", &[sleep_rule()]).is_none());
     }
 
     // ── property tests ───────────────────────────────────────────────────
