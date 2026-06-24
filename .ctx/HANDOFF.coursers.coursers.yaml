@@ -1,13 +1,13 @@
 project: coursers
 id: coursers
-updated: 2026-06-11
+updated: 2026-06-24
 items:
   - id: uncommitted-work
-    doob_uuid: 38ece75f-06d7-4038-b0fb-2140ca4b0264
+    doob_uuid: null
     name: uncommitted-work
     priority: P1
     status: open
-    title: Uncommitted changes (15 files)
+    title: Uncommitted changes (35 files)
     description: |-
       Working tree has uncommitted changes:
       .ctx/HANDOFF.coursers.coursers.yaml
@@ -16,15 +16,35 @@ items:
       CLAUDE.md
       Cargo.lock
       Cargo.toml
+      crates/core/src/analyze/history.rs
+      crates/core/src/analyze/insights.rs
+      crates/core/src/analyze/stats.rs
+      crates/core/src/config.rs
+      crates/core/src/lib.rs
+      crates/core/src/store.rs
+      crates/core/tests/conformance_state_store.rs
+      crates/core/tests/property_tests.rs
+      crates/coursers/src/hook/pre.rs
+      crates/coursers/tests/common.rs
       crates/crs/Cargo.toml
+      crates/crs/src/jsonl_source.rs
       crates/crs/src/lib.rs
       crates/crs/src/main.rs
+      crates/crs/src/obfsck/process.rs
+      crates/crs/tests/common_bin.rs
+      crates/crs/tests/discover_integration.rs
+      crates/e2e/tests/scenarios.rs
+      fuzz/Cargo.toml
+      scripts/enrich-handoff.sh
+      scripts/smoke.nu
       .codex/
       .sccignore
       AGENTS.md
+      agents/INDEX.md
       crates/crs/src/nu_check/
       crates/crs/tests/nu_check_binary.rs
       docs/plans/
+      fuzz/fuzz_targets/fuzz_jsonl_parse.rs
     files:
       - .ctx/HANDOFF.coursers.coursers.yaml
       - .ctx/HANDOFF.tools.yaml
@@ -32,15 +52,35 @@ items:
       - CLAUDE.md
       - Cargo.lock
       - Cargo.toml
+      - crates/core/src/analyze/history.rs
+      - crates/core/src/analyze/insights.rs
+      - crates/core/src/analyze/stats.rs
+      - crates/core/src/config.rs
+      - crates/core/src/lib.rs
+      - crates/core/src/store.rs
+      - crates/core/tests/conformance_state_store.rs
+      - crates/core/tests/property_tests.rs
+      - crates/coursers/src/hook/pre.rs
+      - crates/coursers/tests/common.rs
       - crates/crs/Cargo.toml
+      - crates/crs/src/jsonl_source.rs
       - crates/crs/src/lib.rs
       - crates/crs/src/main.rs
+      - crates/crs/src/obfsck/process.rs
+      - crates/crs/tests/common_bin.rs
+      - crates/crs/tests/discover_integration.rs
+      - crates/e2e/tests/scenarios.rs
+      - fuzz/Cargo.toml
+      - scripts/enrich-handoff.sh
+      - scripts/smoke.nu
       - .codex/
       - .sccignore
       - AGENTS.md
+      - agents/INDEX.md
       - crates/crs/src/nu_check/
       - crates/crs/tests/nu_check_binary.rs
       - docs/plans/
+      - fuzz/fuzz_targets/fuzz_jsonl_parse.rs
     completed: null
     extra: []
 log:
@@ -48,9 +88,23 @@ log:
     summary: Tackled GitHub issues
     commits: []
     session: 2
+  - date: "20260614.043647"
+    summary: done=18 running=0 pending=0 blocked=0
+    commits: []
+  - date: "20260612.012822"
+    summary: done=18 running=0 pending=0 blocked=0
+    commits: []
   - date: "20260612.011633"
     summary: done=16 running=0 pending=2 blocked=0
     commits: []
+  - date: "20260611"
+    summary: |
+      gm-self-heal: 11 clippy fixes, discover_integration regression fix (load_rules→fixture_rules).
+      SOLID review: removed StateStore::path() from trait, extracted find_matching_rule() helper,
+      added fuzz_jsonl_parse target + parse_session_content() entry point, added regression test.
+      Tests: 428/428 passing. Clippy clean. Fmt clean. All changes uncommitted.
+    commits: []
+    session: 4
   - date: 20260609::162110
     summary: |
       match-lines filter mode, clippy cleanup, nu_libs centralization. Added FilterMode::MatchLines with configurable match_pattern field (fail-open, passthrough on error). 12 new tests. Global filters for cargo kani, rustqual, cargo install. Fixed 8 pre-existing clippy warnings across pipeline.rs and main.rs. Added no-bash-use-nu block rule. Added no-sed-n-use-read stub (disabled). Centralized hook boilerplate into nu_libs lib/hooks/mod.nu and lib/rust/workspace.nu — 5 hooks refactored. Project-local crs-filters.toml for minibox and crux (local-only, gitignored).

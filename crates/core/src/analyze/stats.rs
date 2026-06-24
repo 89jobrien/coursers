@@ -58,7 +58,7 @@ pub fn record_block(path: &std::path::Path, rule_id: &str) {
 /// Return block counts sorted by count descending.
 pub fn sorted_blocks(stats: &Stats) -> Vec<(String, u64)> {
     let mut v: Vec<(String, u64)> = stats.blocks.iter().map(|(k, v)| (k.clone(), *v)).collect();
-    v.sort_by(|a, b| b.1.cmp(&a.1));
+    v.sort_by_key(|b| std::cmp::Reverse(b.1));
     v
 }
 

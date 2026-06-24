@@ -1,3 +1,6 @@
+// TODO(unreachable-pub): add `#![warn(unreachable_pub)]` once the public API
+// surface is intentionally locked down. Currently many items are `pub` for
+// test/integration use; audit and tighten to `pub(crate)` where appropriate.
 pub mod analyze;
 pub mod config;
 pub mod date;

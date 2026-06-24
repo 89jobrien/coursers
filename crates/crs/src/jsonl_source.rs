@@ -39,6 +39,43 @@ impl CommandSource for JsonlCommandSource {
     }
 }
 
+/// Parse JSONL session content from a string (used by fuzz targets and tests).
+///
+/// This is the pure string-based entry point — `parse_file` is the I/O wrapper.
+pub fn parse_session_content(content: &str) -> Vec<CommandRecord> {
+    let mut bash_calls: HashMap<String, (String, String, String, Option<String>)> = HashMap::new();
+    let mut output_sizes: HashMap<String, usize> = HashMap::new();
+
+    for line in content.lines() {
+        let v: serde_json::Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        match v.get("type").and_then(|t| t.as_str()) {
+            Some("assistant") => {
+                parse_assistant_block(&v, true, &None, &mut bash_calls);
+            }
+            Some("user") => {
+                parse_user_block(&v, &mut output_sizes);
+            }
+            _ => {}
+        }
+    }
+
+    bash_calls
+        .into_iter()
+        .map(
+            |(id, (command, cwd, session_id, timestamp))| CommandRecord {
+                command,
+                session_id,
+                cwd,
+                timestamp,
+                output_bytes: output_sizes.get(&id).copied(),
+            },
+        )
+        .collect()
+}
+
 /// Parse a single JSONL session file.
 ///
 /// Two-pass over the lines:

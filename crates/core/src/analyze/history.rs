@@ -148,6 +148,9 @@ pub fn discover(
         entry.count += 1;
         // Use real output length when available: bytes / 4 ≈ tokens.
         // Never fabricate a number — if output_bytes is absent, leave est_tokens at 0.
+        // TODO(token-estimation): the bytes/4 heuristic is undocumented and fragile
+        // for non-ASCII content (multi-byte Unicode inflates the estimate). Consider
+        // exposing BYTES_PER_TOKEN in user config or using a proper tokenizer.
         if let Some(bytes) = rec.output_bytes {
             entry.est_tokens += (bytes / BYTES_PER_TOKEN) as u64;
         }
@@ -165,8 +168,8 @@ pub fn discover(
         .collect();
 
     // Sort by count desc, truncate to limit
-    intercepted.sort_by(|a, b| b.count.cmp(&a.count));
-    unhandled.sort_by(|a, b| b.count.cmp(&a.count));
+    intercepted.sort_by_key(|b| std::cmp::Reverse(b.count));
+    unhandled.sort_by_key(|b| std::cmp::Reverse(b.count));
     if opts.limit > 0 {
         intercepted.truncate(opts.limit);
         unhandled.truncate(opts.limit);

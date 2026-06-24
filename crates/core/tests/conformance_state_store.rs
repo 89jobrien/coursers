@@ -77,13 +77,6 @@ fn assert_state_store_contract(store: &impl StateStore) {
         !loaded2.failures.contains_key("key-a"),
         "contract 3: old key must be gone"
     );
-
-    // 4. path() returns a valid path
-    let path = store.path();
-    assert!(
-        !path.as_os_str().is_empty(),
-        "contract 4: path must not be empty"
-    );
 }
 
 // ---------------------------------------------------------------------------

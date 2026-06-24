@@ -12,23 +12,27 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/89jobrien/coursers"
+rust-version = "1.89.0"
 
 [workspace.dependencies]
+chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
+crs-core = { path = "crates/core", version = "^0.1.0" } #unified
+dirs = "5"
+fd-lock = "4"
+hex = "0.4"
+prefixe = { path = "../prefixe/crates/prefixe" }
+redb = "4.1"
+regex = "1"
+# nu-parser/nu-protocol removed: nu-engine 0.111-0.113 has a compilation bug
+# (PipelineExecutionData missing `exit` field). We call `nu --ide-check` instead.
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-regex = "1"
 sha2 = "0.10"
-hex = "0.4"
-dirs = "5"
+shell-words = "1"
 tempfile = "3"
 toml = "0.8"
 walkdir = "2"
-chrono = "0.4"
-shell-words = "1"
-prefixe = { path = "../prefixe/crates/prefixe" }
-fd-lock = "4"
-redb = "4.1"
 
 [workspace.lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }

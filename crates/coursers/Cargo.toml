@@ -11,13 +11,13 @@ name = "coursers"
 path = "src/main.rs"
 
 [dependencies]
-crs-core = { path = "../core" }
 clap = { workspace = true }
+crs-core = { workspace = true } #unified
+regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-regex = { workspace = true }
 
 [dev-dependencies]
-crs-core = { path = "../core", features = ["testing"] }
-tempfile = { workspace = true }
+crs-core = { workspace = true, features = ["testing"] } #unified
 serde_json = { workspace = true }
+tempfile = { workspace = true }

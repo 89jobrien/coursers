@@ -213,7 +213,7 @@ fn repo_name_from_cwd(cwd: &str) -> String {
 
 fn sorted_top(map: HashMap<String, usize>, limit: usize) -> Vec<(String, usize)> {
     let mut v: Vec<(String, usize)> = map.into_iter().collect();
-    v.sort_by(|a, b| b.1.cmp(&a.1));
+    v.sort_by_key(|b| std::cmp::Reverse(b.1));
     v.truncate(limit);
     v
 }

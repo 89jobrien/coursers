@@ -1,4 +1,5 @@
 pub mod jsonl_source;
+pub mod nu_check;
 pub mod obfsck;
 pub mod rtk;
 

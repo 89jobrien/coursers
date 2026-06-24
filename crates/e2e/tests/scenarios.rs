@@ -217,7 +217,7 @@ fn all_scenarios_pass() {
     let mut entries: Vec<_> = std::fs::read_dir(&dir)
         .unwrap_or_else(|e| panic!("read fixtures dir {}: {e}", dir.display()))
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |x| x == "toml"))
+        .filter(|e| e.path().extension().is_some_and(|x| x == "toml"))
         .collect();
     assert!(
         !entries.is_empty(),

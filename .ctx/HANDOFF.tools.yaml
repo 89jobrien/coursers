@@ -1,115 +1,13 @@
-generated: 2026-05-30
-since_days: 30
-sessions_scanned: 13
-total_commands: 375
+generated: 2026-06-24
+since_days: 3
+sessions_scanned: 1
+total_commands: 21
 top_supported:
-  - command: grep
-    count: 6
-    rule: no-grep-use-tool
-    est_savings_tokens: 58
-  - command: cat
-    count: 3
-    rule: no-cat-use-read
-    est_savings_tokens: 27
-  - command: find /Users/joe/dev
-    count: 2
-    rule: no-find-use-glob
-    rtk_equivalent: rtk find
-    est_savings_tokens: 59
-    est_savings_pct: 70
-  - command: cat ~/.config/rx/prefixes.toml
+  - command: cd /Users/joe/dev/updog
     count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 9
-  - command: cat ~/.claude/settings.json
-    count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 9
-  - command: cat /Users/joe/dev/coursers/.ctx/candidates.toml
-    count: 1
-    rule: no-cat-use-read
-    rtk_equivalent: rtk read
-    est_savings_tokens: 121
-    est_savings_pct: 60
-  - command: printf '{"tool_name":"Bash","tool_input":{"command":"cargo
-    count: 1
-    rule: no-grep-use-tool
-    est_savings_tokens: 9
-  - command: printf '{"tool_name":"Bash","tool_input":{"command":"cat
-    count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 9
-  - command: find /Users/joe
-    count: 1
-    rule: no-find-use-glob
-    est_savings_tokens: 9
-  - command: cat /private/tmp/claude-501/-Users-joe-dev-coursers/81e3ff00-cf14-4d00-91d1-9f74af0da061/tasks/bw13eb3t2.output
-    count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 9
-  - command: cat >
-    count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 9
-  - command: find /Users/joe/.claude/plugins/hand
-    count: 1
-    rule: no-find-use-glob
-    est_savings_tokens: 9
-  - command: cat /Users/joe/dev/coursers/.gitignore
-    count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 9
-  - command: ls /Users/joe/dev/coursers/rustqual.toml
-    count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 9
-  - command: for f
-    count: 1
-    rule: no-head-tail-use-read
+    rule: no-bash-use-nu
     est_savings_tokens: 9
 top_unhandled:
-  - base_command: git
-    count: 57
-    example: "REPO=/Users/joe/dev/coursers\ngit -C \"$REPO\" add crates/core/src/date.rs\ngit -C \"..."
-  - base_command: gh issue
-    count: 29
-    example: "gh issue create --repo 89jobrien/coursers \\\n  --title \"refactor(date): name rema..."
-  - base_command: cargo nextest
-    count: 25
-    example: "cargo nextest run -p crs-core --manifest-path /Users/joe/dev/coursers/Cargo.toml..."
-  - base_command: cargo kani
-    count: 25
-    example: "cargo kani -p crs-core --harness no_empty_segments 2>&1 | tail -10"
-  - base_command: rustqual /Users/joe/dev/coursers
-    count: 25
-    example: "rustqual /Users/joe/dev/coursers 2>&1 | head -12"
-  - base_command: cargo test
-    count: 21
-    example: "cargo test --workspace 2>&1 | tail -15"
-  - base_command: cargo check
-    count: 15
-    example: "cargo check --manifest-path /Users/joe/dev/coursers/Cargo.toml 2>&1"
-  - base_command: cargo clippy
-    count: 14
-    example: "cargo clippy --workspace -- -D warnings 2>&1 | tail -5"
-  - base_command: cargo fmt
-    count: 8
-    example: "cargo fmt --all --manifest-path /Users/joe/dev/coursers/Cargo.toml 2>&1\ngit -C /..."
-  - base_command: ls
-    count: 8
-    example: "ls /Users/joe/dev/coursers/crates/coursers/src/hook/"
-  - base_command: git add
-    count: 7
-    example: "git add crates/core/Cargo.toml crates/core/src/rx_prefix.rs Cargo.toml && git co..."
   - base_command: nu
-    count: 5
-    example: "nu -c 'source /Users/joe/.claude/hooks/nu/session/bazaar-plugin-audit.nu; main' ..."
-  - base_command: git diff
-    count: 4
-    example: "git diff --stat HEAD~1 HEAD"
-  - base_command: cargo qual
-    count: 4
-    example: "cargo qual . --suggestions 2>&1"
-  - base_command: cd /Users/joe/dev/prefixe
-    count: 4
-    example: "cd /Users/joe/dev/prefixe && git init -q && cargo check 2>&1"
+    count: 20
+    example: 'nu -c "cd /Users/joe/dev/updog; cargo check --workspace"'

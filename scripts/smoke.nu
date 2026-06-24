@@ -1,6 +1,18 @@
 #!/usr/bin/env nu
 # smoke.nu — end-to-end smoke test for the coursers binary
 # Usage: nu scripts/smoke.nu
+#
+# TODO(crs-validate-ci): integrate `crs validate` into this smoke test and add it
+# to GitHub Actions CI. It currently runs only ad-hoc. Gate: cargo build must
+# succeed and crs binary must be on PATH.
+#
+# TODO(enrich-script-tests): add integration tests for the enrich scripts here —
+# create a fixture rtk JSON output, run enrich-handoff.sh/nu against it, and
+# assert the generated YAML structure matches expectations (no rtk install needed).
+#
+# TODO(enrich-dedup-scripts): scripts/enrich-handoff.nu, enrich-handoff.sh, and
+# enrich-handoff.jq are three implementations of the same logic. Pick one canonical
+# version (likely .nu) and remove or clearly label the others as deprecated.
 
 # Find the binary
 let bin = if (which coursers | length) > 0 {

@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Commands
 
@@ -47,12 +47,12 @@ All domain logic lives here. Key modules:
 - `filters` — loads `.ctx/crs-filters.toml` (project) or `~/.config/crs/filters.toml` (global);
   four modes: `passthrough`, `failures-only`, `errors-only`, `truncate`
 - `rewrite` — regex-replace rules from the same TOML file (`[[rewrites]]` sections)
-- `history` — `CommandSource` trait + `discover()` function; scans Claude Code `.jsonl` session
+- `history` — `CommandSource` trait + `discover()` function; scans Codex `.jsonl` session
   files to surface missed savings; uses `output_bytes / 4` for token estimates
 
 ### coursers binary
 
-Two subcommands wired as Claude Code hooks:
+Two subcommands wired as Codex hooks:
 
 - `coursers pre` — reads `PreToolUse` JSON from stdin; blocks if command matches a rule and no
   exception overrides; also blocks commands that have hit the failure threshold
@@ -66,7 +66,7 @@ Five subcommands:
 - `crs filter` — PostToolUse hook; compresses/suppresses output per filter rules
 - `crs rewrite` — PreToolUse hook; rewrites commands (e.g. force `--message-format json`);
   exit 1 = passthrough unchanged, exit 0 + JSON = rewritten
-- `crs discover` — scans `~/.claude/projects/**/*.jsonl` for unhandled Bash commands
+- `crs discover` — scans `~/.Codex/projects/**/*.jsonl` for unhandled Bash commands
 - `crs validate` — rule health check: pattern compiles, known triggers fire, exceptions work,
   alternative tools (bun, uv) on PATH
 - `crs probe` — interactive: read command from stdin (raw string or JSON), show per-rule verdict
@@ -116,7 +116,7 @@ file system directly.
 
 ## Open work (coursers-5)
 
-Wire `crs rewrite` and `crs filter` into `~/.claude/settings.json` and update
+Wire `crs rewrite` and `crs filter` into `~/.Codex/settings.json` and update
 `agents/coursers-companion.md` to reflect the full hook chain.
 
 ## Council Analysis
@@ -131,27 +131,6 @@ op run --account=my.1password.com --env-file=/Users/joe/.secrets -- devkit counc
 - `no-find-use-glob` rule matches any command containing `\bfind\s+[./~$"']` —
   this includes git commit messages with phrases like "find .ctx". Exception added
   for `git (commit|log|tag|stash)` including `git -C` form.
-
-## Godmode Skills
-
-Godmode lives at `~/dev/godmode` — a library of reusable skills and agents available in any
-Claude Code session. Relevant skills for coursers development:
-
-| Skill                             | When to use                                               |
-| --------------------------------- | --------------------------------------------------------- |
-| `godmode:ci-fix`                  | CI failing — self-healing diagnosis + fix loop            |
-| `godmode:systematic-debugging`    | Any test failure, panic, or unexpected behavior           |
-| `godmode:code-review`             | Before merging — structured review of implementation      |
-| `godmode:cap`                     | Commit + push with pre-flight validation                  |
-| `godmode:task-driven-development` | Before writing impl — TDD scaffold + task graph           |
-| `godmode:testing-philosophy`      | Designing a test strategy for new modules                 |
-| `godmode:refactoring`             | Restructuring code without changing behavior              |
-| `godmode:health-score`            | Measure codebase health (tests, clippy, TODOs, coverage)  |
-| `godmode:dead-code`               | Find unused public API surface and orphaned modules       |
-| `godmode:pr-author`               | Compose PR descriptions from branch diff + commit history |
-
-Invoke via `/godmode:<skill-name>` in the Claude Code prompt, or use the `Skill` tool directly.
-Agents live at `~/dev/godmode/agents/` — prefixed by domain (`dbg__`, `qual__`, `plan__`, etc.).
 
 ## HANDOFF Dependency Fields
 

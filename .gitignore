@@ -1,3 +1,8 @@
+# TODO(gitignore-target): target/ was committed to the repo despite this entry
+# (see commit 9b5a2ca). Purge it from history with `git filter-repo --path target
+# --invert-paths` and verify the entry below excludes it correctly.
+# TODO(gitignore-target-tracked): also check for tracked target/ subtrees with
+# `git ls-files target/` and remove any with `git rm -r --cached target/`.
 /target
 /fuzz/target
 /fuzz/artifacts
@@ -14,3 +19,4 @@
 # handoff-end
 .worktrees/
 .DS_Store
+fuzz/corpus/

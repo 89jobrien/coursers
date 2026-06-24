@@ -13,6 +13,10 @@ libfuzzer-sys = "0.4"
 [dependencies.crs-core]
 path = "../crates/core"
 
+[dependencies.crs-lib]
+package = "crs"
+path = "../crates/crs"
+
 # Prevent this from being discovered as a workspace member
 [workspace]
 
@@ -39,4 +43,9 @@ doc = false
 [[bin]]
 name = "fuzz_rule_check"
 path = "fuzz_targets/fuzz_rule_check.rs"
+doc = false
+
+[[bin]]
+name = "fuzz_jsonl_parse"
+path = "fuzz_targets/fuzz_jsonl_parse.rs"
 doc = false

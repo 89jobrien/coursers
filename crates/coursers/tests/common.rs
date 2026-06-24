@@ -12,6 +12,7 @@ pub fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+#[allow(dead_code)]
 pub fn run_pre(payload_path: &Path, rules_path: &Path, state_path: &Path) -> Output {
     let payload = std::fs::read_to_string(payload_path).unwrap();
     run_hook("pre", &payload, rules_path, state_path)

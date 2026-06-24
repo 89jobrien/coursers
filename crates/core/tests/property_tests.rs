@@ -64,8 +64,8 @@ proptest! {
     #[test]
     fn ymd_produces_valid_ranges(secs in 0u64..=(1u64 << 40)) {
         let (_, m, d) = unix_secs_to_ymd(secs);
-        prop_assert!(m >= 1 && m <= 12, "month out of range: {m}");
-        prop_assert!(d >= 1 && d <= 31, "day out of range: {d}");
+        prop_assert!((1..=12).contains(&m), "month out of range: {m}");
+        prop_assert!((1..=31).contains(&d), "day out of range: {d}");
     }
 
     /// Monotonicity: s1 < s2 implies (y1,m1,d1) <= (y2,m2,d2).

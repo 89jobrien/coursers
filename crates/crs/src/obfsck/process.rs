@@ -48,8 +48,7 @@ pub(crate) fn parse_jsonrpc_response(
     }
     let text = String::from_utf8_lossy(stdout);
     text.lines()
-        .filter(|l| !l.trim().is_empty())
-        .next_back()
+        .rfind(|l| !l.trim().is_empty())
         .and_then(|l| serde_json::from_str(l).ok())
 }
 

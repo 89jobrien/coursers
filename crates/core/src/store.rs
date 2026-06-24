@@ -7,7 +7,6 @@ use crate::state::State;
 pub trait StateStore {
     fn load(&self) -> State;
     fn save(&self, state: &State);
-    fn path(&self) -> &Path;
 }
 
 /// Resolve the state file path from `FailureLearning` config.
@@ -57,17 +56,12 @@ impl StateStore for FsStateStore {
     fn save(&self, state: &State) {
         Self::save_to(&self.path, state);
     }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
 }
 
 /// In-memory store for tests. No filesystem I/O.
 #[cfg(any(test, feature = "testing"))]
 pub struct InMemoryStateStore {
     inner: std::cell::RefCell<State>,
-    path: PathBuf,
 }
 
 #[cfg(any(test, feature = "testing"))]
@@ -75,14 +69,12 @@ impl InMemoryStateStore {
     pub fn new() -> Self {
         Self {
             inner: std::cell::RefCell::new(State::default()),
-            path: PathBuf::from("/tmp/in-memory-state.json"),
         }
     }
 
     pub fn with_state(state: State) -> Self {
         Self {
             inner: std::cell::RefCell::new(state),
-            path: PathBuf::from("/tmp/in-memory-state.json"),
         }
     }
 
@@ -107,16 +99,15 @@ impl StateStore for InMemoryStateStore {
     fn save(&self, state: &State) {
         *self.inner.borrow_mut() = state.clone();
     }
-
-    fn path(&self) -> &Path {
-        &self.path
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses
+    // serialization locks (ENV_LOCK) rather than RAII isolation. Refactor to use
+    // `temp_env::with_var` for cleaner, panic-safe env isolation in all test files.
     #[test]
     fn in_memory_store_roundtrip() {
         let store = InMemoryStateStore::new();
