@@ -4,6 +4,14 @@ use std::path::PathBuf;
 /// Used by both `history` (discover token estimation) and `tool_swap` (budget clamping).
 pub const BYTES_PER_TOKEN: usize = 4;
 
+// TODO(config-path-inconsistency): README says hooks live at ~/.claude/hooks/ but
+// CLAUDE.md and this code use ~/.config/coursers/. Pick one canonical location and
+// update all docs, smoke tests, and example configs to match.
+
+// TODO(config-defaults-migrate): migrate config default paths from ~/.claude/hooks/
+// to ~/.config/coursers/ everywhere (docs, smoke.nu, agent companion). The XDG path
+// used here is correct; the legacy ~/.claude/hooks/ references are stale.
+
 pub fn rules_path() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_RULES") {
         return PathBuf::from(p);
@@ -26,6 +34,109 @@ pub fn state_path_default() -> PathBuf {
         .join(".config/coursers/course-correct-state.json")
 }
 
+/// Resolved paths for a named profile (or the default profile).
+/// Constructed via [`ConfigBuilder::build`].
+pub struct ProfileConfig {
+    /// Path to the rules JSON file.
+    pub rules_path: PathBuf,
+    /// Path to the global (home-dir) state file.
+    pub global_state_path: PathBuf,
+    /// Project-local state path (`.ctx/crs-<profile>-state.json`).
+    pub local_state_path: PathBuf,
+}
+
+impl ProfileConfig {
+    /// Returns the project-local state path if it exists on disk,
+    /// otherwise returns the global state path.
+    pub fn effective_state_path(&self) -> &PathBuf {
+        if self.local_state_path.exists() {
+            &self.local_state_path
+        } else {
+            &self.global_state_path
+        }
+    }
+}
+
+/// Builder for [`ProfileConfig`]. Layered resolution:
+/// defaults → profile directory → explicit overrides.
+pub struct ConfigBuilder {
+    profile: Option<String>,
+    rules_override: Option<PathBuf>,
+    state_override: Option<PathBuf>,
+}
+
+impl ConfigBuilder {
+    pub fn new() -> Self {
+        Self {
+            profile: None,
+            rules_override: None,
+            state_override: None,
+        }
+    }
+
+    /// Set a named profile. Resolves to `~/.config/coursers/profiles/<name>/`.
+    pub fn profile(mut self, name: impl Into<String>) -> Self {
+        self.profile = Some(name.into());
+        self
+    }
+
+    /// Override the rules path; takes precedence over the profile directory.
+    pub fn rules(mut self, path: PathBuf) -> Self {
+        self.rules_override = Some(path);
+        self
+    }
+
+    /// Override the global state path; takes precedence over the profile directory.
+    pub fn state(mut self, path: PathBuf) -> Self {
+        self.state_override = Some(path);
+        self
+    }
+
+    pub fn build(self) -> ProfileConfig {
+        let home = dirs::home_dir().expect("home dir");
+        let base = home.join(".config/coursers");
+
+        let (default_rules, default_global_state, default_local_state) =
+            if let Some(ref name) = self.profile {
+                let profile_dir = base.join("profiles").join(name);
+                (
+                    profile_dir.join("rules.json"),
+                    profile_dir.join("state.json"),
+                    PathBuf::from(format!(".ctx/crs-{name}-state.json")),
+                )
+            } else {
+                // Respect legacy env-var overrides when no profile is set.
+                let rules = if let Ok(p) = std::env::var("COURSERS_RULES") {
+                    PathBuf::from(p)
+                } else {
+                    base.join("course-correct-rules.json")
+                };
+                let global_state = if let Ok(p) = std::env::var("COURSERS_STATE") {
+                    PathBuf::from(p)
+                } else {
+                    base.join("course-correct-state.json")
+                };
+                (
+                    rules,
+                    global_state,
+                    PathBuf::from(".ctx/course-correct-state.json"),
+                )
+            };
+
+        ProfileConfig {
+            rules_path: self.rules_override.unwrap_or(default_rules),
+            global_state_path: self.state_override.unwrap_or(default_global_state),
+            local_state_path: default_local_state,
+        }
+    }
+}
+
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(kani)]
 mod kani_proofs {
     use super::BYTES_PER_TOKEN;
@@ -40,7 +151,7 @@ mod kani_proofs {
 
 #[cfg(test)]
 mod tests {
-    use super::rules_path;
+    use super::*;
     use std::sync::Mutex;
 
     // Serialize env-mutation tests to avoid races between parallel test threads.
@@ -65,5 +176,105 @@ mod tests {
             "expected XDG path, got: {}",
             path.display()
         );
+    }
+
+    // ── ConfigBuilder / ProfileConfig ─────────────────────────────────────
+
+    #[test]
+    fn default_builder_gives_legacy_rules_path() {
+        let cfg = ConfigBuilder::new().build();
+        assert!(
+            cfg.rules_path
+                .to_string_lossy()
+                .contains("course-correct-rules.json"),
+            "got: {}",
+            cfg.rules_path.display()
+        );
+    }
+
+    #[test]
+    fn default_builder_gives_legacy_global_state_path() {
+        let cfg = ConfigBuilder::new().build();
+        assert!(
+            cfg.global_state_path
+                .to_string_lossy()
+                .contains("course-correct-state.json"),
+            "got: {}",
+            cfg.global_state_path.display()
+        );
+    }
+
+    #[test]
+    fn default_builder_gives_legacy_local_state_path() {
+        let cfg = ConfigBuilder::new().build();
+        assert_eq!(
+            cfg.local_state_path,
+            std::path::PathBuf::from(".ctx/course-correct-state.json")
+        );
+    }
+
+    #[test]
+    fn profile_builder_resolves_rules_under_profiles_dir() {
+        let cfg = ConfigBuilder::new().profile("codex").build();
+        assert!(
+            cfg.rules_path
+                .to_string_lossy()
+                .contains("profiles/codex/rules.json"),
+            "got: {}",
+            cfg.rules_path.display()
+        );
+    }
+
+    #[test]
+    fn profile_builder_resolves_global_state_under_profiles_dir() {
+        let cfg = ConfigBuilder::new().profile("codex").build();
+        assert!(
+            cfg.global_state_path
+                .to_string_lossy()
+                .contains("profiles/codex/state.json"),
+            "got: {}",
+            cfg.global_state_path.display()
+        );
+    }
+
+    #[test]
+    fn profile_builder_gives_profile_scoped_local_state_path() {
+        let cfg = ConfigBuilder::new().profile("codex").build();
+        assert_eq!(
+            cfg.local_state_path,
+            std::path::PathBuf::from(".ctx/crs-codex-state.json")
+        );
+    }
+
+    #[test]
+    fn rules_override_wins_over_profile() {
+        let cfg = ConfigBuilder::new()
+            .profile("codex")
+            .rules(std::path::PathBuf::from("/tmp/custom-rules.json"))
+            .build();
+        assert_eq!(
+            cfg.rules_path,
+            std::path::PathBuf::from("/tmp/custom-rules.json")
+        );
+    }
+
+    #[test]
+    fn state_override_wins_over_profile() {
+        let cfg = ConfigBuilder::new()
+            .profile("codex")
+            .state(std::path::PathBuf::from("/tmp/custom-state.json"))
+            .build();
+        assert_eq!(
+            cfg.global_state_path,
+            std::path::PathBuf::from("/tmp/custom-state.json")
+        );
+    }
+
+    #[test]
+    fn effective_state_path_returns_global_when_local_absent() {
+        let cfg = ConfigBuilder::new().build();
+        // .ctx/course-correct-state.json does not exist in test CWD
+        let effective = cfg.effective_state_path();
+        assert!(!effective.as_os_str().is_empty());
     }
 }

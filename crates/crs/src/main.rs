@@ -1,9 +1,11 @@
 // qual:allow(srp) reason: "CLI entry point — subcommand dispatch is inherently large"
 use clap::{Parser, Subcommand};
+use crs_core::config::ConfigBuilder;
 use crs_lib::{FilterPayload, FilterResult, run_filter, run_rewrite};
 use serde::Deserialize;
 use serde_json::Value;
 use std::io::{self, Read, Write};
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "crs", about = "Command rewriter and output filter")]
@@ -15,11 +17,34 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
-    Filter,
+    Filter {
+        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
+        #[arg(long)]
+        profile: Option<String>,
+        /// Override rules file path
+        #[arg(long)]
+        rules: Option<PathBuf>,
+        /// Override global state file path
+        #[arg(long)]
+        state: Option<PathBuf>,
+    },
     /// Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
-    Rewrite,
+    Rewrite {
+        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
+        #[arg(long)]
+        profile: Option<String>,
+        /// Override rules file path
+        #[arg(long)]
+        rules: Option<PathBuf>,
+    },
     /// Discover missed savings from Claude Code session history
     Discover {
+        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
+        #[arg(long)]
+        profile: Option<String>,
+        /// Override rules file path
+        #[arg(long)]
+        rules: Option<PathBuf>,
         /// Scan all projects (default: current project only)
         #[arg(short, long)]
         all: bool,
@@ -40,11 +65,29 @@ enum Command {
         min_count: u64,
     },
     /// Validate rules: check patterns compile, examples fire, exceptions work, alternatives on PATH
-    Validate,
+    Validate {
+        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
+        #[arg(long)]
+        profile: Option<String>,
+        /// Override rules file path
+        #[arg(long)]
+        rules: Option<PathBuf>,
+    },
     /// Probe a command against all rules and show what would fire — reads command from stdin
-    Probe,
+    Probe {
+        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
+        #[arg(long)]
+        profile: Option<String>,
+        /// Override rules file path
+        #[arg(long)]
+        rules: Option<PathBuf>,
+    },
     /// Show cumulative block counts by rule
-    Stats,
+    Stats {
+        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
+        #[arg(long)]
+        profile: Option<String>,
+    },
     /// Analyze session facets enriched with git context
     Insights {
         /// Output format: text or json
@@ -65,6 +108,12 @@ enum Command {
     },
     /// Suggest new rules from the top unhandled commands in session history
     Suggest {
+        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
+        #[arg(long)]
+        profile: Option<String>,
+        /// Override rules file path
+        #[arg(long)]
+        rules: Option<PathBuf>,
         /// Scan all projects (default: current project only)
         #[arg(short, long)]
         all: bool,
@@ -137,7 +186,27 @@ enum Command {
         #[arg(short, long, default_value = "text")]
         format: String,
     },
+    /// Validate nu scripts using `nu --ide-check` (requires nu on PATH)
+    NuCheck {
+        /// Files to check
+        #[arg(value_name = "FILE")]
+        files: Vec<String>,
+        /// Check all hook scripts in ~/.claude/hooks/nu/**/*.nu
+        #[arg(long)]
+        hooks: bool,
+        /// Check all mod.nu files in ~/dev/nu_libs/lib/**
+        #[arg(long)]
+        nu_libs: bool,
+    },
+    // TODO(crs-state-reset): add State { reset } subcommand to clear
+    // .ctx/course-correct-state.json for a fresh failure-learning baseline.
 }
+
+// TODO(coursers-5-wire): wire crs rewrite (PreToolUse) and crs filter (PostToolUse)
+// into ~/.claude/settings.json. See CLAUDE.md open work coursers-5.
+
+// TODO(crs-validate-ci): crs validate is not wired into CI -- add to just ci,
+// GitHub Actions, and smoke.nu so rule health is checked on every PR.
 
 /// Minimal PostToolUse hook payload.
 #[derive(Debug, Deserialize)]
@@ -152,12 +221,42 @@ struct ToolInput {
     command: Option<String>,
 }
 
+fn resolve_profile(
+    profile: Option<String>,
+    rules: Option<PathBuf>,
+    state: Option<PathBuf>,
+) -> crs_core::config::ProfileConfig {
+    let mut b = ConfigBuilder::new();
+    if let Some(p) = profile {
+        b = b.profile(p);
+    }
+    if let Some(r) = rules {
+        b = b.rules(r);
+    }
+    if let Some(s) = state {
+        b = b.state(s);
+    }
+    b.build()
+}
+
 fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Command::Filter => cmd_filter(),
-        Command::Rewrite => cmd_rewrite(),
+        Command::Filter {
+            profile,
+            rules,
+            state,
+        } => {
+            let _profile_cfg = resolve_profile(profile, rules, state);
+            cmd_filter();
+        }
+        Command::Rewrite { profile, rules } => {
+            let _profile_cfg = resolve_profile(profile, rules, None);
+            cmd_rewrite();
+        }
         Command::Discover {
+            profile,
+            rules,
             all,
             limit,
             since,
@@ -165,11 +264,29 @@ fn main() {
             generate_filters,
             min_count,
         } => {
-            cmd_discover(all, limit, since, &format, generate_filters, min_count);
+            let profile_cfg = resolve_profile(profile, rules, None);
+            cmd_discover(
+                &profile_cfg,
+                all,
+                limit,
+                since,
+                &format,
+                generate_filters,
+                min_count,
+            );
         }
-        Command::Validate => cmd_validate(),
-        Command::Probe => cmd_probe(),
-        Command::Stats => cmd_stats(),
+        Command::Validate { profile, rules } => {
+            let profile_cfg = resolve_profile(profile, rules, None);
+            cmd_validate(&profile_cfg);
+        }
+        Command::Probe { profile, rules } => {
+            let profile_cfg = resolve_profile(profile, rules, None);
+            cmd_probe(&profile_cfg);
+        }
+        Command::Stats { profile } => {
+            let _profile_cfg = resolve_profile(profile, None, None);
+            cmd_stats();
+        }
         Command::Insights {
             format,
             since,
@@ -177,11 +294,16 @@ fn main() {
         } => cmd_insights(&format, since, repo.as_deref()),
         Command::Audit { remove } => cmd_audit(remove),
         Command::Suggest {
+            profile,
+            rules,
             all,
             since,
             limit,
             format,
-        } => cmd_suggest(all, since, limit, &format),
+        } => {
+            let profile_cfg = resolve_profile(profile, rules, None);
+            cmd_suggest(&profile_cfg, all, since, limit, &format);
+        }
         Command::History {
             limit,
             rule,
@@ -205,6 +327,11 @@ fn main() {
         ),
         Command::Heat { rule } => cmd_heat(rule.as_deref()),
         Command::Replay { session, format } => cmd_replay(session.as_deref(), &format),
+        Command::NuCheck {
+            files,
+            hooks,
+            nu_libs,
+        } => cmd_nu_check(&files, hooks, nu_libs),
     }
 }
 
@@ -985,9 +1112,15 @@ fn emit_rewrite(command: &str) {
     handle.flush().ok();
 }
 
-fn cmd_validate() {
-    use crs_core::rules::load as load_rules;
+fn cmd_validate(profile_cfg: &crs_core::config::ProfileConfig) {
+    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
+    let load_rules = || {
+        ProfileFsRulesLoader {
+            path: profile_cfg.rules_path.clone(),
+        }
+        .load()
+    };
 
     // Map rule id → (commands that should trigger, commands that should NOT trigger via exceptions)
     type KnownRule<'a> = (&'a str, &'a [&'a str], &'a [&'a str], &'a [&'a str]);
@@ -1103,9 +1236,15 @@ fn cmd_validate() {
     }
 }
 
-fn cmd_probe() {
-    use crs_core::rules::load as load_rules;
+fn cmd_probe(profile_cfg: &crs_core::config::ProfileConfig) {
+    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
+    let load_rules = || {
+        ProfileFsRulesLoader {
+            path: profile_cfg.rules_path.clone(),
+        }
+        .load()
+    };
     use std::io::Read as _;
 
     let mut raw = String::new();
@@ -1209,6 +1348,7 @@ fn cmd_probe() {
 }
 
 fn cmd_discover(
+    profile_cfg: &crs_core::config::ProfileConfig,
     all: bool,
     limit: usize,
     since: u32,
@@ -1217,9 +1357,9 @@ fn cmd_discover(
     min_count: u64,
 ) {
     use crs_core::history::{DiscoverOpts, discover};
+    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use crs_core::obfsck::ObfsckMcp as _;
     use crs_core::rtk::RtkAnalysis as _;
-    use crs_core::rules::load as load_rules;
     use std::collections::HashMap;
 
     let root = std::env::var("CLAUDE_PROJECTS_DIR")
@@ -1229,7 +1369,10 @@ fn cmd_discover(
     let current_dir = std::env::current_dir().ok();
     let src = crs_lib::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
 
-    let rules_cfg = load_rules();
+    let rules_cfg = ProfileFsRulesLoader {
+        path: profile_cfg.rules_path.clone(),
+    }
+    .load();
     let opts = DiscoverOpts {
         limit,
         since_days: Some(since),
@@ -1647,9 +1790,15 @@ fn cmd_audit(remove: Option<String>) {
     }
 }
 
-fn cmd_suggest(all: bool, since: u32, limit: usize, format: &str) {
+fn cmd_suggest(
+    profile_cfg: &crs_core::config::ProfileConfig,
+    all: bool,
+    since: u32,
+    limit: usize,
+    format: &str,
+) {
     use crs_core::history::{DiscoverOpts, discover};
-    use crs_core::rules::load as load_rules;
+    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use crs_core::suggest::suggest;
 
     let root = std::env::var("CLAUDE_PROJECTS_DIR")
@@ -1659,7 +1808,10 @@ fn cmd_suggest(all: bool, since: u32, limit: usize, format: &str) {
     let current_dir = std::env::current_dir().ok();
     let src = crs_lib::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
 
-    let rules_cfg = load_rules();
+    let rules_cfg = ProfileFsRulesLoader {
+        path: profile_cfg.rules_path.clone(),
+    }
+    .load();
     let opts = DiscoverOpts {
         limit,
         since_days: Some(since),
@@ -1967,6 +2119,52 @@ fn cmd_replay(session_path: Option<&str>, format: &str) {
 }
 
 /// Find the most recently modified `.jsonl` file matching the current project directory.
+fn cmd_nu_check(files: &[String], hooks: bool, nu_libs: bool) {
+    use crs_lib::nu_check::check_files;
+    use walkdir::WalkDir;
+
+    let mut paths: Vec<std::path::PathBuf> = files.iter().map(std::path::PathBuf::from).collect();
+
+    if hooks {
+        let hooks_dir = dirs::home_dir().expect("home dir").join(".claude/hooks/nu");
+        for entry in WalkDir::new(&hooks_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map(|x| x == "nu").unwrap_or(false))
+        {
+            paths.push(entry.into_path());
+        }
+    }
+
+    if nu_libs {
+        let libs_dir = dirs::home_dir().expect("home dir").join("dev/nu_libs/lib");
+        for entry in WalkDir::new(&libs_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name() == "mod.nu")
+        {
+            paths.push(entry.into_path());
+        }
+    }
+
+    if paths.is_empty() {
+        eprintln!("crs nu-check: no files specified. Use --hooks, --nu-libs, or pass file paths.");
+        std::process::exit(1);
+    }
+
+    let result = check_files(&paths);
+
+    if result.is_ok() {
+        let count = paths.len();
+        println!("ok ({count} file{})", if count == 1 { "" } else { "s" });
+    } else {
+        for e in &result.errors {
+            eprintln!("{}", e.display());
+        }
+        std::process::exit(1);
+    }
+}
+
 fn find_most_recent_session(
     root: &std::path::Path,
     current_dir: Option<&std::path::Path>,
@@ -2489,6 +2687,7 @@ mod cli_tests {
     }
     // ── Insights table tests ────────────────────────────────────────────────
 
+    #[allow(clippy::too_many_arguments)]
     fn make_enriched(
         session_id: &str,
         repo: &str,

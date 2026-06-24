@@ -87,8 +87,18 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
     store.save(&st);
 }
 
+#[allow(dead_code)]
 pub fn run() {
     let Some((payload, loader, store, capture)) = super::hook_context() else {
+        return;
+    };
+    run_with(&loader, &store, &capture, &payload);
+}
+
+/// Profile-aware entry point for `coursers post --profile <name>`.
+pub fn run_with_profile(profile_cfg: &crs_core::config::ProfileConfig) {
+    let Some((payload, loader, store, capture)) = super::hook_context_with_profile(profile_cfg)
+    else {
         return;
     };
     run_with(&loader, &store, &capture, &payload);

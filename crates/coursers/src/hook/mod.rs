@@ -37,7 +37,7 @@ pub struct HookSpecificOutput {
 }
 
 /// Shared hook wiring: read stdin, load rules, state store, and capture store.
-#[allow(clippy::type_complexity)]
+#[allow(clippy::type_complexity, dead_code)]
 pub fn hook_context() -> Option<(
     HookPayload,
     crs_core::loader::FsRulesLoader,
@@ -54,6 +54,32 @@ pub fn hook_context() -> Option<(
     let config = loader.load();
     let path = state_path(&config.failure_learning);
     let store = FsStateStore { path };
+    let capture = SuggestionStore::new(SuggestionStore::default_path());
+    Some((payload, loader, store, capture))
+}
+
+/// Profile-aware variant of [`hook_context`].
+/// Constructs loaders and stores from a resolved [`crs_core::config::ProfileConfig`].
+#[allow(clippy::type_complexity)]
+pub fn hook_context_with_profile(
+    profile_cfg: &crs_core::config::ProfileConfig,
+) -> Option<(
+    HookPayload,
+    crs_core::loader::ProfileFsRulesLoader,
+    crs_core::store::FsStateStore,
+    crs_core::capture::SuggestionStore,
+)> {
+    use crs_core::capture::SuggestionStore;
+    use crs_core::loader::ProfileFsRulesLoader;
+    use crs_core::store::FsStateStore;
+
+    let payload = read_stdin()?;
+    let loader = ProfileFsRulesLoader {
+        path: profile_cfg.rules_path.clone(),
+    };
+    let store = FsStateStore {
+        path: profile_cfg.effective_state_path().clone(),
+    };
     let capture = SuggestionStore::new(SuggestionStore::default_path());
     Some((payload, loader, store, capture))
 }

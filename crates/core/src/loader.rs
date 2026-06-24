@@ -13,6 +13,24 @@ impl RulesLoader for FsRulesLoader {
     }
 }
 
+/// Loads rules from an explicit path — no env-var lookup.
+/// Use when a [`crate::config::ProfileConfig`] has already resolved the path.
+pub struct ProfileFsRulesLoader {
+    pub path: std::path::PathBuf,
+}
+
+impl RulesLoader for ProfileFsRulesLoader {
+    fn load(&self) -> RulesConfig {
+        std::fs::read_to_string(&self.path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_else(|| RulesConfig {
+                rules: vec![],
+                failure_learning: crate::rules::FailureLearning::default(),
+            })
+    }
+}
+
 /// In-memory loader for tests. Returns the config it was constructed with.
 #[cfg(any(test, feature = "testing"))]
 #[derive(Clone)]
@@ -71,5 +89,30 @@ mod tests {
         let config = loader.load();
         unsafe { std::env::remove_var("COURSERS_RULES") };
         assert!(config.rules.is_empty());
+    }
+
+    #[test]
+    fn profile_fs_loader_returns_default_on_missing_file() {
+        let loader = ProfileFsRulesLoader {
+            path: std::path::PathBuf::from("/nonexistent/profile-rules.json"),
+        };
+        let config = loader.load();
+        assert!(config.rules.is_empty());
+    }
+
+    #[test]
+    fn profile_fs_loader_loads_from_explicit_path() {
+        use std::io::Write;
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        writeln!(
+            f,
+            r#"{{"rules":[],"failure_learning":{{"enabled":false}}}}"#
+        )
+        .unwrap();
+        let loader = ProfileFsRulesLoader {
+            path: f.path().to_path_buf(),
+        };
+        let config = loader.load();
+        assert!(!config.failure_learning.enabled);
     }
 }

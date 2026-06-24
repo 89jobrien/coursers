@@ -72,6 +72,18 @@ fn file_tree(path: &str) -> String {
     "(could not list directory)".to_string()
 }
 
+// TODO(hook-ordering-semantics): document whether Claude Code short-circuits on
+// the first deny response from a hook chain or runs all hooks in the chain.
+// If short-circuit: the failure-learning check below (step 2) is skipped when a
+// rule fires (step 1). If not: both can produce output. Clarify in CLAUDE.md.
+//
+// TODO(no-sed-n-use-read): enable the `no-sed-n-use-read` block rule once the
+// Read tool's offset/limit feature is stable. Currently deferred because the
+// alternative (Read with offset) is not yet ergonomic enough to enforce.
+//
+// TODO(coursers-11): coursers-11 (cross-tool block) depends on obfsck-11 and
+// mcpipe-21 in external repos. No local fallback is documented. When those issues
+// are resolved, wire the cross-tool detection here.
 // qual:allow(iosp) reason: "integration root — orchestrates rule checks"
 pub fn run_with<L: RulesLoader, S: StateStore>(
     loader: &L,
@@ -129,6 +141,23 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
             deny(&msg);
         }
     }
+}
+
+#[allow(dead_code)]
+pub fn run() {
+    let Some((payload, loader, store, capture)) = super::hook_context() else {
+        return;
+    };
+    run_with(&loader, &store, &capture, &payload);
+}
+
+/// Profile-aware entry point for `coursers pre --profile <name>`.
+pub fn run_with_profile(profile_cfg: &crs_core::config::ProfileConfig) {
+    let Some((payload, loader, store, capture)) = super::hook_context_with_profile(profile_cfg)
+    else {
+        return;
+    };
+    run_with(&loader, &store, &capture, &payload);
 }
 
 #[cfg(test)]
@@ -326,11 +355,4 @@ mod tests {
             &bash_payload("grep foo ."),
         );
     }
-}
-
-pub fn run() {
-    let Some((payload, loader, store, capture)) = super::hook_context() else {
-        return;
-    };
-    run_with(&loader, &store, &capture, &payload);
 }
