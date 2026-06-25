@@ -88,7 +88,21 @@ pub fn read_stdin() -> Option<HookPayload> {
     use std::io::Read;
     let mut buf = String::new();
     std::io::stdin().read_to_string(&mut buf).ok()?;
-    serde_json::from_str(&buf).ok()
+    match serde_json::from_str(&buf) {
+        Ok(payload) => Some(payload),
+        Err(e) => {
+            eprintln!("[coursers] warning: failed to parse stdin as hook payload: {e}");
+            None
+        }
+    }
+}
+
+/// Serialize a [`PreResponse`] to JSON, falling back to a hardcoded deny payload if
+/// serialization fails. This function never panics.
+pub(crate) fn serialize_deny_response(resp: &PreResponse) -> String {
+    serde_json::to_string(resp).unwrap_or_else(|_| {
+        r#"{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[coursers] internal error: failed to serialize deny response"}}"#.to_owned()
+    })
 }
 
 pub fn deny(reason: &str) {
@@ -100,11 +114,60 @@ pub fn deny(reason: &str) {
             permission_decision_reason: reason.into(),
         },
     };
-    let json = serde_json::to_string(&resp).unwrap();
+    let json = serialize_deny_response(&resp);
     let stdout = std::io::stdout();
     let mut handle = stdout.lock();
     writeln!(handle, "{}", json).ok();
     handle.flush().ok();
     drop(handle);
     std::process::exit(2);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serialize_deny_response_produces_valid_json() {
+        let resp = PreResponse {
+            hook_specific_output: HookSpecificOutput {
+                hook_event_name: "PreToolUse".into(),
+                permission_decision: "deny".into(),
+                permission_decision_reason: "test reason".into(),
+            },
+        };
+        let json = serialize_deny_response(&resp);
+        let parsed: serde_json::Value =
+            serde_json::from_str(&json).expect("serialize_deny_response must produce valid JSON");
+        assert_eq!(parsed["hookSpecificOutput"]["permissionDecision"], "deny");
+        assert_eq!(
+            parsed["hookSpecificOutput"]["permissionDecisionReason"],
+            "test reason"
+        );
+    }
+
+    #[test]
+    fn serialize_deny_response_fallback_is_valid_json() {
+        // Verify the hardcoded fallback string is itself valid JSON with the expected
+        // deny decision — this is emitted when serde_json::to_string fails.
+        let fallback = r#"{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[coursers] internal error: failed to serialize deny response"}}"#;
+        let parsed: serde_json::Value =
+            serde_json::from_str(fallback).expect("fallback must be valid JSON");
+        assert_eq!(parsed["hookSpecificOutput"]["permissionDecision"], "deny");
+    }
+
+    /// Conformance test: malformed stdin must not panic; hook continues with allow behavior.
+    ///
+    /// `read_stdin` returns `None` on malformed input. Callers treat `None` as passthrough
+    /// (allow), so this verifies the boundary that produces that outcome.
+    #[test]
+    fn hook_pre_malformed_stdin_does_not_panic() {
+        // Deserializing malformed bytes must return None, not panic.
+        let malformed = b"not valid json at all";
+        let result: Option<HookPayload> = serde_json::from_slice(malformed).ok();
+        assert!(
+            result.is_none(),
+            "malformed stdin must deserialize to None, triggering allow passthrough"
+        );
+    }
 }

@@ -115,4 +115,20 @@ mod tests {
         let config = loader.load();
         assert!(!config.failure_learning.enabled);
     }
+
+    /// Conformance test: malformed rules.json must return empty config, never panic.
+    #[test]
+    fn fs_rules_loader_returns_default_on_malformed_json() {
+        use std::io::Write;
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        write!(f, "{{invalid json!!").unwrap();
+        let loader = ProfileFsRulesLoader {
+            path: f.path().to_path_buf(),
+        };
+        let config = loader.load();
+        assert!(
+            config.rules.is_empty(),
+            "malformed rules.json must yield an empty rules vec"
+        );
+    }
 }

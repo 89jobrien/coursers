@@ -108,6 +108,22 @@ mod tests {
     // TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses
     // serialization locks (ENV_LOCK) rather than RAII isolation. Refactor to use
     // `temp_env::with_var` for cleaner, panic-safe env isolation in all test files.
+    /// Conformance test: malformed state JSON must return State::default(), never panic.
+    #[test]
+    fn fs_state_store_returns_default_on_malformed_json() {
+        use std::io::Write;
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        write!(f, "{{bad: json").unwrap();
+        let store = FsStateStore {
+            path: f.path().to_path_buf(),
+        };
+        let state = store.load();
+        assert!(
+            state.failures.is_empty(),
+            "malformed state file must yield default State"
+        );
+    }
+
     #[test]
     fn in_memory_store_roundtrip() {
         let store = InMemoryStateStore::new();
