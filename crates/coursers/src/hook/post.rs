@@ -67,7 +67,9 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
     // Check for suggestion acceptance on exit 0.
     if exit_code == 0 {
         if let Some(session_id) = payload.session_id.as_deref() {
-            capture.mark_accepted(session_id, command, exit_code);
+            capture
+                .mark_accepted(session_id, command, exit_code)
+                .unwrap_or_else(|e| eprintln!("[coursers] warning: failed to mark accepted: {e}"));
         }
         return;
     }
@@ -76,15 +78,26 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
         return;
     }
 
-    let config = loader.load();
+    let config = loader.load().unwrap_or_else(|e| {
+        eprintln!("[coursers] warning: failed to load rules: {e}");
+        crs_core::rules::RulesConfig {
+            rules: vec![],
+            failure_learning: crs_core::rules::FailureLearning::default(),
+        }
+    });
     let fl = &config.failure_learning;
     if !fl.enabled {
         return;
     }
 
-    let st = store.load();
+    let st = store.load().unwrap_or_else(|e| {
+        eprintln!("[coursers] warning: failed to load state: {e}");
+        crs_core::state::State::default()
+    });
     let st = state::record_failure(st, command, fl);
-    store.save(&st);
+    store
+        .save(&st)
+        .unwrap_or_else(|e| eprintln!("[coursers] warning: failed to save state: {e}"));
 }
 
 #[allow(dead_code)]

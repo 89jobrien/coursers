@@ -1,3 +1,4 @@
+use crate::error::CourserError;
 use serde::Deserialize;
 use std::path::PathBuf;
 
@@ -67,7 +68,7 @@ impl FiltersConfig {
 
 /// Port: abstracts how filter configuration is loaded.
 pub trait FiltersLoader {
-    fn load(&self) -> FiltersConfig;
+    fn load(&self) -> Result<FiltersConfig, CourserError>;
     fn filters_path(&self) -> Option<PathBuf>;
 }
 
@@ -78,10 +79,14 @@ pub trait FiltersLoader {
 pub struct FsFiltersLoader;
 
 impl FiltersLoader for FsFiltersLoader {
-    fn load(&self) -> FiltersConfig {
-        self.filters_path()
-            .map(|p| FiltersConfig::load_from(&p))
-            .unwrap_or_default()
+    fn load(&self) -> Result<FiltersConfig, CourserError> {
+        match self.filters_path() {
+            Some(p) => {
+                let content = std::fs::read_to_string(&p).map_err(CourserError::Io)?;
+                toml::from_str(&content).map_err(CourserError::Toml)
+            }
+            None => Ok(FiltersConfig::default()),
+        }
     }
 
     fn filters_path(&self) -> Option<PathBuf> {
@@ -96,8 +101,8 @@ pub struct InMemoryFiltersLoader(pub FiltersConfig);
 
 #[cfg(any(test, feature = "testing"))]
 impl FiltersLoader for InMemoryFiltersLoader {
-    fn load(&self) -> FiltersConfig {
-        self.0.clone()
+    fn load(&self) -> Result<FiltersConfig, CourserError> {
+        Ok(self.0.clone())
     }
 
     fn filters_path(&self) -> Option<PathBuf> {
@@ -136,7 +141,7 @@ pub fn filters_path() -> Option<PathBuf> {
 
 /// Load the active filters config (project-local wins over global).
 pub fn load() -> FiltersConfig {
-    FsFiltersLoader.load()
+    FsFiltersLoader.load().unwrap_or_default()
 }
 
 /// Find the first matching filter rule for `command`.

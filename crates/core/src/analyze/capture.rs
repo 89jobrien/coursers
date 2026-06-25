@@ -10,6 +10,7 @@
 //! `~/.config/coursers/suggestions.jsonl`. Dedup key is `(original, suggestion)`;
 //! duplicates increment `count` and upgrade `accepted` from false → true.
 
+use crate::error::CourserError;
 use fd_lock::RwLock as FdRwLock;
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, Write};
@@ -125,8 +126,13 @@ impl DedupeKey {
 // ---------------------------------------------------------------------------
 
 pub trait CaptureStore {
-    fn record(&self, record: SuggestionRecord);
-    fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64);
+    fn record(&self, record: SuggestionRecord) -> Result<(), CourserError>;
+    fn mark_accepted(
+        &self,
+        session_id: &str,
+        command: &str,
+        exit_code: i64,
+    ) -> Result<(), CourserError>;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,11 +166,17 @@ impl Default for InMemoryCaptureStore {
 
 #[cfg(any(test, feature = "testing"))]
 impl CaptureStore for InMemoryCaptureStore {
-    fn record(&self, record: SuggestionRecord) {
+    fn record(&self, record: SuggestionRecord) -> Result<(), CourserError> {
         self.inner.borrow_mut().push(record);
+        Ok(())
     }
 
-    fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
+    fn mark_accepted(
+        &self,
+        session_id: &str,
+        command: &str,
+        exit_code: i64,
+    ) -> Result<(), CourserError> {
         let mut records = self.inner.borrow_mut();
         for r in records.iter_mut() {
             if r.accepted {
@@ -180,6 +192,7 @@ impl CaptureStore for InMemoryCaptureStore {
             r.accepted_ts = Some(now_iso8601());
             r.exit_code = Some(exit_code);
         }
+        Ok(())
     }
 }
 
@@ -306,12 +319,19 @@ impl SuggestionStore {
 }
 
 impl CaptureStore for SuggestionStore {
-    fn record(&self, record: SuggestionRecord) {
+    fn record(&self, record: SuggestionRecord) -> Result<(), CourserError> {
         self.do_record(record);
+        Ok(())
     }
 
-    fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
+    fn mark_accepted(
+        &self,
+        session_id: &str,
+        command: &str,
+        exit_code: i64,
+    ) -> Result<(), CourserError> {
         self.do_mark_accepted(session_id, command, exit_code);
+        Ok(())
     }
 }
 

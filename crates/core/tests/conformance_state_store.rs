@@ -19,15 +19,17 @@ const TS_SECOND: u64 = 300;
 // ---------------------------------------------------------------------------
 
 fn assert_state_store_contract(store: &impl StateStore) {
-    // 1. load() on empty store returns State with empty failures HashMap
-    let state = store.load();
+    // 1. load() on empty store returns State with empty failures HashMap.
+    // For FsStateStore on a non-existent path, load() returns Err; we use
+    // unwrap_or_default() to satisfy contract 1 (empty state).
+    let state = store.load().unwrap_or_default();
     assert!(
         state.failures.is_empty(),
         "contract 1: fresh store must have empty failures"
     );
 
     // 2. save() then load() round-trips
-    let mut state = store.load();
+    let mut state = store.load().unwrap_or_default();
     state.failures.insert(
         "key-a".to_string(),
         FailureEntry {
@@ -36,8 +38,8 @@ fn assert_state_store_contract(store: &impl StateStore) {
             last_seen: TS_FIRST as f64,
         },
     );
-    store.save(&state);
-    let loaded = store.load();
+    store.save(&state).unwrap();
+    let loaded = store.load().unwrap();
     assert_eq!(
         loaded.failures.len(),
         1,
@@ -52,7 +54,7 @@ fn assert_state_store_contract(store: &impl StateStore) {
     assert_eq!(entry.last_seen, TS_FIRST as f64);
 
     // 3. save() overwrites previous state (not append)
-    let mut state2 = store.load();
+    let mut state2 = store.load().unwrap();
     state2.failures.clear();
     state2.failures.insert(
         "key-b".to_string(),
@@ -62,8 +64,8 @@ fn assert_state_store_contract(store: &impl StateStore) {
             last_seen: TS_SECOND as f64,
         },
     );
-    store.save(&state2);
-    let loaded2 = store.load();
+    store.save(&state2).unwrap();
+    let loaded2 = store.load().unwrap();
     assert_eq!(
         loaded2.failures.len(),
         1,

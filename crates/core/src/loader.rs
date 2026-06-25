@@ -1,15 +1,16 @@
+use crate::error::CourserError;
 use crate::rules::{RulesConfig, load as fs_load};
 
 pub trait RulesLoader {
-    fn load(&self) -> RulesConfig;
+    fn load(&self) -> Result<RulesConfig, CourserError>;
 }
 
 /// Loads rules from the filesystem (COURSERS_RULES env var or default path).
 pub struct FsRulesLoader;
 
 impl RulesLoader for FsRulesLoader {
-    fn load(&self) -> RulesConfig {
-        fs_load()
+    fn load(&self) -> Result<RulesConfig, CourserError> {
+        Ok(fs_load())
     }
 }
 
@@ -20,14 +21,9 @@ pub struct ProfileFsRulesLoader {
 }
 
 impl RulesLoader for ProfileFsRulesLoader {
-    fn load(&self) -> RulesConfig {
-        std::fs::read_to_string(&self.path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_else(|| RulesConfig {
-                rules: vec![],
-                failure_learning: crate::rules::FailureLearning::default(),
-            })
+    fn load(&self) -> Result<RulesConfig, CourserError> {
+        let content = std::fs::read_to_string(&self.path).map_err(CourserError::Io)?;
+        serde_json::from_str(&content).map_err(CourserError::Json)
     }
 }
 
@@ -38,8 +34,8 @@ pub struct InMemoryRulesLoader(pub RulesConfig);
 
 #[cfg(any(test, feature = "testing"))]
 impl RulesLoader for InMemoryRulesLoader {
-    fn load(&self) -> RulesConfig {
-        self.0.clone()
+    fn load(&self) -> Result<RulesConfig, CourserError> {
+        Ok(self.0.clone())
     }
 }
 
@@ -47,6 +43,13 @@ impl RulesLoader for InMemoryRulesLoader {
 mod tests {
     use super::*;
     use crate::rules::{FailureLearning, Rule, RulesConfig};
+
+    fn empty_rules() -> RulesConfig {
+        RulesConfig {
+            rules: vec![],
+            failure_learning: FailureLearning::default(),
+        }
+    }
 
     #[test]
     fn in_memory_loader_returns_its_config() {
@@ -64,7 +67,7 @@ mod tests {
             failure_learning: FailureLearning::default(),
         };
         let loader = InMemoryRulesLoader(config.clone());
-        let loaded = loader.load();
+        let loaded = loader.load().unwrap();
         assert_eq!(loaded.rules.len(), 1);
         assert_eq!(loaded.rules[0].id, "test-rule");
         assert_eq!(loaded.rules[0].pattern, r"\bgrep\b");
@@ -72,32 +75,26 @@ mod tests {
 
     #[test]
     fn in_memory_loader_empty_config() {
-        let config = RulesConfig {
-            rules: vec![],
-            failure_learning: FailureLearning::default(),
-        };
-        let loader = InMemoryRulesLoader(config);
-        let loaded = loader.load();
+        let loader = InMemoryRulesLoader(empty_rules());
+        let loaded = loader.load().unwrap();
         assert!(loaded.rules.is_empty());
     }
 
     #[test]
     fn fs_loader_returns_default_on_missing_file() {
-        // Set COURSERS_RULES to a nonexistent path
         unsafe { std::env::set_var("COURSERS_RULES", "/nonexistent/rules.json") };
         let loader = FsRulesLoader;
-        let config = loader.load();
+        let config = loader.load().unwrap_or_else(|_| empty_rules());
         unsafe { std::env::remove_var("COURSERS_RULES") };
         assert!(config.rules.is_empty());
     }
 
     #[test]
-    fn profile_fs_loader_returns_default_on_missing_file() {
+    fn profile_fs_loader_returns_err_on_missing_file() {
         let loader = ProfileFsRulesLoader {
             path: std::path::PathBuf::from("/nonexistent/profile-rules.json"),
         };
-        let config = loader.load();
-        assert!(config.rules.is_empty());
+        assert!(loader.load().is_err());
     }
 
     #[test]
@@ -112,23 +109,22 @@ mod tests {
         let loader = ProfileFsRulesLoader {
             path: f.path().to_path_buf(),
         };
-        let config = loader.load();
+        let config = loader.load().unwrap();
         assert!(!config.failure_learning.enabled);
     }
 
-    /// Conformance test: malformed rules.json must return empty config, never panic.
+    /// Conformance test: malformed rules.json must return Err, never panic.
     #[test]
-    fn fs_rules_loader_returns_default_on_malformed_json() {
+    fn fs_rules_loader_returns_err_on_malformed_json() {
         use std::io::Write;
         let mut f = tempfile::NamedTempFile::new().unwrap();
-        write!(f, "{{invalid json!!").unwrap();
+        write!(f, "{{").unwrap();
+        write!(f, "invalid json!!").unwrap();
         let loader = ProfileFsRulesLoader {
             path: f.path().to_path_buf(),
         };
-        let config = loader.load();
-        assert!(
-            config.rules.is_empty(),
-            "malformed rules.json must yield an empty rules vec"
-        );
+        let result = loader.load();
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), CourserError::Json(_)));
     }
 }

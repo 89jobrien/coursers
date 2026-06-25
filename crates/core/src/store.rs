@@ -1,12 +1,13 @@
 use std::path::{Path, PathBuf};
 
 use crate::config::state_path_default;
+use crate::error::CourserError;
 use crate::rules::FailureLearning;
 use crate::state::State;
 
 pub trait StateStore {
-    fn load(&self) -> State;
-    fn save(&self, state: &State);
+    fn load(&self) -> Result<State, CourserError>;
+    fn save(&self, state: &State) -> Result<(), CourserError>;
 }
 
 /// Resolve the state file path from `FailureLearning` config.
@@ -29,32 +30,28 @@ pub struct FsStateStore {
 }
 
 impl FsStateStore {
-    /// Load state from a file path. Returns default on missing or malformed file.
-    fn load_from(path: &Path) -> State {
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+    /// Load state from a file path. Returns `Err` on I/O or JSON failure.
+    fn load_from(path: &Path) -> Result<State, CourserError> {
+        let content = std::fs::read_to_string(path).map_err(CourserError::Io)?;
+        serde_json::from_str(&content).map_err(CourserError::Json)
     }
 
     /// Atomically save state to a file path via tmp+rename.
-    fn save_to(path: &Path, state: &State) {
+    fn save_to(path: &Path, state: &State) -> Result<(), CourserError> {
         let tmp = path.with_extension("json.tmp");
-        if let Ok(json) = serde_json::to_string_pretty(state)
-            && std::fs::write(&tmp, json).is_ok()
-        {
-            let _ = std::fs::rename(&tmp, path);
-        }
+        let json = serde_json::to_string_pretty(state).map_err(CourserError::Json)?;
+        std::fs::write(&tmp, json).map_err(CourserError::Io)?;
+        std::fs::rename(&tmp, path).map_err(CourserError::Io)
     }
 }
 
 impl StateStore for FsStateStore {
-    fn load(&self) -> State {
+    fn load(&self) -> Result<State, CourserError> {
         Self::load_from(&self.path)
     }
 
-    fn save(&self, state: &State) {
-        Self::save_to(&self.path, state);
+    fn save(&self, state: &State) -> Result<(), CourserError> {
+        Self::save_to(&self.path, state)
     }
 }
 
@@ -92,12 +89,13 @@ impl Default for InMemoryStateStore {
 
 #[cfg(any(test, feature = "testing"))]
 impl StateStore for InMemoryStateStore {
-    fn load(&self) -> State {
-        self.inner.borrow().clone()
+    fn load(&self) -> Result<State, CourserError> {
+        Ok(self.inner.borrow().clone())
     }
 
-    fn save(&self, state: &State) {
+    fn save(&self, state: &State) -> Result<(), CourserError> {
         *self.inner.borrow_mut() = state.clone();
+        Ok(())
     }
 }
 
@@ -108,26 +106,25 @@ mod tests {
     // TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses
     // serialization locks (ENV_LOCK) rather than RAII isolation. Refactor to use
     // `temp_env::with_var` for cleaner, panic-safe env isolation in all test files.
-    /// Conformance test: malformed state JSON must return State::default(), never panic.
+
+    /// Conformance test: malformed state JSON must return Err, never panic.
     #[test]
-    fn fs_state_store_returns_default_on_malformed_json() {
+    fn fs_state_store_returns_err_on_malformed_json() {
         use std::io::Write;
         let mut f = tempfile::NamedTempFile::new().unwrap();
-        write!(f, "{{bad: json").unwrap();
+        f.write_all(b"{bad: json").unwrap();
         let store = FsStateStore {
             path: f.path().to_path_buf(),
         };
-        let state = store.load();
-        assert!(
-            state.failures.is_empty(),
-            "malformed state file must yield default State"
-        );
+        let result = store.load();
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), CourserError::Json(_)));
     }
 
     #[test]
     fn in_memory_store_roundtrip() {
         let store = InMemoryStateStore::new();
-        let mut state = store.load();
+        let mut state = store.load().unwrap();
         assert!(state.failures.is_empty());
 
         state.failures.insert(
@@ -138,9 +135,9 @@ mod tests {
                 last_seen: 1.0,
             },
         );
-        store.save(&state);
+        store.save(&state).unwrap();
 
-        let loaded = store.load();
+        let loaded = store.load().unwrap();
         assert_eq!(loaded.failures.len(), 1);
         assert!(loaded.failures.contains_key("key"));
     }

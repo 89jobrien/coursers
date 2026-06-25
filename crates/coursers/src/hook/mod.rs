@@ -51,7 +51,13 @@ pub fn hook_context() -> Option<(
 
     let payload = read_stdin()?;
     let loader = FsRulesLoader;
-    let config = loader.load();
+    let config = loader.load().unwrap_or_else(|e| {
+        eprintln!("[coursers] warning: failed to load rules: {e}");
+        crs_core::rules::RulesConfig {
+            rules: vec![],
+            failure_learning: crs_core::rules::FailureLearning::default(),
+        }
+    });
     let path = state_path(&config.failure_learning);
     let store = FsStateStore { path };
     let capture = SuggestionStore::new(SuggestionStore::default_path());

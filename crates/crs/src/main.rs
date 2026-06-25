@@ -1151,7 +1151,13 @@ fn cmd_validate(profile_cfg: &crs_core::config::ProfileConfig) {
         ),
     ];
 
-    let config = load_rules();
+    let config = load_rules().unwrap_or_else(|e| {
+        eprintln!("[crs] warning: failed to load rules: {e}");
+        crs_core::rules::RulesConfig {
+            rules: vec![],
+            failure_learning: crs_core::rules::FailureLearning::default(),
+        }
+    });
     let mut any_fail = false;
 
     println!("CRS Validate — Rule Health Check");
@@ -1268,7 +1274,13 @@ fn cmd_probe(profile_cfg: &crs_core::config::ProfileConfig) {
         std::process::exit(1);
     }
 
-    let config = load_rules();
+    let config = load_rules().unwrap_or_else(|e| {
+        eprintln!("[crs] warning: failed to load rules: {e}");
+        crs_core::rules::RulesConfig {
+            rules: vec![],
+            failure_learning: crs_core::rules::FailureLearning::default(),
+        }
+    });
 
     println!("Command: {command}");
     println!("{}", "─".repeat(60));
@@ -1372,7 +1384,14 @@ fn cmd_discover(
     let rules_cfg = ProfileFsRulesLoader {
         path: profile_cfg.rules_path.clone(),
     }
-    .load();
+    .load()
+    .unwrap_or_else(|e| {
+        eprintln!("[crs] warning: failed to load rules: {e}");
+        crs_core::rules::RulesConfig {
+            rules: vec![],
+            failure_learning: crs_core::rules::FailureLearning::default(),
+        }
+    });
     let opts = DiscoverOpts {
         limit,
         since_days: Some(since),
@@ -1811,7 +1830,14 @@ fn cmd_suggest(
     let rules_cfg = ProfileFsRulesLoader {
         path: profile_cfg.rules_path.clone(),
     }
-    .load();
+    .load()
+    .unwrap_or_else(|e| {
+        eprintln!("[crs] warning: failed to load rules: {e}");
+        crs_core::rules::RulesConfig {
+            rules: vec![],
+            failure_learning: crs_core::rules::FailureLearning::default(),
+        }
+    });
     let opts = DiscoverOpts {
         limit,
         since_days: Some(since),
@@ -1863,7 +1889,10 @@ fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
     let stats = load_stats(&stats_p);
 
     let state_p = state_path(&rules_cfg.failure_learning);
-    let state = FsStateStore { path: state_p }.load();
+    let state = FsStateStore { path: state_p }.load().unwrap_or_else(|e| {
+        eprintln!("[crs] warning: failed to load state: {e}");
+        crs_core::state::State::default()
+    });
 
     // Build per-rule history from stats last_seen + failure state entries
     #[derive(serde::Serialize)]
@@ -1948,7 +1977,11 @@ fn cmd_export(out_path: Option<&str>) {
     let state = FsStateStore {
         path: state_path(&rules_cfg.failure_learning),
     }
-    .load();
+    .load()
+    .unwrap_or_else(|e| {
+        eprintln!("[crs] warning: failed to load state: {e}");
+        crs_core::state::State::default()
+    });
 
     let snapshot = serde_json::json!({
         "exported_at": chrono::Local::now().to_rfc3339(),

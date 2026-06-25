@@ -9,7 +9,7 @@ use crs_core::rules::{FailureLearning, Rule, RulesConfig};
 
 fn assert_rules_loader_contract(loader: &impl RulesLoader, expected_rule_count: usize) {
     // 1. load() returns a valid RulesConfig
-    let config = loader.load();
+    let config = loader.load().unwrap();
     assert_eq!(
         config.rules.len(),
         expected_rule_count,
@@ -17,7 +17,7 @@ fn assert_rules_loader_contract(loader: &impl RulesLoader, expected_rule_count: 
     );
 
     // 2. load() is idempotent — calling twice returns same data
-    let config2 = loader.load();
+    let config2 = loader.load().unwrap();
     assert_eq!(
         config.rules.len(),
         config2.rules.len(),
@@ -68,7 +68,7 @@ fn in_memory_loader_satisfies_contract_with_rules() {
     assert_rules_loader_contract(&loader, 2);
 
     // Verify field fidelity
-    let loaded = loader.load();
+    let loaded = loader.load().unwrap();
     assert_eq!(loaded.rules[0].id, "no-grep");
     assert_eq!(loaded.rules[0].exceptions.len(), 1);
     assert_eq!(loaded.rules[1].id, "no-cat");
@@ -98,7 +98,7 @@ fn in_memory_loader_returns_exact_config() {
         },
     };
     let loader = InMemoryRulesLoader(config);
-    let loaded = loader.load();
+    let loaded = loader.load().unwrap();
     assert!(!loaded.rules[0].enabled);
     assert_eq!(loaded.rules[0].pattern_flags, "i");
     assert!(!loaded.failure_learning.enabled);

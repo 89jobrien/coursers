@@ -37,8 +37,12 @@ fn assert_mark_accepted_contract(store: &InMemoryCaptureStore) {
     // -----------------------------------------------------------------------
     // 3. Correct session + suggestion → accepted
     // -----------------------------------------------------------------------
-    store.record(make_record("grep a .", "rg a .", "sess-A"));
-    store.mark_accepted("sess-A", "rg a .", 0);
+    store
+        .record(make_record("grep a .", "rg a .", "sess-A"))
+        .unwrap_or_default();
+    store
+        .mark_accepted("sess-A", "rg a .", 0)
+        .unwrap_or_default();
     let recs = store.records();
     assert_eq!(recs.len(), 1, "contract 3: expected 1 record");
     assert!(recs[0].accepted, "contract 3: record should be accepted");
@@ -51,8 +55,12 @@ fn assert_mark_accepted_contract(store: &InMemoryCaptureStore) {
     // -----------------------------------------------------------------------
     // 4. Wrong session_id → no mutation (use a fresh unaccepted record)
     // -----------------------------------------------------------------------
-    store.record(make_record("find . -name x", "fd x", "sess-B"));
-    store.mark_accepted("sess-WRONG", "fd x", 0);
+    store
+        .record(make_record("find . -name x", "fd x", "sess-B"))
+        .unwrap_or_default();
+    store
+        .mark_accepted("sess-WRONG", "fd x", 0)
+        .unwrap_or_default();
     let recs = store.records();
     let fd_rec = recs
         .iter()
@@ -66,8 +74,12 @@ fn assert_mark_accepted_contract(store: &InMemoryCaptureStore) {
     // -----------------------------------------------------------------------
     // 5. Wrong command → no mutation
     // -----------------------------------------------------------------------
-    store.record(make_record("cat file.txt", "bat file.txt", "sess-C"));
-    store.mark_accepted("sess-C", "totally-wrong-command", 0);
+    store
+        .record(make_record("cat file.txt", "bat file.txt", "sess-C"))
+        .unwrap_or_default();
+    store
+        .mark_accepted("sess-C", "totally-wrong-command", 0)
+        .unwrap_or_default();
     let recs = store.records();
     let cat_rec = recs
         .iter()
@@ -79,10 +91,12 @@ fn assert_mark_accepted_contract(store: &InMemoryCaptureStore) {
     );
 
     // -----------------------------------------------------------------------
-    // 6. Already accepted → second mark_accepted stays true (idempotent)
+    // 6. Already accepted → second mark_accepted() is idempotent (stays true)
     // -----------------------------------------------------------------------
     // Record from contract 3 is already accepted. Call mark_accepted again.
-    store.mark_accepted("sess-A", "rg a .", 99);
+    store
+        .mark_accepted("sess-A", "rg a .", 99)
+        .unwrap_or_default();
     let recs = store.records();
     let rg_rec = recs
         .iter()
@@ -102,6 +116,8 @@ fn assert_mark_accepted_contract(store: &InMemoryCaptureStore) {
 
 // ---------------------------------------------------------------------------
 // SuggestionStore: full 6-point contract including dedup (contract 1+2)
+// Uses the concrete direct methods (non-trait) on SuggestionStore which
+// return () — these are the public fire-and-forget wrappers.
 // ---------------------------------------------------------------------------
 
 fn assert_fs_store_contract(store: &SuggestionStore) {

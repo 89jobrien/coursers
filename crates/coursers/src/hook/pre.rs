@@ -104,7 +104,13 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
         _ => return,
     };
 
-    let config = loader.load();
+    let config = loader.load().unwrap_or_else(|e| {
+        eprintln!("[coursers] warning: failed to load rules: {e}");
+        crs_core::rules::RulesConfig {
+            rules: vec![],
+            failure_learning: crs_core::rules::FailureLearning::default(),
+        }
+    });
     let fl = &config.failure_learning;
 
     // 1. Predefined rules
@@ -121,14 +127,16 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
                     .map(|p| p.display().to_string())
             })
             .unwrap_or_default();
-        capture.record(crs_core::capture::SuggestionRecord::new(
-            command,
-            &msg,
-            &rule_id,
-            cwd,
-            payload.session_id.clone(),
-            payload.tool_name.as_deref().unwrap_or("Bash"),
-        ));
+        capture
+            .record(crs_core::capture::SuggestionRecord::new(
+                command,
+                &msg,
+                &rule_id,
+                cwd,
+                payload.session_id.clone(),
+                payload.tool_name.as_deref().unwrap_or("Bash"),
+            ))
+            .unwrap_or_else(|e| eprintln!("[coursers] warning: failed to record suggestion: {e}"));
 
         let full_msg = enrich_message(&rule_id, command, &msg);
         deny(&full_msg);
@@ -136,7 +144,10 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
 
     // 2. Learned failures
     if fl.enabled {
-        let st = store.load();
+        let st = store.load().unwrap_or_else(|e| {
+            eprintln!("[coursers] warning: failed to load state: {e}");
+            crs_core::state::State::default()
+        });
         if let Some(msg) = state::check_learned(command, &st, fl) {
             deny(&msg);
         }
@@ -324,9 +335,9 @@ mod tests {
 
         // Simulate what run_with does on a rule match — record before deny
         for _ in 0..2 {
-            let st = store.load();
+            let st = store.load().unwrap_or_default();
             let st = state::record_failure(st, command, fl);
-            store.save(&st);
+            store.save(&st).unwrap();
         }
 
         assert_eq!(
