@@ -17,7 +17,10 @@ pub fn rules_path() -> PathBuf {
         return PathBuf::from(p);
     }
     dirs::home_dir()
-        .expect("home dir")
+        .unwrap_or_else(|| {
+            eprintln!("[coursers] warning: could not resolve home directory; falling back to /tmp");
+            std::path::PathBuf::from("/tmp")
+        })
         .join(".config/coursers/course-correct-rules.json")
 }
 
@@ -30,7 +33,10 @@ pub fn state_path_default() -> PathBuf {
         return local;
     }
     dirs::home_dir()
-        .expect("home dir")
+        .unwrap_or_else(|| {
+            eprintln!("[coursers] warning: could not resolve home directory; falling back to /tmp");
+            std::path::PathBuf::from("/tmp")
+        })
         .join(".config/coursers/course-correct-state.json")
 }
 
@@ -93,7 +99,10 @@ impl ConfigBuilder {
     }
 
     pub fn build(self) -> ProfileConfig {
-        let home = dirs::home_dir().expect("home dir");
+        let home = dirs::home_dir().unwrap_or_else(|| {
+            eprintln!("[coursers] warning: could not resolve home directory; falling back to /tmp");
+            std::path::PathBuf::from("/tmp")
+        });
         let base = home.join(".config/coursers");
 
         let (default_rules, default_global_state, default_local_state) =

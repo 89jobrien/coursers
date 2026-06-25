@@ -85,9 +85,12 @@ pub fn load() -> RulesConfig {
             failure_learning: FailureLearning::default(),
         };
     };
-    serde_json::from_str(&content).unwrap_or(RulesConfig {
-        rules: vec![],
-        failure_learning: FailureLearning::default(),
+    serde_json::from_str(&content).unwrap_or_else(|e| {
+        eprintln!("[coursers] warning: failed to parse rules config: {e}");
+        RulesConfig {
+            rules: vec![],
+            failure_learning: FailureLearning::default(),
+        }
     })
 }
 
@@ -728,5 +731,30 @@ mod tests {
             prop_assert_eq!(id.is_some(), chk.is_some(),
                 "Disagreement on: {}", cmd);
         }
+    }
+
+    // ── parse-failure fallback (finding #3) ──────────────────────────────
+
+    /// Verify that `load()` returns an empty `RulesConfig` when the rules file
+    /// contains malformed JSON.  The warning is emitted to stderr (observable in
+    /// integration tests); here we assert the safe-default behavior.
+    #[test]
+    fn malformed_rules_json_returns_empty_config() {
+        use std::io::Write as _;
+        let mut tmp = tempfile::NamedTempFile::new().expect("tmp file");
+        write!(tmp, "this is not {{ valid json").expect("write");
+        // Point the loader at our malformed file via env var.
+        let prev = std::env::var("COURSERS_RULES").ok();
+        unsafe { std::env::set_var("COURSERS_RULES", tmp.path()) };
+        let cfg = super::load();
+        match prev {
+            Some(v) => unsafe { std::env::set_var("COURSERS_RULES", v) },
+            None => unsafe { std::env::remove_var("COURSERS_RULES") },
+        }
+        assert!(
+            cfg.rules.is_empty(),
+            "expected empty rules on malformed JSON, got {} rules",
+            cfg.rules.len()
+        );
     }
 }

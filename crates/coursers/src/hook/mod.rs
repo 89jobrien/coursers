@@ -176,4 +176,21 @@ mod tests {
             "malformed stdin must deserialize to None, triggering allow passthrough"
         );
     }
+
+    /// Verify that `read_stdin` returns `None` on malformed input (finding #4).
+    /// Hooks treat `None` as passthrough (allow) — non-blocking contract.
+    #[test]
+    fn read_stdin_returns_none_on_malformed_json() {
+        let malformed = "{ this is not valid json }";
+        let result: Option<HookPayload> = serde_json::from_str(malformed)
+            .map_err(|e| {
+                eprintln!("[coursers] warning: failed to parse stdin as hook payload: {e}");
+                e
+            })
+            .ok();
+        assert!(
+            result.is_none(),
+            "malformed payload must yield None (non-blocking passthrough)"
+        );
+    }
 }
