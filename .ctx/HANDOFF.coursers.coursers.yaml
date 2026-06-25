@@ -1,89 +1,25 @@
 project: coursers
 id: coursers
 updated: 2026-06-25
-items:
-  - id: uncommitted-work
-    doob_uuid: null
-    name: uncommitted-work
-    priority: P1
-    status: open
-    title: Uncommitted changes (35 files)
-    description: |-
-      Working tree has uncommitted changes:
-      .ctx/HANDOFF.coursers.coursers.yaml
-      .ctx/HANDOFF.tools.yaml
-      .gitignore
-      CLAUDE.md
-      Cargo.lock
-      Cargo.toml
-      crates/core/src/analyze/history.rs
-      crates/core/src/analyze/insights.rs
-      crates/core/src/analyze/stats.rs
-      crates/core/src/config.rs
-      crates/core/src/lib.rs
-      crates/core/src/store.rs
-      crates/core/tests/conformance_state_store.rs
-      crates/core/tests/property_tests.rs
-      crates/coursers/src/hook/pre.rs
-      crates/coursers/tests/common.rs
-      crates/crs/Cargo.toml
-      crates/crs/src/jsonl_source.rs
-      crates/crs/src/lib.rs
-      crates/crs/src/main.rs
-      crates/crs/src/obfsck/process.rs
-      crates/crs/tests/common_bin.rs
-      crates/crs/tests/discover_integration.rs
-      crates/e2e/tests/scenarios.rs
-      fuzz/Cargo.toml
-      scripts/enrich-handoff.sh
-      scripts/smoke.nu
-      .codex/
-      .sccignore
-      AGENTS.md
-      agents/INDEX.md
-      crates/crs/src/nu_check/
-      crates/crs/tests/nu_check_binary.rs
-      docs/plans/
-      fuzz/fuzz_targets/fuzz_jsonl_parse.rs
-    files:
-      - .ctx/HANDOFF.coursers.coursers.yaml
-      - .ctx/HANDOFF.tools.yaml
-      - .gitignore
-      - CLAUDE.md
-      - Cargo.lock
-      - Cargo.toml
-      - crates/core/src/analyze/history.rs
-      - crates/core/src/analyze/insights.rs
-      - crates/core/src/analyze/stats.rs
-      - crates/core/src/config.rs
-      - crates/core/src/lib.rs
-      - crates/core/src/store.rs
-      - crates/core/tests/conformance_state_store.rs
-      - crates/core/tests/property_tests.rs
-      - crates/coursers/src/hook/pre.rs
-      - crates/coursers/tests/common.rs
-      - crates/crs/Cargo.toml
-      - crates/crs/src/jsonl_source.rs
-      - crates/crs/src/lib.rs
-      - crates/crs/src/main.rs
-      - crates/crs/src/obfsck/process.rs
-      - crates/crs/tests/common_bin.rs
-      - crates/crs/tests/discover_integration.rs
-      - crates/e2e/tests/scenarios.rs
-      - fuzz/Cargo.toml
-      - scripts/enrich-handoff.sh
-      - scripts/smoke.nu
-      - .codex/
-      - .sccignore
-      - AGENTS.md
-      - agents/INDEX.md
-      - crates/crs/src/nu_check/
-      - crates/crs/tests/nu_check_binary.rs
-      - docs/plans/
-      - fuzz/fuzz_targets/fuzz_jsonl_parse.rs
-    completed: null
-    extra: []
+items: []
 log:
+  - date: "20260625"
+    summary: |
+      MoA review pipeline: 5-lens parallel analysis of error handling gaps. Scaffolded
+      crates/xtask with cargo xtask build and cargo xtask ci. Introduced CourserError enum
+      in crs-core with 8 From impls for external types. Updated all trait methods
+      (RulesLoader, StateStore, CaptureStore, FiltersLoader) to return Result<T,
+      CourserError>. Replaced .expect("home dir") panics and .unwrap() in deny() with
+      graceful fallbacks + stderr warnings. Added 3 conformance tests for malformed
+      JSON/stdin/state error paths. Added doc comments to 35 previously undocumented
+      public API items (coverage 46.1% → 62.1%). All changes pushed to main; 470/470
+      tests passing, clippy clean.
+    commits:
+      - eb81b26
+      - 6e7741e
+      - c257d1b
+      - da204f3
+      - 213b9af
   - date: "null"
     summary: Tackled GitHub issues
     commits: []
