@@ -4,6 +4,7 @@ members = [
     "crates/coursers",
     "crates/crs",
     "crates/e2e",
+    "crates/xtask",
 ]
 resolver = "3"
 
