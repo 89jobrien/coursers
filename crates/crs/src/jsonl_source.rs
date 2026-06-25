@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
+/// [`CommandSource`] adapter that walks a directory tree and parses `.jsonl` session files.
 pub struct JsonlCommandSource {
     root: PathBuf,
     all_projects: bool,
@@ -11,6 +12,7 @@ pub struct JsonlCommandSource {
 }
 
 impl JsonlCommandSource {
+    /// Create a new source rooted at `root`. Pass `all_projects: true` to skip cwd filtering.
     pub fn new(root: PathBuf, all_projects: bool, current_dir: Option<PathBuf>) -> Self {
         Self {
             root,

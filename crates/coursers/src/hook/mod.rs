@@ -14,6 +14,7 @@ pub struct HookPayload {
     pub cwd: Option<String>,
 }
 
+/// The `tool_input` field of a Claude Code hook payload.
 #[derive(Debug, Deserialize)]
 pub struct ToolInput {
     pub command: Option<String>,
@@ -26,6 +27,7 @@ pub struct PreResponse {
     pub hook_specific_output: HookSpecificOutput,
 }
 
+/// Inner payload of a `PreToolUse` permission response.
 #[derive(Debug, Serialize)]
 pub struct HookSpecificOutput {
     #[serde(rename = "hookEventName")]
@@ -90,6 +92,7 @@ pub fn hook_context_with_profile(
     Some((payload, loader, store, capture))
 }
 
+/// Read and deserialize a hook payload from stdin. Returns `None` on malformed input.
 pub fn read_stdin() -> Option<HookPayload> {
     use std::io::Read;
     let mut buf = String::new();
@@ -111,6 +114,7 @@ pub(crate) fn serialize_deny_response(resp: &PreResponse) -> String {
     })
 }
 
+/// Emit a deny response to stdout and exit with code 2.
 pub fn deny(reason: &str) {
     use std::io::Write;
     let resp = PreResponse {

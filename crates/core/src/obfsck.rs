@@ -1,19 +1,21 @@
-/// Domain types and port for obfsck MCP server integration.
-///
-/// `ObfsckMcp` exposes two tools mirroring the obfsck-mcp JSON-RPC protocol:
-///   - `audit`            — pipe text, get pattern hit counts back
-///   - `generate_filters` — given example strings, suggest filter patterns
+//! Domain types and port for obfsck MCP server integration.
+//!
+//! `ObfsckMcp` exposes two tools mirroring the obfsck-mcp JSON-RPC protocol:
+//!   - `audit`            — pipe text, get pattern hit counts back
+//!   - `generate_filters` — given example strings, suggest filter patterns
 
 // ---------------------------------------------------------------------------
 // Domain types
 // ---------------------------------------------------------------------------
 
+/// A pattern hit returned by the obfsck MCP `audit` tool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuditHit {
     pub label: String,
     pub count: usize,
 }
 
+/// A suggested redaction filter pattern returned by the obfsck MCP `generate_filters` tool.
 #[derive(Debug, Clone)]
 pub struct FilterSuggestion {
     pub pattern: String,
@@ -37,6 +39,7 @@ pub trait ObfsckMcp {
 // Null adapter — used when obfsck-mcp is not on PATH
 // ---------------------------------------------------------------------------
 
+/// Null adapter for [`ObfsckMcp`] — used when `obfsck-mcp` is not on PATH.
 pub struct NullObfsckMcpClient;
 
 impl ObfsckMcp for NullObfsckMcpClient {

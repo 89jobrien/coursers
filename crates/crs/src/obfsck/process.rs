@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 
 use crs_core::obfsck::{AuditHit, FilterSuggestion, ObfsckMcp};
 
+/// Spawns `obfsck-mcp` as a subprocess and communicates via JSON-RPC over stdio.
 pub struct ProcessObfsckMcpClient;
 
 impl ProcessObfsckMcpClient {

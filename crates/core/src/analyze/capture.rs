@@ -125,6 +125,7 @@ impl DedupeKey {
 // CaptureStore trait (port)
 // ---------------------------------------------------------------------------
 
+/// Port for recording and accepting suggestion events.
 pub trait CaptureStore {
     fn record(&self, record: SuggestionRecord) -> Result<(), CourserError>;
     fn mark_accepted(
@@ -139,6 +140,7 @@ pub trait CaptureStore {
 // InMemoryCaptureStore (test double)
 // ---------------------------------------------------------------------------
 
+/// In-memory [`CaptureStore`] for tests — no filesystem I/O.
 #[cfg(any(test, feature = "testing"))]
 pub struct InMemoryCaptureStore {
     inner: std::cell::RefCell<Vec<SuggestionRecord>>,
@@ -200,12 +202,17 @@ impl CaptureStore for InMemoryCaptureStore {
 // Store
 // ---------------------------------------------------------------------------
 
+/// Filesystem-backed store for [`SuggestionRecord`]s.
+///
+/// Records are written as newline-delimited JSON to `path` (typically
+/// `~/.config/coursers/suggestions.jsonl`). Dedup on `(original, suggestion)` key.
 // qual:allow(srp) reason: "LCOM4=3 is acceptable for I/O store with load/save/append"
 pub struct SuggestionStore {
     pub path: PathBuf,
 }
 
 impl SuggestionStore {
+    /// Return the default JSONL path under `$XDG_CONFIG_HOME/coursers/suggestions.jsonl`.
     pub fn default_path() -> PathBuf {
         let base = std::env::var_os("XDG_CONFIG_HOME")
             .map(PathBuf::from)
@@ -215,6 +222,7 @@ impl SuggestionStore {
         base.join("coursers").join("suggestions.jsonl")
     }
 
+    /// Create a store backed by the given JSONL file path.
     pub fn new(path: PathBuf) -> Self {
         Self { path }
     }

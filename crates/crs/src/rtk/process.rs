@@ -8,6 +8,7 @@ use crs_core::rtk::{
     RtkRewrite, RtkSessionEntry, RtkSupportedEntry, RtkUnsupportedEntry, RtkVerifyResult,
 };
 
+/// Shells out to the `rtk` binary to implement [`RtkAnalysis`] and [`RtkRewrite`].
 pub struct ProcessRtkClient;
 
 impl ProcessRtkClient {

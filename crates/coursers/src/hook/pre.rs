@@ -84,6 +84,9 @@ fn file_tree(path: &str) -> String {
 // TODO(coursers-11): coursers-11 (cross-tool block) depends on obfsck-11 and
 // mcpipe-21 in external repos. No local fallback is documented. When those issues
 // are resolved, wire the cross-tool detection here.
+/// Core pre-hook logic, injectable for testing.
+///
+/// Blocks the command with a deny response if it matches a rule and no exception applies.
 // qual:allow(iosp) reason: "integration root — orchestrates rule checks"
 pub fn run_with<L: RulesLoader, S: StateStore>(
     loader: &L,
@@ -154,6 +157,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
     }
 }
 
+/// Default entry point for the `coursers pre` hook.
 #[allow(dead_code)]
 pub fn run() {
     let Some((payload, loader, store, capture)) = super::hook_context() else {

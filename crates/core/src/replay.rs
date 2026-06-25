@@ -6,18 +6,21 @@
 
 use crate::rules::{Rule, check};
 
+/// Outcome of replaying a single command against the active ruleset.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReplayVerdict {
     Blocked { rule_id: String, message: String },
     Pass,
 }
 
+/// A single command and its replay verdict.
 #[derive(Debug, Clone)]
 pub struct ReplayEntry {
     pub command: String,
     pub verdict: ReplayVerdict,
 }
 
+/// Aggregated result of replaying a command list through the ruleset.
 #[derive(Debug, Default)]
 pub struct ReplayReport {
     pub entries: Vec<ReplayEntry>,

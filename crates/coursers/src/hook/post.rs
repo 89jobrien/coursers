@@ -38,6 +38,9 @@ pub(crate) fn should_record(exit_code: i64, command: &str) -> bool {
     !is_excluded(command)
 }
 
+/// Core post-hook logic, injectable for testing.
+///
+/// Records non-zero exit codes to the failure-learning state and logs accepted suggestions.
 pub fn run_with<L: RulesLoader, S: StateStore>(
     loader: &L,
     store: &S,
@@ -100,6 +103,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
         .unwrap_or_else(|e| eprintln!("[coursers] warning: failed to save state: {e}"));
 }
 
+/// Default entry point for the `coursers post` hook.
 #[allow(dead_code)]
 pub fn run() {
     let Some((payload, loader, store, capture)) = super::hook_context() else {

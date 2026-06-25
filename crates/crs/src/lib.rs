@@ -93,6 +93,7 @@ pub enum FilterResult {
     Suppress,
 }
 
+/// Parsed PostToolUse hook payload used by the `crs filter` subcommand.
 pub struct FilterPayload {
     pub command: String,
     pub output: String,

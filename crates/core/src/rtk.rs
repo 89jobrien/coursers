@@ -1,13 +1,14 @@
-/// Domain types and ports for RTK (Rust Token Killer) integration.
-///
-/// Two trait groups follow ISP/capability-group B:
-///   - `RtkAnalysis`  — read-only: discover, gain, session, audit, verify
-///   - `RtkRewrite`   — intercept: rewrite, probe, check, list proxies, flush
+//! Domain types and ports for RTK (Rust Token Killer) integration.
+//!
+//! Two trait groups follow ISP/capability-group B:
+//!   - `RtkAnalysis`  — read-only: discover, gain, session, audit, verify
+//!   - `RtkRewrite`   — intercept: rewrite, probe, check, list proxies, flush
 
 // ---------------------------------------------------------------------------
 // Domain types — RtkAnalysis
 // ---------------------------------------------------------------------------
 
+/// Report produced by `rtk discover`: sessions scanned and supported/unsupported commands.
 #[derive(Debug, Default)]
 pub struct RtkDiscoverReport {
     pub sessions_scanned: u64,
@@ -17,6 +18,7 @@ pub struct RtkDiscoverReport {
     pub unsupported: Vec<RtkUnsupportedEntry>,
 }
 
+/// A command that RTK can rewrite, with savings statistics.
 #[derive(Debug, Default)]
 pub struct RtkSupportedEntry {
     pub command: String,
@@ -27,6 +29,7 @@ pub struct RtkSupportedEntry {
     pub est_savings_pct: f64,
 }
 
+/// A command that RTK does not yet support rewriting.
 #[derive(Debug, Default)]
 pub struct RtkUnsupportedEntry {
     pub base_command: String,
@@ -34,6 +37,7 @@ pub struct RtkUnsupportedEntry {
     pub example: String,
 }
 
+/// Aggregate token-savings report from `rtk gain`.
 #[derive(Debug, Default)]
 pub struct RtkGainReport {
     pub total_commands: u64,
@@ -42,6 +46,7 @@ pub struct RtkGainReport {
     pub by_command: Vec<RtkGainEntry>,
 }
 
+/// Per-command savings breakdown within a [`RtkGainReport`].
 #[derive(Debug, Default)]
 pub struct RtkGainEntry {
     pub command: String,
@@ -50,6 +55,7 @@ pub struct RtkGainEntry {
     pub avg_savings_pct: f64,
 }
 
+/// Per-session RTK adoption statistics.
 #[derive(Debug, Default)]
 pub struct RtkSessionEntry {
     pub id: String,
@@ -59,6 +65,7 @@ pub struct RtkSessionEntry {
     pub output_bytes: u64,
 }
 
+/// Result of `rtk verify`: whether the hook is installed and test counts.
 #[derive(Debug, Default)]
 pub struct RtkVerifyResult {
     pub hook_installed: bool,
@@ -66,11 +73,13 @@ pub struct RtkVerifyResult {
     pub tests_total: u32,
 }
 
+/// Audit of rewrite events recorded by the RTK hook.
 #[derive(Debug, Default)]
 pub struct RtkHookAudit {
     pub rewrites: Vec<RtkAuditEntry>,
 }
 
+/// A single rewrite event captured by the RTK hook.
 #[derive(Debug, Default)]
 pub struct RtkAuditEntry {
     pub original: String,
@@ -82,6 +91,7 @@ pub struct RtkAuditEntry {
 // Domain types — RtkRewrite
 // ---------------------------------------------------------------------------
 
+/// Result of probing a single command through the RTK rewrite engine.
 #[derive(Debug, Default)]
 pub struct RtkProbeResult {
     pub original: String,
@@ -117,6 +127,7 @@ pub trait RtkRewrite {
 // Null adapter — used when rtk is not on PATH; all methods are no-ops
 // ---------------------------------------------------------------------------
 
+/// Null adapter for [`RtkAnalysis`] and [`RtkRewrite`] — all methods are no-ops.
 pub struct NullRtkClient;
 
 impl RtkAnalysis for NullRtkClient {

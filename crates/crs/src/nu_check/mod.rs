@@ -44,6 +44,7 @@ pub struct CheckResult {
 }
 
 impl CheckResult {
+    /// Returns `true` when no errors were found.
     pub fn is_ok(&self) -> bool {
         self.errors.is_empty()
     }
