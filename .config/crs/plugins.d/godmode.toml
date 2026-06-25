@@ -1,0 +1,184 @@
+# godmode hook plugin — consolidates nu hooks into crs pipeline
+# Loaded by: crs hook <event>
+
+# ---------------------------------------------------------------------------
+# PreToolUse / Bash — guards (deny)
+# ---------------------------------------------------------------------------
+
+[[hooks]]
+label = "destructive-guardian/gitea-password-reset"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'gitea\s+admin\s+user\s+(change-password|reset-password|create)'
+action = "deny"
+message = "STOP — Gitea admin credential operation. May set must_change_password=true and break API tokens. Confirm with user first."
+
+[[hooks]]
+label = "destructive-guardian/op-item-edit"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'op\s+item\s+(edit|delete|create|update)'
+action = "deny"
+message = "STOP — 1Password item modification. Permanently modifies or deletes credential store entries. Confirm with user first."
+
+[[hooks]]
+label = "destructive-guardian/docker-passwd"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'docker\s+exec.+passwd\s+|docker\s+exec.+chpasswd'
+action = "deny"
+message = "STOP — Container password change. Changes credentials inside a running container. Confirm with user first."
+
+[[hooks]]
+label = "destructive-guardian/psql-alter-user"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = '(?i)ALTER\s+(USER|ROLE)'
+action = "deny"
+message = "STOP — PostgreSQL user/role modification. Changes database credentials or permissions. Confirm with user first."
+
+[[hooks]]
+label = "destructive-guardian/systemctl-shared"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'systemctl\s+(restart|stop|disable|mask)\s+(gitea|postgres|mysql|nginx|caddy|traefik)'
+action = "deny"
+message = "STOP — Shared service restart/stop. Interrupts a shared infrastructure service. Confirm with user first."
+
+[[hooks]]
+label = "destructive-guardian/git-push-force"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'git\s+push.+--force\b|git\s+push.+-f\b'
+unless = "--force-with-lease"
+action = "deny"
+message = "STOP — Force push (destructive git history rewrite). Use --force-with-lease instead, or confirm with user."
+
+[[hooks]]
+label = "destructive-guardian/drop-database"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = '(?i)DROP\s+(DATABASE|TABLE|SCHEMA)\s+'
+unless = "IF EXISTS test|IF EXISTS dev"
+action = "deny"
+message = "STOP — Database/table drop. Permanently destroys data. Confirm with user first."
+
+# ---------------------------------------------------------------------------
+# PreToolUse / Bash — rewrites
+# ---------------------------------------------------------------------------
+
+[[hooks]]
+label = "nextest-op-wrap"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'cargo nextest'
+unless = "_DEVLOOP_OP_WRAPPED"
+action = "rewrite"
+prepend = "_DEVLOOP_OP_WRAPPED=1"
+
+[[hooks]]
+label = "doob-branch-tagger"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'doob todo add'
+unless = "--tags"
+action = "rewrite"
+inject = "--tags ${GIT_BRANCH_SLUG}"
+
+# ---------------------------------------------------------------------------
+# PreToolUse / Bash — side-effects
+# ---------------------------------------------------------------------------
+
+[[hooks]]
+label = "pre-commit-handoff"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = 'git commit'
+action = "run"
+command = ["hj", "handoff"]
+
+# ---------------------------------------------------------------------------
+# PreToolUse / Edit|Write — guards
+# ---------------------------------------------------------------------------
+
+[[hooks]]
+label = "block-generated/baml-client"
+event = "pre-tool-use"
+matcher = "Edit|Write"
+pattern = 'baml_client/'
+action = "deny"
+message = "Blocked edit to generated file. Edit the source BAML schema and regenerate."
+
+[[hooks]]
+label = "block-generated/pb-rs"
+event = "pre-tool-use"
+matcher = "Edit|Write"
+pattern = '\.pb\.rs$'
+action = "deny"
+message = "Blocked edit to generated protobuf file. Edit the .proto source and regenerate."
+
+[[hooks]]
+label = "block-generated/prost-rs"
+event = "pre-tool-use"
+matcher = "Edit|Write"
+pattern = '\.prost\.rs$'
+action = "deny"
+message = "Blocked edit to generated prost file. Edit the source and regenerate."
+
+[[hooks]]
+label = "block-generated/tonic-rs"
+event = "pre-tool-use"
+matcher = "Edit|Write"
+pattern = '\.tonic\.rs$'
+action = "deny"
+message = "Blocked edit to generated tonic file. Edit the source and regenerate."
+
+[[hooks]]
+label = "block-generated/sqlx"
+event = "pre-tool-use"
+matcher = "Edit|Write"
+pattern = '\.sqlx/'
+action = "deny"
+message = "Blocked edit to sqlx offline query cache. Regenerate with cargo sqlx prepare."
+
+# ---------------------------------------------------------------------------
+# PostToolUse / Bash — side-effects
+# ---------------------------------------------------------------------------
+
+[[hooks]]
+label = "doob-commit-autocomplete"
+event = "post-tool-use"
+matcher = "Bash"
+pattern = 'git commit'
+when = "on-success"
+action = "run"
+command = ["doob", "todo", "complete-from-commit"]
+
+[[hooks]]
+label = "doob-gh-sync"
+event = "post-tool-use"
+matcher = "Bash"
+pattern = 'doob todo (add|complete|remove)'
+when = "on-success"
+action = "run"
+command = ["doob", "todo", "gh-sync"]
+
+[[hooks]]
+label = "nextest-snap-notify"
+event = "post-tool-use"
+matcher = "Bash"
+pattern = 'cargo nextest'
+when = "on-success"
+action = "run"
+command = ["fd", "--extension", "snap.new", "--exclude", "target"]
+capture = true
+
+# ---------------------------------------------------------------------------
+# Lifecycle events
+# ---------------------------------------------------------------------------
+
+[[hooks]]
+label = "stop-handoff"
+event = "stop"
+action = "run"
+command = ["hj", "handoff"]
