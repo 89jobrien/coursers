@@ -516,25 +516,33 @@ mod tests {
         assert!(check("echo grep is useful", &rules).is_some());
     }
 
-    // ── no-sleep-find-work rule ───────────────────────────────────────────
+    // ── no-sleep-find-work rule (sleep + timeout) ────────────────────────
 
     fn sleep_rule() -> Rule {
         Rule {
             id: "no-sleep-find-work".to_string(),
             enabled: true,
-            pattern: r"\bsleep\s+".to_string(),
+            pattern: r"\b(sleep|timeout)\s+".to_string(),
             pattern_flags: String::new(),
-            exceptions: vec![],
-            target_commands: vec!["sleep".to_string()],
+            exceptions: vec![
+                r"timeout\s+--preserve-status\b".to_string(),
+                r"timeout\s+--foreground\b".to_string(),
+                r"timeout\s+.*\bsh\b".to_string(),
+                r"timeout\s+.*\bbash\b".to_string(),
+                r"timeout\s+.*\bnu\b".to_string(),
+            ],
+            target_commands: vec!["sleep".to_string(), "timeout".to_string()],
             message: Some(
-                "Do not sleep. If waiting for a background task, use `run_in_background` \
-                 and you will be notified when it completes. If polling, run the check \
-                 command directly (e.g. `gh run view`). If blocked, find other work."
+                "Do not sleep or wrap commands in timeout as a wait mechanism. \
+                 If waiting for a background task, use `run_in_background` — you will be \
+                 notified when it completes. If polling, run the check command directly \
+                 (e.g. `gh run view`). If blocked, find other productive work to do."
                     .to_string(),
             ),
         }
     }
 
+    // sleep — blocking
     #[test]
     fn sleep_rule_blocks_bare_sleep() {
         assert!(check("sleep 5", &[sleep_rule()]).is_some());
@@ -558,7 +566,6 @@ mod tests {
 
     #[test]
     fn sleep_rule_blocks_sleep_then_command() {
-        // sleep as first segment of a sequential pipeline
         assert!(check_pipeline("sleep 3 && cargo test", &[sleep_rule()]).is_some());
     }
 
@@ -567,9 +574,32 @@ mod tests {
         assert!(check_pipeline("cargo build && sleep 2", &[sleep_rule()]).is_some());
     }
 
+    // timeout — blocking
+    #[test]
+    fn sleep_rule_blocks_timeout_as_wait() {
+        assert!(check("timeout 30 cargo test", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_blocks_timeout_short() {
+        assert!(check("timeout 5 gh run view", &[sleep_rule()]).is_some());
+    }
+
+    #[test]
+    fn sleep_rule_blocks_timeout_in_pipeline() {
+        assert!(check_pipeline("cargo build && timeout 60 cargo test", &[sleep_rule()]).is_some());
+    }
+
+    // message / id
     #[test]
     fn sleep_rule_id_is_correct() {
         let (id, _) = check("sleep 5", &[sleep_rule()]).unwrap();
+        assert_eq!(id, "no-sleep-find-work");
+    }
+
+    #[test]
+    fn sleep_rule_timeout_id_is_correct() {
+        let (id, _) = check("timeout 10 cargo test", &[sleep_rule()]).unwrap();
         assert_eq!(id, "no-sleep-find-work");
     }
 
@@ -582,9 +612,9 @@ mod tests {
         );
     }
 
+    // false positives — must NOT block
     #[test]
     fn sleep_rule_allows_sleep_word_in_test_name() {
-        // target_commands=["sleep"] means argv[0] must be "sleep"; cargo is argv[0] here
         assert!(check("cargo test sleep_test", &[sleep_rule()]).is_none());
     }
 
@@ -600,13 +630,23 @@ mod tests {
 
     #[test]
     fn sleep_rule_allows_sleep_in_ssh_remote() {
-        // argv[0] is "ssh", not "sleep" — target_commands gate prevents false positive
+        // argv[0] is "ssh", not "sleep"
         assert!(check("ssh host 'sleep 5'", &[sleep_rule()]).is_none());
     }
 
     #[test]
     fn sleep_rule_allows_sleep_in_grep_arg() {
         assert!(check("grep sleep main.rs", &[sleep_rule()]).is_none());
+    }
+
+    #[test]
+    fn sleep_rule_allows_timeout_word_in_test_name() {
+        assert!(check("cargo test timeout_test", &[sleep_rule()]).is_none());
+    }
+
+    #[test]
+    fn sleep_rule_allows_timeout_in_commit_message() {
+        assert!(check(r#"git commit -m "fix timeout handling""#, &[sleep_rule()]).is_none());
     }
 
     // ── property tests ───────────────────────────────────────────────────
