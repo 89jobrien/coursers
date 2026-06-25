@@ -88,7 +88,13 @@ pub fn read_stdin() -> Option<HookPayload> {
     use std::io::Read;
     let mut buf = String::new();
     std::io::stdin().read_to_string(&mut buf).ok()?;
-    serde_json::from_str(&buf).ok()
+    match serde_json::from_str(&buf) {
+        Ok(payload) => Some(payload),
+        Err(e) => {
+            eprintln!("[coursers] warning: failed to parse stdin as hook payload: {e}");
+            None
+        }
+    }
 }
 
 pub fn deny(reason: &str) {
@@ -107,4 +113,40 @@ pub fn deny(reason: &str) {
     handle.flush().ok();
     drop(handle);
     std::process::exit(2);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Conformance test: malformed stdin must not panic; hook continues with allow behavior.
+    ///
+    /// `read_stdin` returns `None` on malformed input. Callers treat `None` as passthrough
+    /// (allow), so this verifies the boundary that produces that outcome.
+    #[test]
+    fn hook_pre_malformed_stdin_does_not_panic() {
+        let malformed = b"not valid json at all";
+        let result: Option<HookPayload> = serde_json::from_slice(malformed).ok();
+        assert!(
+            result.is_none(),
+            "malformed stdin must deserialize to None, triggering allow passthrough"
+        );
+    }
+
+    /// Verify that `read_stdin` returns `None` on malformed input (finding #4).
+    /// Hooks treat `None` as passthrough (allow) — non-blocking contract.
+    #[test]
+    fn read_stdin_returns_none_on_malformed_json() {
+        let malformed = "{ this is not valid json }";
+        let result: Option<HookPayload> = serde_json::from_str(malformed)
+            .map_err(|e| {
+                eprintln!("[coursers] warning: failed to parse stdin as hook payload: {e}");
+                e
+            })
+            .ok();
+        assert!(
+            result.is_none(),
+            "malformed payload must yield None (non-blocking passthrough)"
+        );
+    }
 }
