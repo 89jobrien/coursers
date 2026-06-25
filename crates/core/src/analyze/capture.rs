@@ -452,8 +452,8 @@ mod tests {
             Some("sess-1".to_string()),
             "Bash",
         );
-        store.record(r.clone());
-        store.record(r);
+        let _ = store.record(r.clone());
+        let _ = store.record(r);
         assert_eq!(store.records().len(), 2);
     }
 
