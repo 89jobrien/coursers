@@ -1,0 +1,4 @@
+interface:
+  display_name: "Coursers Maintenance"
+  short_description: "Develop and maintain the coursers repo"
+  default_prompt: "Use $coursers-maintain to implement and validate changes in the coursers repo."

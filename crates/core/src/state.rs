@@ -11,6 +11,7 @@ const PREVIEW_MAX_CHARS: usize = 80;
 /// Minimum window in minutes (floor to avoid divide-by-zero in messages).
 const MIN_WINDOW_MINUTES: u64 = 1;
 
+/// A per-command failure record stored in the rolling failure log.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct FailureEntry {
     pub command_preview: String,
@@ -18,18 +19,21 @@ pub struct FailureEntry {
     pub last_seen: f64,
 }
 
+/// The full failure-learning state persisted to disk.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct State {
     #[serde(default)]
     pub failures: HashMap<String, FailureEntry>,
 }
 
+/// Derive a stable SHA-256 key for a command string used as the state map key.
 pub fn command_key(command: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(command.as_bytes());
     hex::encode(hasher.finalize())
 }
 
+/// Return the current time as Unix seconds.
 pub fn now_secs() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -1,8 +1,12 @@
 project: coursers
 id: coursers
-updated: 2026-06-25
+updated: 2026-06-27
 items: []
 log:
+  - date: "null"
+    summary: Tackled GitHub issues
+    commits: []
+    session: 2
   - date: "20260625"
     summary: |
       MoA review pipeline: 5-lens parallel analysis of error handling gaps. Scaffolded
@@ -14,16 +18,7 @@ log:
       JSON/stdin/state error paths. Added doc comments to 35 previously undocumented
       public API items (coverage 46.1% → 62.1%). All changes pushed to main; 470/470
       tests passing, clippy clean.
-    commits:
-      - eb81b26
-      - 6e7741e
-      - c257d1b
-      - da204f3
-      - 213b9af
-  - date: "null"
-    summary: Tackled GitHub issues
     commits: []
-    session: 2
   - date: "20260614.043647"
     summary: done=18 running=0 pending=0 blocked=0
     commits: []

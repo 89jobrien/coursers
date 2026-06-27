@@ -1,5 +1,6 @@
 use crs_core::history::{DiscoverOpts, discover};
-use crs_core::rules::{Rule, load as load_rules};
+use crs_core::loader::{FsRulesLoader, RulesLoader};
+use crs_core::rules::Rule;
 use std::path::PathBuf;
 
 /// Stable inline rules for tests that need deterministic intercept/unhandled splits,
@@ -24,7 +25,7 @@ fn jsonl_source_empty_dir_yields_no_commands() {
         false,
         std::env::current_dir().ok(),
     );
-    let rules = load_rules();
+    let rules = FsRulesLoader.load().unwrap_or_default();
     let report = discover(
         &src,
         &rules.rules,

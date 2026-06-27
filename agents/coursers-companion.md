@@ -37,6 +37,9 @@ Wired in `~/.claude/settings.json`:
 ]
 ```
 
+After installing the hook block in your local settings file, run
+`crs validate-hooks` to verify the chain.
+
 ## Binaries
 
 | Binary     | Crate             | Install                                |

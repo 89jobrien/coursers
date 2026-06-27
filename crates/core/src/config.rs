@@ -12,6 +12,7 @@ pub const BYTES_PER_TOKEN: usize = 4;
 // to ~/.config/coursers/ everywhere (docs, smoke.nu, agent companion). The XDG path
 // used here is correct; the legacy ~/.claude/hooks/ references are stale.
 
+/// Resolve the rules config path: `COURSERS_RULES` env var or XDG default.
 pub fn rules_path() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_RULES") {
         return PathBuf::from(p);
@@ -24,6 +25,7 @@ pub fn rules_path() -> PathBuf {
         .join(".config/coursers/course-correct-rules.json")
 }
 
+/// Resolve the state file path: project-local `.ctx/` wins over XDG global.
 pub fn state_path_default() -> PathBuf {
     if let Ok(p) = std::env::var("COURSERS_STATE") {
         return PathBuf::from(p);
@@ -38,6 +40,22 @@ pub fn state_path_default() -> PathBuf {
             std::path::PathBuf::from("/tmp")
         })
         .join(".config/coursers/course-correct-state.json")
+}
+
+/// Resolve the state file path from `FailureLearning` config.
+///
+/// Handles `~/` prefix expansion and falls back to [`state_path_default`].
+pub fn state_path(fl: &crate::rules::FailureLearning) -> std::path::PathBuf {
+    fl.state_file
+        .as_deref()
+        .map(|p| {
+            if let Some(rest) = p.strip_prefix("~/") {
+                dirs::home_dir().unwrap_or_default().join(rest)
+            } else {
+                PathBuf::from(p)
+            }
+        })
+        .unwrap_or_else(state_path_default)
 }
 
 /// Resolved paths for a named profile (or the default profile).
@@ -72,6 +90,7 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
+    /// Create a builder with no overrides (uses XDG defaults or env vars).
     pub fn new() -> Self {
         Self {
             profile: None,
@@ -98,6 +117,7 @@ impl ConfigBuilder {
         self
     }
 
+    /// Resolve all paths and return a [`ProfileConfig`].
     pub fn build(self) -> ProfileConfig {
         let home = dirs::home_dir().unwrap_or_else(|| {
             eprintln!("[coursers] warning: could not resolve home directory; falling back to /tmp");

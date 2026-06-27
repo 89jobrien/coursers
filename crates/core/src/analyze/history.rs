@@ -41,6 +41,7 @@ use crate::rules::Rule;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// A single Bash command extracted from a Claude Code session file.
 pub struct CommandRecord {
     pub command: String,
     pub session_id: String,
@@ -50,10 +51,12 @@ pub struct CommandRecord {
     pub output_bytes: Option<usize>,
 }
 
+/// Port for iterating over historical Bash commands.
 pub trait CommandSource {
     fn commands(&self) -> impl Iterator<Item = CommandRecord>;
 }
 
+/// Options controlling how `discover` filters and paginates command history.
 pub struct DiscoverOpts {
     pub limit: usize,
     pub since_days: Option<u32>,
@@ -75,6 +78,7 @@ impl Default for DiscoverOpts {
     }
 }
 
+/// Frequency bucket for a command stem in the discover report.
 #[derive(Debug, Default)]
 pub struct CommandFreq {
     pub stem: String,
@@ -84,6 +88,7 @@ pub struct CommandFreq {
     pub rule_id: Option<String>,
 }
 
+/// Output of `discover`: intercepted and unhandled command frequencies.
 #[derive(Debug, Default)]
 pub struct DiscoverReport {
     pub intercepted: Vec<CommandFreq>,
@@ -92,6 +97,7 @@ pub struct DiscoverReport {
     pub scanned_commands: usize,
 }
 
+/// Scan command history and produce a frequency report of intercepted and unhandled commands.
 pub fn discover(
     source: &impl CommandSource,
     rules: &[Rule],

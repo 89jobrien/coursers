@@ -1,13 +1,85 @@
-generated: 2026-06-24
-since_days: 3
-sessions_scanned: 1
-total_commands: 21
+generated: 2026-06-27
+since_days: 30
+sessions_scanned: 28
+total_commands: 1242
 top_supported:
-  - command: cd /Users/joe/dev/updog
-    count: 1
+  - command: cargo test
+    count: 78
     rule: no-bash-use-nu
-    est_savings_tokens: 9
+    rtk_equivalent: rtk cargo
+    est_savings_tokens: 38825
+    est_savings_pct: 80
+  - command: cargo kani
+    count: 46
+    rule: no-bash-use-nu
+    est_savings_tokens: 4183
+  - command: git
+    count: 44
+    rule: no-bash-use-nu
+    est_savings_tokens: 5054
+  - command: cargo nextest
+    count: 39
+    rule: no-bash-use-nu
+    est_savings_tokens: 8629
+  - command: cargo clippy
+    count: 39
+    rule: no-bash-use-nu
+    est_savings_tokens: 3047
+  - command: doob todo
+    count: 31
+    rule: no-bash-use-nu
+    est_savings_tokens: 4762
+  - command: gh issue
+    count: 27
+    rule: no-bash-use-nu
+    rtk_equivalent: rtk gh
+    est_savings_tokens: 7410
+    est_savings_pct: 80
+  - command: rustqual /Users/joe/dev/coursers
+    count: 26
+    rule: no-bash-use-nu
+    est_savings_tokens: 6533
+  - command: godmode task
+    count: 24
+    rule: no-bash-use-nu
+    est_savings_tokens: 3001
+  - command: cargo check
+    count: 19
+    rule: no-bash-use-nu
+    est_savings_tokens: 3275
+  - command: python3
+    count: 17
+    rule: no-bash-use-nu
+    est_savings_tokens: 1336
+  - command: git diff
+    count: 15
+    rule: no-bash-use-nu
+    est_savings_tokens: 4668
+  - command: cargo install
+    count: 14
+    rule: no-bash-use-nu
+    est_savings_tokens: 1318
+  - command: sed
+    count: 14
+    rule: no-bash-use-nu
+    est_savings_tokens: 5041
+  - command: git log
+    count: 12
+    rule: no-bash-use-nu
+    est_savings_tokens: 815
 top_unhandled:
   - base_command: nu
-    count: 20
-    example: 'nu -c "cd /Users/joe/dev/updog; cargo check --workspace"'
+    count: 447
+    example: 'nu -c "ls /Users/joe/dev/crux/crates/crux/src/; cat /Users/joe/dev/crux/Cargo.to...'
+  - base_command: git add
+    count: 9
+    example: "git add crates/core/tests/conformance_var_expander.rs crates/core/tests/conforma..."
+  - base_command: git commit
+    count: 9
+    example: "git commit -m \"$(cat <<'EOF'\nfeat: hook pipeline validation, matched-rules track..."
+  - base_command: cargo fmt
+    count: 4
+    example: 'cargo fmt --all && git add crates/core/src/hook/pipeline.rs && git commit -m "$(...'
+  - base_command: nu /Users/joe/.claude/skills/observability-as-infrastructure/helpers/trace-stats.nu
+    count: 1
+    example: "nu /Users/joe/.claude/skills/observability-as-infrastructure/helpers/trace-stats..."

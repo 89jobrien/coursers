@@ -84,6 +84,51 @@ proptest! {
 }
 
 // ---------------------------------------------------------------------------
+// stats::StatsStore — record_block count invariant
+// ---------------------------------------------------------------------------
+
+use crs_core::stats::{InMemoryStatsStore, StatsStore};
+
+proptest! {
+    /// After N calls to record_block(rule_id), blocks[rule_id] == N.
+    #[test]
+    fn record_block_count_equals_call_count(
+        rule_id in "[a-z]{1,20}",
+        n in 1u32..10u32,
+    ) {
+        let store = InMemoryStatsStore::new();
+        for _ in 0..n {
+            store.record_block(&rule_id).expect("record_block must succeed");
+        }
+        let stats = store.load().expect("load must succeed");
+        let count = stats.blocks.get(&rule_id).copied().unwrap_or(0);
+        prop_assert_eq!(count, n as u64);
+    }
+
+    /// record_block for one rule does not affect another rule's count.
+    #[test]
+    fn record_block_independent_rules(
+        rule_a in "[a-z]{1,10}",
+        rule_b in "[A-Z]{1,10}",
+        n_a in 1u32..5u32,
+        n_b in 1u32..5u32,
+    ) {
+        let store = InMemoryStatsStore::new();
+        for _ in 0..n_a {
+            store.record_block(&rule_a).unwrap();
+        }
+        for _ in 0..n_b {
+            store.record_block(&rule_b).unwrap();
+        }
+        let stats = store.load().unwrap();
+        let count_a = stats.blocks.get(&rule_a).copied().unwrap_or(0);
+        let count_b = stats.blocks.get(&rule_b).copied().unwrap_or(0);
+        prop_assert_eq!(count_a, n_a as u64);
+        prop_assert_eq!(count_b, n_b as u64);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // ast::parse — non-empty input produces non-empty argv
 // ---------------------------------------------------------------------------
 

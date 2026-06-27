@@ -52,6 +52,14 @@ name = "conformance_command_source"
 required-features = ["testing"]
 
 [[test]]
+name = "conformance_stats_store"
+required-features = ["testing"]
+
+[[test]]
+name = "property_tests"
+required-features = ["testing"]
+
+[[test]]
 name = "conformance_var_expander"
 
 [[test]]

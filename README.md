@@ -40,7 +40,7 @@ cargo install --path crates/coursers
 cargo install --path crates/crs
 ```
 
-Wire into `~/.claude/settings.json`:
+Install the full hook chain into your local `~/.claude/settings.json`:
 
 ```json
 {
@@ -67,8 +67,8 @@ Wire into `~/.claude/settings.json`:
 }
 ```
 
-`crs rewrite` and `crs filter` are optional — run `coursers` alone if you only want blocking
-and failure learning.
+Run `crs validate-hooks` after installing the hook block to verify the chain is wired
+correctly.
 
 ---
 
@@ -152,7 +152,7 @@ pattern = "cargo nextest"
 mode = "failures-only"
 ```
 
-Wire into `settings.json`:
+Wire into your local `~/.claude/settings.json`:
 
 ```json
 { "matcher": "Bash", "hooks": [{ "type": "command", "command": "crs filter" }] }
@@ -169,7 +169,7 @@ pattern = "^cargo build$"
 replace = "cargo build --message-format json"
 ```
 
-Wire into `settings.json`:
+Wire into your local `~/.claude/settings.json`:
 
 ```json
 {

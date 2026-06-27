@@ -1009,6 +1009,9 @@ fn event_str_for(event: crs_core::hook_pipeline::HookEvent) -> &'static str {
 }
 
 fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
+    // TODO: verify the Claude Code hook contract for tool swaps.
+    // `updatedInput` is documented as parameter-only, so tool-name swaps may
+    // need a different response shape or a separate hook path.
     let msg = serde_json::json!({
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -1880,11 +1883,11 @@ fn cmd_suggest(
 }
 
 fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
-    use crs_core::rules::load as load_rules;
+    use crs_core::loader::{FsRulesLoader, RulesLoader};
     use crs_core::stats::{load as load_stats, stats_path};
     use crs_core::store::{FsStateStore, StateStore, state_path};
 
-    let rules_cfg = load_rules();
+    let rules_cfg = FsRulesLoader.load().unwrap_or_default();
     let stats_p = stats_path();
     let stats = load_stats(&stats_p);
 
@@ -1968,11 +1971,11 @@ fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
 }
 
 fn cmd_export(out_path: Option<&str>) {
-    use crs_core::rules::load as load_rules;
+    use crs_core::loader::{FsRulesLoader, RulesLoader};
     use crs_core::stats::{load as load_stats, stats_path};
     use crs_core::store::{FsStateStore, StateStore, state_path};
 
-    let rules_cfg = load_rules();
+    let rules_cfg = FsRulesLoader.load().unwrap_or_default();
     let stats = load_stats(&stats_path());
     let state = FsStateStore {
         path: state_path(&rules_cfg.failure_learning),
@@ -2060,10 +2063,10 @@ fn cmd_heat(rule_filter: Option<&str>) {
 }
 
 fn cmd_replay(session_path: Option<&str>, format: &str) {
+    use crs_core::loader::{FsRulesLoader, RulesLoader};
     use crs_core::replay::{format_text, replay};
-    use crs_core::rules::load as load_rules;
 
-    let rules_cfg = load_rules();
+    let rules_cfg = FsRulesLoader.load().unwrap_or_default();
 
     // Resolve session file: explicit path or most-recent .jsonl for current project
     let jsonl_path: std::path::PathBuf = if let Some(p) = session_path {

@@ -5,6 +5,7 @@ use std::fs;
 
 use crate::config::rules_path;
 
+/// A rule that blocks a shell command matching a pattern.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Rule {
     pub id: String,
@@ -23,6 +24,7 @@ pub struct Rule {
     pub message: Option<String>,
 }
 
+/// Configuration for the failure-learning subsystem.
 #[derive(Debug, Clone, Deserialize)]
 pub struct FailureLearning {
     #[serde(default = "default_true")]
@@ -53,7 +55,8 @@ impl Default for FailureLearning {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+/// Root configuration loaded from the course-correct-rules JSON file.
+#[derive(Debug, Clone, Default, Deserialize)]
 pub struct RulesConfig {
     #[serde(default)]
     pub rules: Vec<Rule>,
@@ -77,7 +80,12 @@ fn default_cleanup() -> u64 {
     3600
 }
 
-pub fn load() -> RulesConfig {
+/// Load the rules config from disk. Returns an empty config on missing or malformed file.
+///
+/// Prefer [`crate::loader::RulesLoader`] implementations over calling this directly.
+/// This function is `pub(crate)` — external callers should use `FsRulesLoader` or
+/// `ProfileFsRulesLoader`.
+pub(crate) fn load() -> RulesConfig {
     let path = rules_path();
     let Ok(content) = fs::read_to_string(&path) else {
         return RulesConfig {

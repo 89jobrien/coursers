@@ -1,6 +1,7 @@
 use crate::error::CourserError;
 use crate::rules::{RulesConfig, load as fs_load};
 
+/// Port for loading the rules configuration.
 pub trait RulesLoader {
     fn load(&self) -> Result<RulesConfig, CourserError>;
 }

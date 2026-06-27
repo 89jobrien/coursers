@@ -5,9 +5,11 @@ pub struct ShellCmd {
 }
 
 impl ShellCmd {
+    /// Return argv[0] (the command name), or an empty string for an empty argv.
     pub fn name(&self) -> &str {
         self.argv.first().map(|s| s.as_str()).unwrap_or("")
     }
+    /// Return all arguments (argv[1..]), or an empty slice for an empty argv.
     pub fn args(&self) -> &[String] {
         if self.argv.is_empty() {
             &[]

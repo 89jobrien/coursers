@@ -48,6 +48,7 @@ impl Default for MockWorkspace {
 }
 
 impl MockWorkspace {
+    /// Create an empty workspace with default cwd `/project`.
     pub fn new() -> Self {
         Self::default()
     }

@@ -1,27 +1,19 @@
 use std::path::{Path, PathBuf};
 
-use crate::config::state_path_default;
 use crate::error::CourserError;
-use crate::rules::FailureLearning;
 use crate::state::State;
 
+/// Port for loading and saving failure-learning state.
 pub trait StateStore {
     fn load(&self) -> Result<State, CourserError>;
     fn save(&self, state: &State) -> Result<(), CourserError>;
 }
 
 /// Resolve the state file path from `FailureLearning` config.
-pub fn state_path(fl: &FailureLearning) -> PathBuf {
-    fl.state_file
-        .as_deref()
-        .map(|p| {
-            if let Some(rest) = p.strip_prefix("~/") {
-                dirs::home_dir().unwrap_or_default().join(rest)
-            } else {
-                PathBuf::from(p)
-            }
-        })
-        .unwrap_or_else(state_path_default)
+///
+/// Re-exported from [`crate::config::state_path`] for backwards compatibility.
+pub fn state_path(fl: &crate::rules::FailureLearning) -> PathBuf {
+    crate::config::state_path(fl)
 }
 
 /// Reads/writes state JSON to a real file path.
@@ -63,18 +55,21 @@ pub struct InMemoryStateStore {
 
 #[cfg(any(test, feature = "testing"))]
 impl InMemoryStateStore {
+    /// Create an empty in-memory store.
     pub fn new() -> Self {
         Self {
             inner: std::cell::RefCell::new(State::default()),
         }
     }
 
+    /// Create an in-memory store pre-populated with the given state.
     pub fn with_state(state: State) -> Self {
         Self {
             inner: std::cell::RefCell::new(state),
         }
     }
 
+    /// Return a clone of the current in-memory state.
     pub fn get_state(&self) -> State {
         self.inner.borrow().clone()
     }

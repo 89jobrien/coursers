@@ -6,6 +6,7 @@
 use crate::history::CommandFreq;
 use serde::Serialize;
 
+/// A candidate rule auto-generated from an unhandled command stem.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct SuggestedRule {
     pub id: String,

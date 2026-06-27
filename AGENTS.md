@@ -87,7 +87,7 @@ file system directly.
 | `.ctx/crs-filters.toml`                        | `crs filter/rewrite`                               | Project-local filter and rewrite rules                  |
 | `~/.config/crs/filters.toml`                   | `crs filter/rewrite`                               | Global fallback filter and rewrite rules                |
 
-## Hook wiring (settings.json)
+## Hook wiring (`~/.claude/settings.json`)
 
 ```json
 {
@@ -114,10 +114,11 @@ file system directly.
 }
 ```
 
-## Open work (coursers-5)
+## Hook wiring
 
-Wire `crs rewrite` and `crs filter` into `~/.Codex/settings.json` and update
-`agents/coursers-companion.md` to reflect the full hook chain.
+The standard hook chain is documented above and mirrored in
+`agents/coursers-companion.md`. After installing the hook block in your local
+`~/.claude/settings.json`, run `crs validate-hooks` to verify the chain.
 
 ## Council Analysis
 

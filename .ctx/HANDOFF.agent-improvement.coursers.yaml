@@ -1,0 +1,84 @@
+title: "Agent Improvement Loop: coursers — 2026-06-27"
+agent: coursers
+loop_iteration: 1
+trace_source: "crs discover --since 30 (28 sessions, 1242 commands)"
+date: 2026-06-27
+
+context: |
+  First agent improvement loop run for coursers. Analyzed 30 days of
+  trace data across 28 Claude Code sessions. 165 total rule blocks,
+  dominated by no-bash-use-nu (104). Identified 4 actionable clusters
+  covering missing rules, disabled rules, and message improvements.
+
+changes:
+  - rank: 1
+    cluster_id: python3-file-edits
+    type: missing-rule
+    halo_score: 3.4
+    severity: P2
+    evidence_count: 17
+    action: Add rule to ~/.config/coursers/course-correct-rules.json
+    eval_gate: python3-file-write, python3-file-open-write, python3-json-ok
+    spec:
+      id: no-python3-file-edit
+      enabled: true
+      description: "Use the Edit tool instead of python3 for file modifications"
+      pattern: "python3?\\s+-c\\s+.*\\bopen\\s*\\(.*['\"]w['\"]"
+      pattern_flags: "s"
+      target_commands: [python3, python]
+      exceptions:
+        - "nu\\s+-c\\b"
+        - "\\|\\s*python"
+      exception_policy: allow_if_any_match
+      message: >
+        Use the Edit tool for file modifications.
+        Example: Edit(file_path='<path>', old_string='...', new_string='...').
+        Python file I/O bypasses review, diffing, and undo.
+        For JSON processing, use `nu -c` with `from json`.
+
+  - rank: 2
+    cluster_id: sed-n-read-disabled
+    type: threshold-tuning
+    halo_score: 2.3
+    severity: P3
+    evidence_count: 14
+    action: "Enable rule no-sed-n-use-read (set enabled: true)"
+    eval_gate: sed-n-read, sed-n-pipe-ok
+
+  - rank: 3
+    cluster_id: rustqual-python3-message
+    type: wrong-message
+    halo_score: 1.7
+    severity: P3
+    evidence_count: 26
+    action: "Append python3 JSON rewrite example to no-bash-use-nu message"
+    spec: |
+      Add line to message:
+        cmd | python3 -c "import json..."  ->  nu -c "cmd | from json | ..."
+
+  - rank: 4
+    cluster_id: cargo-install-double-path
+    type: new-behavior
+    halo_score: 0.7
+    severity: P3
+    evidence_count: 14
+    action: Add rule to ~/.config/coursers/course-correct-rules.json
+    eval_gate: cargo-install-double-path, cargo-install-single-ok
+    spec:
+      id: no-cargo-install-multi-path
+      enabled: true
+      description: "Do not pass multiple --path flags to cargo install"
+      pattern: "cargo\\s+install\\s+--path\\s+\\S+\\s+--path"
+      target_commands: [cargo]
+      exceptions: []
+      exception_policy: allow_if_any_match
+      message: >
+        cargo install only accepts one --path. Run separate commands:
+        `cargo install --path crates/foo` then `cargo install --path crates/bar`.
+
+artifacts:
+  - .ctx/_WORKING_DIR/feedback-2026-06-27.json
+  - .ctx/_WORKING_DIR/diagnosis-2026-06-27.json
+  - .ctx/_WORKING_DIR/evals-2026-06-27.nu
+
+status: ready-for-implementation
