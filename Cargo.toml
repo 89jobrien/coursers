@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/types",
     "crates/core",
     "crates/coursers",
     "crates/crs",
@@ -18,6 +19,7 @@ rust-version = "1.89.0"
 [workspace.dependencies]
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
+coursers-types = { path = "crates/types", version = "^0.1.0" }
 crs-core = { path = "crates/core", version = "^0.1.0" } #unified
 dirs = "5"
 fd-lock = "4"

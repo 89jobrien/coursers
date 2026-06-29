@@ -3,7 +3,8 @@ use crs_core::loader::RulesLoader;
 use crs_core::store::StateStore;
 use crs_core::{rules, state};
 
-use super::{HookPayload, deny};
+use super::{HookPayload, deny_with_protocol};
+use crs_core::config::HookProtocol;
 
 /// Returns true when `rule_id` is the ls rule that warrants directory enrichment.
 pub(crate) fn should_enrich(rule_id: &str) -> bool {
@@ -94,6 +95,18 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
     capture: &dyn CaptureStore,
     payload: &HookPayload,
 ) {
+    run_with_proto(loader, store, capture, payload, HookProtocol::Claude);
+}
+
+/// Core pre-hook logic with explicit protocol selection.
+// qual:allow(iosp) reason: "integration root -- orchestrates rule checks"
+pub fn run_with_proto<L: RulesLoader, S: StateStore>(
+    loader: &L,
+    store: &S,
+    capture: &dyn CaptureStore,
+    payload: &HookPayload,
+    protocol: HookProtocol,
+) {
     if payload.tool_name.as_deref() != Some("Bash") {
         return;
     }
@@ -142,7 +155,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
             .unwrap_or_else(|e| eprintln!("[coursers] warning: failed to record suggestion: {e}"));
 
         let full_msg = enrich_message(&rule_id, command, &msg);
-        deny(&full_msg);
+        deny_with_protocol(protocol, &full_msg);
     }
 
     // 2. Learned failures
@@ -152,7 +165,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
             crs_core::state::State::default()
         });
         if let Some(msg) = state::check_learned(command, &st, fl) {
-            deny(&msg);
+            deny_with_protocol(protocol, &msg);
         }
     }
 }
@@ -172,7 +185,7 @@ pub fn run_with_profile(profile_cfg: &crs_core::config::ProfileConfig) {
     else {
         return;
     };
-    run_with(&loader, &store, &capture, &payload);
+    run_with_proto(&loader, &store, &capture, &payload, profile_cfg.protocol);
 }
 
 #[cfg(test)]

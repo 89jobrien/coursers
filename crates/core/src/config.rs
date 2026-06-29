@@ -58,6 +58,16 @@ pub fn state_path(fl: &crate::rules::FailureLearning) -> std::path::PathBuf {
         .unwrap_or_else(state_path_default)
 }
 
+/// Which hook protocol to use for output formatting and exit codes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HookProtocol {
+    /// Claude Code: exit 2 for deny.
+    #[default]
+    Claude,
+    /// Codex: exit 0 + JSON `permissionDecision: "deny"`.
+    Codex,
+}
+
 /// Resolved paths for a named profile (or the default profile).
 /// Constructed via [`ConfigBuilder::build`].
 pub struct ProfileConfig {
@@ -67,6 +77,8 @@ pub struct ProfileConfig {
     pub global_state_path: PathBuf,
     /// Project-local state path (`.ctx/crs-<profile>-state.json`).
     pub local_state_path: PathBuf,
+    /// Hook I/O protocol (Claude vs Codex).
+    pub protocol: HookProtocol,
 }
 
 impl ProfileConfig {
@@ -87,6 +99,7 @@ pub struct ConfigBuilder {
     profile: Option<String>,
     rules_override: Option<PathBuf>,
     state_override: Option<PathBuf>,
+    protocol_override: Option<HookProtocol>,
 }
 
 impl ConfigBuilder {
@@ -96,6 +109,7 @@ impl ConfigBuilder {
             profile: None,
             rules_override: None,
             state_override: None,
+            protocol_override: None,
         }
     }
 
@@ -114,6 +128,12 @@ impl ConfigBuilder {
     /// Override the global state path; takes precedence over the profile directory.
     pub fn state(mut self, path: PathBuf) -> Self {
         self.state_override = Some(path);
+        self
+    }
+
+    /// Override the hook protocol; takes precedence over profile-name inference.
+    pub fn protocol(mut self, proto: HookProtocol) -> Self {
+        self.protocol_override = Some(proto);
         self
     }
 
@@ -152,10 +172,19 @@ impl ConfigBuilder {
                 )
             };
 
+        let protocol = match self.protocol_override {
+            Some(p) => p,
+            None => match self.profile.as_deref() {
+                Some("codex") => HookProtocol::Codex,
+                _ => HookProtocol::Claude,
+            },
+        };
+
         ProfileConfig {
             rules_path: self.rules_override.unwrap_or(default_rules),
             global_state_path: self.state_override.unwrap_or(default_global_state),
             local_state_path: default_local_state,
+            protocol,
         }
     }
 }
@@ -297,6 +326,27 @@ mod tests {
             cfg.global_state_path,
             std::path::PathBuf::from("/tmp/custom-state.json")
         );
+    }
+
+    #[test]
+    fn default_builder_gives_claude_protocol() {
+        let cfg = ConfigBuilder::new().build();
+        assert_eq!(cfg.protocol, HookProtocol::Claude);
+    }
+
+    #[test]
+    fn codex_profile_infers_codex_protocol() {
+        let cfg = ConfigBuilder::new().profile("codex").build();
+        assert_eq!(cfg.protocol, HookProtocol::Codex);
+    }
+
+    #[test]
+    fn protocol_override_wins() {
+        let cfg = ConfigBuilder::new()
+            .profile("codex")
+            .protocol(HookProtocol::Claude)
+            .build();
+        assert_eq!(cfg.protocol, HookProtocol::Claude);
     }
 
     #[test]

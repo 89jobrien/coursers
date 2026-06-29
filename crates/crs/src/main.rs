@@ -152,7 +152,11 @@ enum Command {
         event: String,
     },
     /// Validate hook pipeline config — check patterns, action constraints, missing labels
-    ValidateHooks,
+    ValidateHooks {
+        /// Target CLI to validate: "claude" (default) or "codex"
+        #[arg(long, default_value = "claude")]
+        target: String,
+    },
     /// Query the hook execution log
     Log {
         /// Max entries to show (default: 20)
@@ -311,7 +315,13 @@ fn main() {
         } => cmd_history(limit, rule.as_deref(), &format),
         Command::Export { out } => cmd_export(out.as_deref()),
         Command::Hook { event } => cmd_hook(&event),
-        Command::ValidateHooks => cmd_validate_hooks(),
+        Command::ValidateHooks { ref target } => {
+            if target == "codex" {
+                cmd_validate_codex_hooks();
+            } else {
+                cmd_validate_hooks();
+            }
+        }
         Command::Log {
             limit,
             event,
@@ -591,10 +601,8 @@ fn cmd_filter() {
     let output = payload
         .tool_response
         .as_ref()
-        .and_then(|r| r.get("output"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
+        .and_then(crs_core::hook::protocol::extract_output)
+        .unwrap_or_default();
 
     let exit_code = payload
         .tool_response
@@ -776,6 +784,77 @@ fn cmd_validate_hooks() {
     }
 }
 
+fn cmd_validate_codex_hooks() {
+    let home = dirs::home_dir().unwrap_or_else(|| {
+        eprintln!("crs: cannot resolve home directory");
+        std::process::exit(1);
+    });
+    let hooks_path = home.join(".codex/hooks.json");
+    let content = match std::fs::read_to_string(&hooks_path) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!(
+                "crs validate-hooks: cannot read {}: {e}",
+                hooks_path.display()
+            );
+            std::process::exit(1);
+        }
+    };
+    let json: Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!(
+                "crs validate-hooks: invalid JSON in {}: {e}",
+                hooks_path.display()
+            );
+            std::process::exit(1);
+        }
+    };
+
+    let expected = [
+        "coursers pre --profile codex",
+        "crs rewrite --profile codex",
+        "coursers post --profile codex",
+        "crs filter --profile codex",
+    ];
+
+    // Flatten all command strings from the hooks JSON.
+    let json_str = json.to_string();
+    let mut missing = Vec::new();
+    for cmd in &expected {
+        if !json_str.contains(cmd) {
+            missing.push(*cmd);
+        }
+    }
+
+    // Check binary availability.
+    let mut bin_missing = Vec::new();
+    for bin in ["coursers", "crs"] {
+        let result = std::process::Command::new("which").arg(bin).output();
+        match result {
+            Ok(out) if out.status.success() => {}
+            _ => bin_missing.push(bin),
+        }
+    }
+
+    println!("Codex hooks: {}", hooks_path.display());
+
+    if !bin_missing.is_empty() {
+        for b in &bin_missing {
+            println!("  MISSING binary: {b}");
+        }
+    }
+
+    if missing.is_empty() && bin_missing.is_empty() {
+        println!("All 4 Codex hook commands found. Binaries available.");
+    } else {
+        for cmd in &missing {
+            println!("  MISSING hook command: {cmd}");
+        }
+        std::process::exit(1);
+    }
+}
+
 fn cmd_hook(event_str: &str) {
     use crs_core::hook_pipeline::{HookContext, HookEvent, load_config, run_pipeline};
 
@@ -844,50 +923,26 @@ fn cmd_hook(event_str: &str) {
 
     // Emit response based on event type and result.
     if let Some(deny_msg) = result.deny {
-        let resp = serde_json::json!({
-            "hookSpecificOutput": {
-                "hookEventName": event_str_for(event),
-                "permissionDecision": "deny",
-            },
-            "systemMessage": format!("[crs-hook] {deny_msg}"),
-        });
-        let stdout = io::stdout();
-        let mut handle = stdout.lock();
-        writeln!(handle, "{resp}").ok();
-        handle.flush().ok();
-        std::process::exit(2);
+        let (json, exit_code) = crs_core::hook::protocol::deny_response(
+            crs_core::config::HookProtocol::Claude,
+            &format!("[crs-hook] {deny_msg}"),
+        );
+        write_stdout(&json);
+        std::process::exit(exit_code);
     }
 
     if let Some(ref rewritten) = result.rewrite {
-        let resp = serde_json::json!({
-            "hookSpecificOutput": {
-                "hookEventName": event_str_for(event),
-                "permissionDecision": "allow",
-                "permissionDecisionReason": "crs-hook: rewrite",
-                "updatedInput": { "command": rewritten },
-            }
-        });
-        let stdout = io::stdout();
-        let mut handle = stdout.lock();
-        writeln!(handle, "{resp}").ok();
-        handle.flush().ok();
+        let json = crs_core::hook::protocol::rewrite_response("crs-hook: rewrite", rewritten);
+        write_stdout(&json);
         return;
     }
 
     // Emit system messages if any.
     if !result.messages.is_empty() {
         let combined = result.messages.join("\n");
-        let resp = serde_json::json!({
-            "hookSpecificOutput": {
-                "hookEventName": event_str_for(event),
-                "permissionDecision": "allow",
-            },
-            "systemMessage": combined,
-        });
-        let stdout = io::stdout();
-        let mut handle = stdout.lock();
-        writeln!(handle, "{resp}").ok();
-        handle.flush().ok();
+        let json =
+            crs_core::hook::protocol::system_message_response(event_str_for(event), &combined);
+        write_stdout(&json);
     }
 
     // No action — silent pass.
@@ -1009,24 +1064,8 @@ fn event_str_for(event: crs_core::hook_pipeline::HookEvent) -> &'static str {
 }
 
 fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
-    // TODO: verify the Claude Code hook contract for tool swaps.
-    // `updatedInput` is documented as parameter-only, so tool-name swaps may
-    // need a different response shape or a separate hook path.
-    let msg = serde_json::json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "allow",
-            "permissionDecisionReason": format!("crs tool-swap: Bash → {tool_name}"),
-            "updatedInput": {
-                "tool_name": tool_name,
-                "tool_input": tool_input,
-            }
-        }
-    });
-    let stdout = io::stdout();
-    let mut handle = stdout.lock();
-    writeln!(handle, "{}", msg).ok();
-    handle.flush().ok();
+    let json = crs_core::hook::protocol::tool_swap_response(tool_name, tool_input);
+    write_stdout(&json);
 }
 
 fn load_rewrite_config() -> crs_core::rewrite::RewriteConfig {
@@ -1050,17 +1089,8 @@ struct RewriteToml {
 
 /// Emit a systemMessage to Claude (post-hook feedback for rx learning).
 fn emit_system_message(text: &str) {
-    let msg = serde_json::json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "permissionDecision": "allow",
-            "systemMessage": text,
-        }
-    });
-    let stdout = io::stdout();
-    let mut handle = stdout.lock();
-    writeln!(handle, "{}", msg).ok();
-    handle.flush().ok();
+    let json = crs_core::hook::protocol::system_message_response("PostToolUse", text);
+    write_stdout(&json);
 }
 
 /// Pre-hook: check if `command` matches a Pending probe's expected retry.
@@ -1089,29 +1119,20 @@ fn check_probe_match(command: &str, probe_store: &dyn crs_core::rx_prefix::Probe
 }
 
 fn emit_message(text: &str) {
-    let msg = serde_json::json!({
-        "type": "result",
-        "message": text,
-        "decision": "allow"
-    });
-    let stdout = io::stdout();
-    let mut handle = stdout.lock();
-    writeln!(handle, "{}", msg).ok();
-    handle.flush().ok();
+    let json = crs_core::hook::protocol::filter_result_response(text);
+    write_stdout(&json);
 }
 
 fn emit_rewrite(command: &str) {
-    let msg = serde_json::json!({
-        "hookSpecificOutput": {
-            "hookEventName": "PreToolUse",
-            "permissionDecision": "allow",
-            "permissionDecisionReason": format!("crs rewrite: {command}"),
-            "updatedInput": { "command": command }
-        }
-    });
+    let json =
+        crs_core::hook::protocol::rewrite_response(&format!("crs rewrite: {command}"), command);
+    write_stdout(&json);
+}
+
+fn write_stdout(json: &str) {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
-    writeln!(handle, "{}", msg).ok();
+    writeln!(handle, "{json}").ok();
     handle.flush().ok();
 }
 

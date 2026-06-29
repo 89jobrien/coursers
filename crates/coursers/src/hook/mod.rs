@@ -20,7 +20,8 @@ pub struct ToolInput {
     pub command: Option<String>,
 }
 
-/// PreToolUse response envelope
+/// PreToolUse response envelope (used by tests; live path uses protocol module).
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct PreResponse {
     #[serde(rename = "hookSpecificOutput")]
@@ -28,6 +29,7 @@ pub struct PreResponse {
 }
 
 /// Inner payload of a `PreToolUse` permission response.
+#[allow(dead_code)]
 #[derive(Debug, Serialize)]
 pub struct HookSpecificOutput {
     #[serde(rename = "hookEventName")]
@@ -108,29 +110,29 @@ pub fn read_stdin() -> Option<HookPayload> {
 
 /// Serialize a [`PreResponse`] to JSON, falling back to a hardcoded deny payload if
 /// serialization fails. This function never panics.
+#[allow(dead_code)]
 pub(crate) fn serialize_deny_response(resp: &PreResponse) -> String {
     serde_json::to_string(resp).unwrap_or_else(|_| {
         r#"{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"[coursers] internal error: failed to serialize deny response"}}"#.to_owned()
     })
 }
 
-/// Emit a deny response to stdout and exit with code 2.
+/// Emit a deny response to stdout and exit with code 2 (Claude protocol).
+#[allow(dead_code)]
 pub fn deny(reason: &str) {
+    deny_with_protocol(crs_core::config::HookProtocol::Claude, reason);
+}
+
+/// Protocol-aware deny: exit code differs between Claude (2) and Codex (0).
+pub fn deny_with_protocol(proto: crs_core::config::HookProtocol, reason: &str) {
     use std::io::Write;
-    let resp = PreResponse {
-        hook_specific_output: HookSpecificOutput {
-            hook_event_name: "PreToolUse".into(),
-            permission_decision: "deny".into(),
-            permission_decision_reason: reason.into(),
-        },
-    };
-    let json = serialize_deny_response(&resp);
+    let (json, exit_code) = crs_core::hook::protocol::deny_response(proto, reason);
     let stdout = std::io::stdout();
     let mut handle = stdout.lock();
-    writeln!(handle, "{}", json).ok();
+    writeln!(handle, "{json}").ok();
     handle.flush().ok();
     drop(handle);
-    std::process::exit(2);
+    std::process::exit(exit_code);
 }
 
 #[cfg(test)]
