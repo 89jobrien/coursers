@@ -1,55 +1,68 @@
 project: coursers
 id: coursers
-updated: 2026-06-28
+updated: 2026-06-29
 items: []
 log:
-  - date: "null"
-    summary: Tackled GitHub issues
-    commits: []
-    session: 2
-  - date: "20260625"
-    summary: |
-      MoA review pipeline: 5-lens parallel analysis of error handling gaps. Scaffolded
-      crates/xtask with cargo xtask build and cargo xtask ci. Introduced CourserError enum
-      in crs-core with 8 From impls for external types. Updated all trait methods
-      (RulesLoader, StateStore, CaptureStore, FiltersLoader) to return Result<T,
-      CourserError>. Replaced .expect("home dir") panics and .unwrap() in deny() with
-      graceful fallbacks + stderr warnings. Added 3 conformance tests for malformed
-      JSON/stdin/state error paths. Added doc comments to 35 previously undocumented
-      public API items (coverage 46.1% → 62.1%). All changes pushed to main; 470/470
-      tests passing, clippy clean.
-    commits: []
-  - date: "20260614.043647"
-    summary: done=18 running=0 pending=0 blocked=0
-    commits: []
-  - date: "20260612.012822"
-    summary: done=18 running=0 pending=0 blocked=0
-    commits: []
-  - date: "20260612.011633"
-    summary: done=16 running=0 pending=2 blocked=0
-    commits: []
-  - date: "20260611"
-    summary: |
-      gm-self-heal: 11 clippy fixes, discover_integration regression fix (load_rules→fixture_rules).
-      SOLID review: removed StateStore::path() from trait, extracted find_matching_rule() helper,
-      added fuzz_jsonl_parse target + parse_session_content() entry point, added regression test.
-      Tests: 428/428 passing. Clippy clean. Fmt clean. All changes uncommitted.
-    commits: []
-    session: 4
-  - date: 20260609::162110
-    summary: |
-      match-lines filter mode, clippy cleanup, nu_libs centralization. Added FilterMode::MatchLines with configurable match_pattern field (fail-open, passthrough on error). 12 new tests. Global filters for cargo kani, rustqual, cargo install. Fixed 8 pre-existing clippy warnings across pipeline.rs and main.rs. Added no-bash-use-nu block rule. Added no-sed-n-use-read stub (disabled). Centralized hook boilerplate into nu_libs lib/hooks/mod.nu and lib/rust/workspace.nu — 5 hooks refactored. Project-local crs-filters.toml for minibox and crux (local-only, gitignored).
-    commits: []
-    session: 3
-  - date: "20260424"
-    summary: |
-      Activity detected on 2026-04-24. Recent commits continue feature work on discover command and rules engine. Previous session (2026-04-23) closed issues #2 and #5 with --min-count flag and version manager block rule.
-    commits: []
-  - date: "20260423"
-    summary: |
-      5 new crs subcommands: suggest, history, export, heat, replay (TDD, 142→153 tests). feat(rules): no-nvm-use-mise block rule. feat(discover): --min-count N flag. Closes GH #2 (P1) and #5 (P1). Commits: edcf5a0, 42730bf.
-    commits: []
-  - date: "20260418"
-    summary: |
-      handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues. VarExpander trait + with_env! macro refactor committed (5d8cfa2).
-    commits: []
+- date: '20260629'
+  summary: |
+    Merged crs binary into coursers (cf439d7, wc-t19 through wc-t23). Refactored crs-core
+    to coursers-core with property tests (99e683e). Introduced coursers-types leaf crate
+    with domain types and port traits (8fc7ddd). Agent improvement loop with new rules,
+    rewrites, and eval harness (3a759d5). 5 commits, all feature work and refactoring
+    landed on main.
+  commits:
+  - cf439d7
+  - 99e683e
+  - 8fc7ddd
+  - 3a759d5
+  - 7aa70bf
+- date: 'null'
+  summary: Tackled GitHub issues
+  commits: []
+  session: 2
+- date: '20260625'
+  summary: |
+    MoA review pipeline: 5-lens parallel analysis of error handling gaps. Scaffolded
+    crates/xtask with cargo xtask build and cargo xtask ci. Introduced CourserError enum
+    in crs-core with 8 From impls for external types. Updated all trait methods
+    (RulesLoader, StateStore, CaptureStore, FiltersLoader) to return Result<T,
+    CourserError>. Replaced .expect("home dir") panics and .unwrap() in deny() with
+    graceful fallbacks + stderr warnings. Added 3 conformance tests for malformed
+    JSON/stdin/state error paths. Added doc comments to 35 previously undocumented
+    public API items (coverage 46.1% → 62.1%). All changes pushed to main; 470/470
+    tests passing, clippy clean.
+  commits: []
+- date: '20260614.043647'
+  summary: done=18 running=0 pending=0 blocked=0
+  commits: []
+- date: '20260612.012822'
+  summary: done=18 running=0 pending=0 blocked=0
+  commits: []
+- date: '20260612.011633'
+  summary: done=16 running=0 pending=2 blocked=0
+  commits: []
+- date: '20260611'
+  summary: |
+    gm-self-heal: 11 clippy fixes, discover_integration regression fix (load_rules→fixture_rules).
+    SOLID review: removed StateStore::path() from trait, extracted find_matching_rule() helper,
+    added fuzz_jsonl_parse target + parse_session_content() entry point, added regression test.
+    Tests: 428/428 passing. Clippy clean. Fmt clean. All changes uncommitted.
+  commits: []
+  session: 4
+- date: 20260609::162110
+  summary: |
+    match-lines filter mode, clippy cleanup, nu_libs centralization. Added FilterMode::MatchLines with configurable match_pattern field (fail-open, passthrough on error). 12 new tests. Global filters for cargo kani, rustqual, cargo install. Fixed 8 pre-existing clippy warnings across pipeline.rs and main.rs. Added no-bash-use-nu block rule. Added no-sed-n-use-read stub (disabled). Centralized hook boilerplate into nu_libs lib/hooks/mod.nu and lib/rust/workspace.nu — 5 hooks refactored. Project-local crs-filters.toml for minibox and crux (local-only, gitignored).
+  commits: []
+  session: 3
+- date: '20260424'
+  summary: |
+    Activity detected on 2026-04-24. Recent commits continue feature work on discover command and rules engine. Previous session (2026-04-23) closed issues #2 and #5 with --min-count flag and version manager block rule.
+  commits: []
+- date: '20260423'
+  summary: |
+    5 new crs subcommands: suggest, history, export, heat, replay (TDD, 142→153 tests). feat(rules): no-nvm-use-mise block rule. feat(discover): --min-count N flag. Closes GH #2 (P1) and #5 (P1). Commits: edcf5a0, 42730bf.
+  commits: []
+- date: '20260418'
+  summary: |
+    handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues. VarExpander trait + with_env! macro refactor committed (5d8cfa2).
+  commits: []
