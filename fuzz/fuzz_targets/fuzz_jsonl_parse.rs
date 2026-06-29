@@ -8,7 +8,7 @@ fuzz_target!(|data: &[u8]| {
     };
 
     // parse_session_content must never panic on arbitrary UTF-8 input.
-    let records = crs_lib::jsonl_source::parse_session_content(s);
+    let records = coursers_core::jsonl_source::parse_session_content(s);
 
     // Invariant: every command string is non-empty (we filter empty stems in discover,
     // but the parser itself should never produce an empty command string from a

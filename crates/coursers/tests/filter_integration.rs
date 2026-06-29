@@ -5,7 +5,7 @@
 //! stdin/stdout wrapper around `run_filter`).
 
 use coursers_core::filters::{FilterMode, FilterRule, FiltersConfig};
-use crs_lib::{FilterPayload, FilterResult, run_filter};
+use coursers_core::hook::filter_logic::{FilterPayload, FilterResult, run_filter};
 
 fn payload(cmd: &str, output: &str, exit_code: i64) -> FilterPayload {
     FilterPayload {

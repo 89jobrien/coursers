@@ -1,5 +1,5 @@
 [package]
-name = "e2e"
+name = "coursers-e2e"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

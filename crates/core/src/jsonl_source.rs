@@ -1,4 +1,4 @@
-use coursers_core::history::{CommandRecord, CommandSource};
+use crate::history::{CommandRecord, CommandSource};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::path::PathBuf;

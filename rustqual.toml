@@ -66,8 +66,8 @@ exclude_files = [
     "crates/core/tests/conformance_state_store.rs",
     "crates/core/tests/conformance_var_expander.rs",
     # process adapter — SLM is inherent, tested via integration tests
-    "crates/crs/src/rtk/process.rs",
-    "crates/crs/src/obfsck/process.rs",
+    "crates/coursers/src/rtk/process.rs",
+    "crates/coursers/src/obfsck/process.rs",
     "crates/core/src/testing.rs",
 ]
 

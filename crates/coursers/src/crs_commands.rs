@@ -1,218 +1,15 @@
-// qual:allow(srp) reason: "CLI entry point — subcommand dispatch is inherently large"
-use clap::{Parser, Subcommand};
+// Commands migrated from the crs binary.
+// qual:allow(srp) reason: "CLI subcommand implementations â inherently large"
+
 use coursers_core::config::ConfigBuilder;
-use crs_lib::{FilterPayload, FilterResult, run_filter, run_rewrite};
+use coursers_core::hook::filter_logic::{FilterPayload, FilterResult, run_filter};
+use coursers_core::rewrite::RewriteConfig;
 use serde::Deserialize;
 use serde_json::Value;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
 
-#[derive(Parser)]
-#[command(name = "crs", about = "Command rewriter and output filter")]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
-    Filter {
-        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
-        #[arg(long)]
-        profile: Option<String>,
-        /// Override rules file path
-        #[arg(long)]
-        rules: Option<PathBuf>,
-        /// Override global state file path
-        #[arg(long)]
-        state: Option<PathBuf>,
-    },
-    /// Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
-    Rewrite {
-        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
-        #[arg(long)]
-        profile: Option<String>,
-        /// Override rules file path
-        #[arg(long)]
-        rules: Option<PathBuf>,
-    },
-    /// Discover missed savings from Claude Code session history
-    Discover {
-        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
-        #[arg(long)]
-        profile: Option<String>,
-        /// Override rules file path
-        #[arg(long)]
-        rules: Option<PathBuf>,
-        /// Scan all projects (default: current project only)
-        #[arg(short, long)]
-        all: bool,
-        /// Max rows per section
-        #[arg(short, long, default_value = "15")]
-        limit: usize,
-        /// Scan sessions from last N days
-        #[arg(short, long, default_value = "30")]
-        since: u32,
-        /// Output format: text or json
-        #[arg(short, long, default_value = "text")]
-        format: String,
-        /// Generate .ctx/obfsck-filters.yaml from unhandled command examples
-        #[arg(long)]
-        generate_filters: bool,
-        /// Only show commands seen at least N times (default: 1 = show all)
-        #[arg(long, default_value = "1")]
-        min_count: u64,
-    },
-    /// Validate rules: check patterns compile, examples fire, exceptions work, alternatives on PATH
-    Validate {
-        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
-        #[arg(long)]
-        profile: Option<String>,
-        /// Override rules file path
-        #[arg(long)]
-        rules: Option<PathBuf>,
-    },
-    /// Probe a command against all rules and show what would fire — reads command from stdin
-    Probe {
-        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
-        #[arg(long)]
-        profile: Option<String>,
-        /// Override rules file path
-        #[arg(long)]
-        rules: Option<PathBuf>,
-    },
-    /// Show cumulative block counts by rule
-    Stats {
-        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
-        #[arg(long)]
-        profile: Option<String>,
-    },
-    /// Analyze session facets enriched with git context
-    Insights {
-        /// Output format: text or json
-        #[arg(short, long, default_value = "text")]
-        format: String,
-        /// Only include facets from the last N days (based on git timestamp)
-        #[arg(short, long)]
-        since: Option<u32>,
-        /// Filter to sessions in a specific repo (matches cwd basename)
-        #[arg(short, long)]
-        repo: Option<String>,
-    },
-    /// Show rx prefix learning state: confirmed mappings and pending probes
-    Audit {
-        /// Remove a confirmed mapping by key
-        #[arg(long)]
-        remove: Option<String>,
-    },
-    /// Suggest new rules from the top unhandled commands in session history
-    Suggest {
-        /// Named profile (resolves to ~/.config/coursers/profiles/<name>/)
-        #[arg(long)]
-        profile: Option<String>,
-        /// Override rules file path
-        #[arg(long)]
-        rules: Option<PathBuf>,
-        /// Scan all projects (default: current project only)
-        #[arg(short, long)]
-        all: bool,
-        /// Scan sessions from last N days
-        #[arg(short, long, default_value = "30")]
-        since: u32,
-        /// Max candidates to suggest
-        #[arg(short, long, default_value = "10")]
-        limit: usize,
-        /// Output format: text or json
-        #[arg(short, long, default_value = "text")]
-        format: String,
-    },
-    /// Show recent blocked commands with timestamps and firing rules
-    History {
-        /// Max entries to show
-        #[arg(short, long, default_value = "20")]
-        limit: usize,
-        /// Filter to a specific rule id
-        #[arg(short, long)]
-        rule: Option<String>,
-        /// Output format: text or json
-        #[arg(short, long, default_value = "text")]
-        format: String,
-    },
-    /// Dump rules + stats + state as a portable JSON snapshot
-    Export {
-        /// Write output to this file instead of stdout
-        #[arg(short, long)]
-        out: Option<String>,
-    },
-    /// Run the generic hook pipeline for a Claude Code event
-    Hook {
-        /// The hook event: pre-tool-use, post-tool-use, session-start, session-end,
-        /// pre-compact, stop, subagent-stop
-        event: String,
-    },
-    /// Validate hook pipeline config — check patterns, action constraints, missing labels
-    ValidateHooks {
-        /// Target CLI to validate: "claude" (default) or "codex"
-        #[arg(long, default_value = "claude")]
-        target: String,
-    },
-    /// Query the hook execution log
-    Log {
-        /// Max entries to show (default: 20)
-        #[arg(short, long, default_value = "20")]
-        limit: usize,
-        /// Filter by event name (e.g. "pre", "post", "stop")
-        #[arg(short, long)]
-        event: Option<String>,
-        /// Filter by outcome: pass, deny, rewrite, notify, side-effect
-        #[arg(short, long)]
-        outcome: Option<String>,
-        /// Output format: text or json
-        #[arg(short, long, default_value = "text")]
-        format: String,
-        /// Prune entries older than N hours
-        #[arg(long)]
-        prune_hours: Option<u64>,
-    },
-    /// Show a heatmap of rule firings by hour-of-day and day-of-week
-    Heat {
-        /// Filter to a specific rule id
-        #[arg(short, long)]
-        rule: Option<String>,
-    },
-    /// Replay a session's Bash commands through the current ruleset (no side effects)
-    Replay {
-        /// Path to a .jsonl session file (default: most recent session for current project)
-        #[arg(short, long)]
-        session: Option<String>,
-        /// Output format: text or json
-        #[arg(short, long, default_value = "text")]
-        format: String,
-    },
-    /// Validate nu scripts using `nu --ide-check` (requires nu on PATH)
-    NuCheck {
-        /// Files to check
-        #[arg(value_name = "FILE")]
-        files: Vec<String>,
-        /// Check all hook scripts in ~/.claude/hooks/nu/**/*.nu
-        #[arg(long)]
-        hooks: bool,
-        /// Check all mod.nu files in ~/dev/nu_libs/lib/**
-        #[arg(long)]
-        nu_libs: bool,
-    },
-    // TODO(crs-state-reset): add State { reset } subcommand to clear
-    // .ctx/course-correct-state.json for a fresh failure-learning baseline.
-}
-
-// TODO(coursers-5-wire): wire crs rewrite (PreToolUse) and crs filter (PostToolUse)
-// into ~/.claude/settings.json. See CLAUDE.md open work coursers-5.
-
-// TODO(crs-validate-ci): crs validate is not wired into CI -- add to just ci,
-// GitHub Actions, and smoke.nu so rule health is checked on every PR.
-
-/// Minimal PostToolUse hook payload.
+/// Minimal PostToolUse hook payload (crs-specific; coursers hook module has its own).
 #[derive(Debug, Deserialize)]
 struct HookPayload {
     tool_name: Option<String>,
@@ -225,7 +22,7 @@ struct ToolInput {
     command: Option<String>,
 }
 
-fn resolve_profile(
+pub fn resolve_profile(
     profile: Option<String>,
     rules: Option<PathBuf>,
     state: Option<PathBuf>,
@@ -243,106 +40,9 @@ fn resolve_profile(
     b.build()
 }
 
-fn main() {
-    let cli = Cli::parse();
-    match cli.command {
-        Command::Filter {
-            profile,
-            rules,
-            state,
-        } => {
-            let _profile_cfg = resolve_profile(profile, rules, state);
-            cmd_filter();
-        }
-        Command::Rewrite { profile, rules } => {
-            let _profile_cfg = resolve_profile(profile, rules, None);
-            cmd_rewrite();
-        }
-        Command::Discover {
-            profile,
-            rules,
-            all,
-            limit,
-            since,
-            format,
-            generate_filters,
-            min_count,
-        } => {
-            let profile_cfg = resolve_profile(profile, rules, None);
-            cmd_discover(
-                &profile_cfg,
-                all,
-                limit,
-                since,
-                &format,
-                generate_filters,
-                min_count,
-            );
-        }
-        Command::Validate { profile, rules } => {
-            let profile_cfg = resolve_profile(profile, rules, None);
-            cmd_validate(&profile_cfg);
-        }
-        Command::Probe { profile, rules } => {
-            let profile_cfg = resolve_profile(profile, rules, None);
-            cmd_probe(&profile_cfg);
-        }
-        Command::Stats { profile } => {
-            let _profile_cfg = resolve_profile(profile, None, None);
-            cmd_stats();
-        }
-        Command::Insights {
-            format,
-            since,
-            repo,
-        } => cmd_insights(&format, since, repo.as_deref()),
-        Command::Audit { remove } => cmd_audit(remove),
-        Command::Suggest {
-            profile,
-            rules,
-            all,
-            since,
-            limit,
-            format,
-        } => {
-            let profile_cfg = resolve_profile(profile, rules, None);
-            cmd_suggest(&profile_cfg, all, since, limit, &format);
-        }
-        Command::History {
-            limit,
-            rule,
-            format,
-        } => cmd_history(limit, rule.as_deref(), &format),
-        Command::Export { out } => cmd_export(out.as_deref()),
-        Command::Hook { event } => cmd_hook(&event),
-        Command::ValidateHooks { ref target } => {
-            if target == "codex" {
-                cmd_validate_codex_hooks();
-            } else {
-                cmd_validate_hooks();
-            }
-        }
-        Command::Log {
-            limit,
-            event,
-            outcome,
-            format,
-            prune_hours,
-        } => cmd_log(
-            limit,
-            event.as_deref(),
-            outcome.as_deref(),
-            &format,
-            prune_hours,
-        ),
-        Command::Heat { rule } => cmd_heat(rule.as_deref()),
-        Command::Replay { session, format } => cmd_replay(session.as_deref(), &format),
-        Command::NuCheck {
-            files,
-            hooks,
-            nu_libs,
-        } => cmd_nu_check(&files, hooks, nu_libs),
-    }
+/// Run the crs rewrite hook logic. Returns Some(rewritten) or None.
+fn run_rewrite(command: &str, config: &RewriteConfig) -> Option<String> {
+    coursers_core::rewrite::apply(command, config, &coursers_core::expand::EnvExpander)
 }
 
 fn read_stdin_payload() -> Option<HookPayload> {
@@ -465,7 +165,7 @@ fn command_key(cmd: &str) -> String {
 
 /// Post-hook: handle the result of a Probing command.
 /// If the prefixed retry succeeded, confirm the mapping. Otherwise discard.
-fn handle_probe_result(
+pub fn handle_probe_result(
     command: &str,
     exit_code: i64,
     probe_store: &dyn coursers_core::rx_prefix::ProbeStore,
@@ -524,7 +224,7 @@ fn handle_probe_result(
 }
 
 /// Post-hook: when a bare command fails, create a Pending probe and suggest retry.
-fn handle_bare_failure(
+pub fn handle_bare_failure(
     command: &str,
     probe_store: &dyn coursers_core::rx_prefix::ProbeStore,
     prefix_store: &dyn coursers_core::rx_prefix::PrefixStore,
@@ -580,7 +280,7 @@ fn handle_bare_failure(
     Some(format!("Command failed. Retry with: {prefixed}"))
 }
 
-fn cmd_filter() {
+pub fn cmd_filter() {
     let Some(payload) = read_stdin_payload() else {
         return;
     };
@@ -669,7 +369,7 @@ fn cmd_filter() {
     }
 }
 
-fn cmd_rewrite() {
+pub fn cmd_rewrite() {
     let Some(payload) = read_stdin_payload() else {
         std::process::exit(1);
     };
@@ -735,7 +435,7 @@ fn cmd_rewrite() {
     std::process::exit(1);
 }
 
-fn cmd_validate_hooks() {
+pub fn cmd_validate_hooks() {
     use coursers_core::hook_pipeline::{
         DiagLevel, HookPipelineConfig, config_source_paths, lint_config, load_config,
         validate_config,
@@ -784,7 +484,7 @@ fn cmd_validate_hooks() {
     }
 }
 
-fn cmd_validate_codex_hooks() {
+pub fn cmd_validate_codex_hooks() {
     let home = dirs::home_dir().unwrap_or_else(|| {
         eprintln!("crs: cannot resolve home directory");
         std::process::exit(1);
@@ -855,7 +555,7 @@ fn cmd_validate_codex_hooks() {
     }
 }
 
-fn cmd_hook(event_str: &str) {
+pub fn cmd_hook(event_str: &str) {
     use coursers_core::hook_pipeline::{HookContext, HookEvent, load_config, run_pipeline};
 
     let event = match event_str {
@@ -951,7 +651,7 @@ fn cmd_hook(event_str: &str) {
     // No action — silent pass.
 }
 
-fn cmd_log(
+pub fn cmd_log(
     limit: usize,
     event: Option<&str>,
     outcome: Option<&str>,
@@ -1053,7 +753,7 @@ fn cmd_log(
     }
 }
 
-fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
+pub fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
     use coursers_core::hook_pipeline::HookEvent;
     match event {
         HookEvent::PreToolUse => "PreToolUse",
@@ -1066,12 +766,12 @@ fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static str
     }
 }
 
-fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
+pub fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
     let json = coursers_core::hook::protocol::tool_swap_response(tool_name, tool_input);
     write_stdout(&json);
 }
 
-fn load_rewrite_config() -> coursers_core::rewrite::RewriteConfig {
+pub fn load_rewrite_config() -> coursers_core::rewrite::RewriteConfig {
     let Some(path) = coursers_core::filters::filters_path() else {
         return coursers_core::rewrite::RewriteConfig::default();
     };
@@ -1091,14 +791,14 @@ struct RewriteToml {
 }
 
 /// Emit a systemMessage to Claude (post-hook feedback for rx learning).
-fn emit_system_message(text: &str) {
+pub fn emit_system_message(text: &str) {
     let json = coursers_core::hook::protocol::system_message_response("PostToolUse", text);
     write_stdout(&json);
 }
 
 /// Pre-hook: check if `command` matches a Pending probe's expected retry.
 /// If so, transition to Probing and return true.
-fn check_probe_match(
+pub fn check_probe_match(
     command: &str,
     probe_store: &dyn coursers_core::rx_prefix::ProbeStore,
 ) -> bool {
@@ -1124,12 +824,12 @@ fn check_probe_match(
     false
 }
 
-fn emit_message(text: &str) {
+pub fn emit_message(text: &str) {
     let json = coursers_core::hook::protocol::filter_result_response(text);
     write_stdout(&json);
 }
 
-fn emit_rewrite(command: &str) {
+pub fn emit_rewrite(command: &str) {
     let json = coursers_core::hook::protocol::rewrite_response(
         &format!("crs rewrite: {command}"),
         command,
@@ -1137,14 +837,14 @@ fn emit_rewrite(command: &str) {
     write_stdout(&json);
 }
 
-fn write_stdout(json: &str) {
+pub fn write_stdout(json: &str) {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
     writeln!(handle, "{json}").ok();
     handle.flush().ok();
 }
 
-fn cmd_validate(profile_cfg: &coursers_core::config::ProfileConfig) {
+pub fn cmd_validate(profile_cfg: &coursers_core::config::ProfileConfig) {
     use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
     let load_rules = || {
@@ -1274,7 +974,7 @@ fn cmd_validate(profile_cfg: &coursers_core::config::ProfileConfig) {
     }
 }
 
-fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
+pub fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
     use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
     let load_rules = || {
@@ -1391,7 +1091,7 @@ fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
     }
 }
 
-fn cmd_discover(
+pub fn cmd_discover(
     profile_cfg: &coursers_core::config::ProfileConfig,
     all: bool,
     limit: usize,
@@ -1411,7 +1111,7 @@ fn cmd_discover(
         .unwrap_or_else(|_| dirs::home_dir().expect("home dir").join(".claude/projects"));
 
     let current_dir = std::env::current_dir().ok();
-    let src = crs_lib::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
+    let src = coursers_core::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
 
     let rules_cfg = ProfileFsRulesLoader {
         path: profile_cfg.rules_path.clone(),
@@ -1437,7 +1137,7 @@ fn cmd_discover(
     // Enrich with RTK data if rtk is on PATH.
 
     // Build stem -> (rtk_equivalent, est_savings_tokens, est_savings_pct) lookup.
-    let rtk_map: HashMap<String, (String, u64, f64)> = crs_lib::rtk::detect()
+    let rtk_map: HashMap<String, (String, u64, f64)> = crate::rtk::detect()
         .and_then(|c| c.discover(since))
         .map(|r| {
             r.supported
@@ -1463,7 +1163,7 @@ fn cmd_discover(
 
         // Generate project-local obfsck filters from unhandled command examples.
         if generate_filters {
-            let client = crs_lib::obfsck::detect();
+            let client = crate::obfsck::detect();
             if let Some(client) = client {
                 let examples: Vec<String> =
                     report.unhandled.iter().map(|f| f.example.clone()).collect();
@@ -1541,7 +1241,7 @@ fn write_tools_yaml(
 /// Falls back silently if obfsck-mcp is not on PATH.
 fn obfsck_audit_mcp(content: &str) {
     use coursers_core::obfsck::ObfsckMcp as _;
-    let Some(client) = crs_lib::obfsck::detect() else {
+    let Some(client) = crate::obfsck::detect() else {
         return;
     };
     let hits = client.audit(content);
@@ -1698,7 +1398,7 @@ fn format_tokens(n: u64) -> String {
     }
 }
 
-fn cmd_stats() {
+pub fn cmd_stats() {
     use coursers_core::stats::{load, sorted_blocks, stats_path};
 
     let path = stats_path();
@@ -1723,7 +1423,7 @@ fn cmd_stats() {
     println!("{:<32} {:>8}", "Total", total);
 }
 
-fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
+pub fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
     use coursers_core::insights::{aggregate, enrich, load_facets};
 
     let facets_dir = std::env::var("CLAUDE_FACETS_DIR")
@@ -1787,7 +1487,7 @@ fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
     }
 }
 
-fn cmd_audit(remove: Option<String>) {
+pub fn cmd_audit(remove: Option<String>) {
     use coursers_core::rx_prefix::{
         FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _, audit_state,
     };
@@ -1841,7 +1541,7 @@ fn cmd_audit(remove: Option<String>) {
     }
 }
 
-fn cmd_suggest(
+pub fn cmd_suggest(
     profile_cfg: &coursers_core::config::ProfileConfig,
     all: bool,
     since: u32,
@@ -1857,7 +1557,7 @@ fn cmd_suggest(
         .unwrap_or_else(|_| dirs::home_dir().expect("home dir").join(".claude/projects"));
 
     let current_dir = std::env::current_dir().ok();
-    let src = crs_lib::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
+    let src = coursers_core::jsonl_source::JsonlCommandSource::new(root, all, current_dir.clone());
 
     let rules_cfg = ProfileFsRulesLoader {
         path: profile_cfg.rules_path.clone(),
@@ -1911,7 +1611,7 @@ fn cmd_suggest(
     }
 }
 
-fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
+pub fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
     use coursers_core::loader::{FsRulesLoader, RulesLoader};
     use coursers_core::stats::{load as load_stats, stats_path};
     use coursers_core::store::{FsStateStore, StateStore, state_path};
@@ -1999,7 +1699,7 @@ fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
     }
 }
 
-fn cmd_export(out_path: Option<&str>) {
+pub fn cmd_export(out_path: Option<&str>) {
     use coursers_core::loader::{FsRulesLoader, RulesLoader};
     use coursers_core::stats::{load as load_stats, stats_path};
     use coursers_core::store::{FsStateStore, StateStore, state_path};
@@ -2052,7 +1752,7 @@ fn cmd_export(out_path: Option<&str>) {
     }
 }
 
-fn cmd_heat(rule_filter: Option<&str>) {
+pub fn cmd_heat(rule_filter: Option<&str>) {
     use coursers_core::heat::build;
     use coursers_core::stats::{load as load_stats, stats_path};
 
@@ -2091,7 +1791,7 @@ fn cmd_heat(rule_filter: Option<&str>) {
     print!("{}", hm.render());
 }
 
-fn cmd_replay(session_path: Option<&str>, format: &str) {
+pub fn cmd_replay(session_path: Option<&str>, format: &str) {
     use coursers_core::loader::{FsRulesLoader, RulesLoader};
     use coursers_core::replay::{format_text, replay};
 
@@ -2184,8 +1884,8 @@ fn cmd_replay(session_path: Option<&str>, format: &str) {
 }
 
 /// Find the most recently modified `.jsonl` file matching the current project directory.
-fn cmd_nu_check(files: &[String], hooks: bool, nu_libs: bool) {
-    use crs_lib::nu_check::check_files;
+pub fn cmd_nu_check(files: &[String], hooks: bool, nu_libs: bool) {
+    use crate::nu_check::check_files;
     use walkdir::WalkDir;
 
     let mut paths: Vec<std::path::PathBuf> = files.iter().map(std::path::PathBuf::from).collect();
@@ -2404,11 +2104,12 @@ fn print_insights_table(enriched: &[coursers_core::insights::EnrichedFacet]) {
 #[cfg(test)]
 mod cli_tests {
     use super::*;
+    use crate::{Cli, Command};
     use clap::Parser;
 
     #[test]
     fn discover_default_no_generate_filters() {
-        let cli = Cli::try_parse_from(["crs", "discover"]).unwrap();
+        let cli = Cli::try_parse_from(["coursers", "discover"]).unwrap();
         match cli.command {
             Command::Discover {
                 generate_filters, ..
@@ -2421,7 +2122,7 @@ mod cli_tests {
 
     #[test]
     fn discover_generate_filters_flag() {
-        let cli = Cli::try_parse_from(["crs", "discover", "--generate-filters"]).unwrap();
+        let cli = Cli::try_parse_from(["coursers", "discover", "--generate-filters"]).unwrap();
         match cli.command {
             Command::Discover {
                 generate_filters, ..
@@ -2587,13 +2288,13 @@ mod cli_tests {
 
     #[test]
     fn audit_subcommand_parses() {
-        let cli = Cli::try_parse_from(["crs", "audit"]).unwrap();
+        let cli = Cli::try_parse_from(["coursers", "audit"]).unwrap();
         assert!(matches!(cli.command, Command::Audit { remove: None }));
     }
 
     #[test]
     fn audit_remove_flag_parses() {
-        let cli = Cli::try_parse_from(["crs", "audit", "--remove", "gh"]).unwrap();
+        let cli = Cli::try_parse_from(["coursers", "audit", "--remove", "gh"]).unwrap();
         assert!(matches!(cli.command, Command::Audit { remove: Some(ref k) } if k == "gh"));
     }
 

@@ -20,7 +20,7 @@ fn fixture_rules() -> Vec<Rule> {
 #[test]
 fn jsonl_source_empty_dir_yields_no_commands() {
     let tmp = tempfile::tempdir().unwrap();
-    let src = crs_lib::jsonl_source::JsonlCommandSource::new(
+    let src = coursers_core::jsonl_source::JsonlCommandSource::new(
         tmp.path().to_path_buf(),
         false,
         std::env::current_dir().ok(),
@@ -53,7 +53,7 @@ fn regression_discover_unhandled_empty_with_catch_all_rule() {
         message: None,
     }];
     let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/discover");
-    let src = crs_lib::jsonl_source::JsonlCommandSource::new(fixtures, true, None);
+    let src = coursers_core::jsonl_source::JsonlCommandSource::new(fixtures, true, None);
     let report = discover(
         &src,
         &catch_all,
@@ -76,7 +76,7 @@ fn regression_discover_unhandled_empty_with_catch_all_rule() {
 fn jsonl_source_reads_fixture_commands() {
     let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/discover");
 
-    let src = crs_lib::jsonl_source::JsonlCommandSource::new(fixtures, true, None);
+    let src = coursers_core::jsonl_source::JsonlCommandSource::new(fixtures, true, None);
 
     let rules = fixture_rules();
     let report = discover(

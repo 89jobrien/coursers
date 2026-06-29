@@ -8,6 +8,7 @@ pub mod analyze;
 pub mod config;
 pub mod date;
 pub mod hook;
+pub mod jsonl_source;
 pub mod loader;
 pub mod obfsck;
 pub mod parse;

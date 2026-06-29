@@ -4,7 +4,10 @@
 //! verifying command rewriting semantics.
 
 use coursers_core::rewrite::{RewriteConfig, RewriteRule};
-use crs_lib::run_rewrite;
+
+fn run_rewrite(command: &str, config: &RewriteConfig) -> Option<String> {
+    coursers_core::rewrite::apply(command, config, &coursers_core::expand::EnvExpander)
+}
 
 fn cfg(rules: &[(&str, &str)]) -> RewriteConfig {
     RewriteConfig {
