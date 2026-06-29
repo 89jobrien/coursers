@@ -17,7 +17,7 @@ path = "src/main.rs"
 [dependencies]
 chrono = { workspace = true }
 clap = { workspace = true }
-crs-core = { workspace = true } #unified
+coursers-core = { workspace = true }
 dirs = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }

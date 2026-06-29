@@ -3,7 +3,7 @@
 //! Both `FsStatsStore` and `InMemoryStatsStore` must satisfy the same observable
 //! contract through the `StatsStore` trait.
 
-use crs_core::stats::{FsStatsStore, InMemoryStatsStore, StatsStore};
+use coursers_core::stats::{FsStatsStore, InMemoryStatsStore, StatsStore};
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------
@@ -93,7 +93,7 @@ fn assert_stats_store_contract(store: &impl StatsStore) {
     );
 
     // 6. save() overwrites previous state (not append).
-    let mut fresh = crs_core::stats::Stats::default();
+    let mut fresh = coursers_core::stats::Stats::default();
     fresh.blocks.insert("rule-z".to_string(), 99);
     store.save(&fresh).expect("contract 6: overwrite save");
     let overwritten = store.load().unwrap();

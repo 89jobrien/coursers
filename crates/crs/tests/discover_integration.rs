@@ -1,6 +1,6 @@
-use crs_core::history::{DiscoverOpts, discover};
-use crs_core::loader::{FsRulesLoader, RulesLoader};
-use crs_core::rules::Rule;
+use coursers_core::history::{DiscoverOpts, discover};
+use coursers_core::loader::{FsRulesLoader, RulesLoader};
+use coursers_core::rules::Rule;
 use std::path::PathBuf;
 
 /// Stable inline rules for tests that need deterministic intercept/unhandled splits,
@@ -57,7 +57,7 @@ fn regression_discover_unhandled_empty_with_catch_all_rule() {
     let report = discover(
         &src,
         &catch_all,
-        &crs_core::history::DiscoverOpts {
+        &coursers_core::history::DiscoverOpts {
             all_projects: true,
             since_days: None,
             ..Default::default()
@@ -82,7 +82,7 @@ fn jsonl_source_reads_fixture_commands() {
     let report = discover(
         &src,
         &rules,
-        &crs_core::history::DiscoverOpts {
+        &coursers_core::history::DiscoverOpts {
             all_projects: true,
             since_days: None,
             ..Default::default()

@@ -1,3 +1,4 @@
+pub mod filter_logic;
 pub mod filters;
 pub mod log;
 pub mod pipeline;

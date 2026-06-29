@@ -1,7 +1,7 @@
 //! Conformance tests for `RulesLoader` implementations.
 
-use crs_core::loader::{InMemoryRulesLoader, RulesLoader};
-use crs_core::rules::{FailureLearning, Rule, RulesConfig};
+use coursers_core::loader::{InMemoryRulesLoader, RulesLoader};
+use coursers_core::rules::{FailureLearning, Rule, RulesConfig};
 
 // ---------------------------------------------------------------------------
 // Contract assertion

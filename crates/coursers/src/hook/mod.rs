@@ -1,65 +1,29 @@
 pub mod post;
 pub mod pre;
 
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
-
-/// Full Claude Code hook payload (PreToolUse or PostToolUse)
-#[derive(Debug, Deserialize)]
-pub struct HookPayload {
-    pub tool_name: Option<String>,
-    pub tool_input: Option<ToolInput>,
-    pub tool_response: Option<Value>,
-    pub session_id: Option<String>,
-    pub cwd: Option<String>,
-}
-
-/// The `tool_input` field of a Claude Code hook payload.
-#[derive(Debug, Deserialize)]
-pub struct ToolInput {
-    pub command: Option<String>,
-}
-
-/// PreToolUse response envelope (used by tests; live path uses protocol module).
-#[allow(dead_code)]
-#[derive(Debug, Serialize)]
-pub struct PreResponse {
-    #[serde(rename = "hookSpecificOutput")]
-    pub hook_specific_output: HookSpecificOutput,
-}
-
-/// Inner payload of a `PreToolUse` permission response.
-#[allow(dead_code)]
-#[derive(Debug, Serialize)]
-pub struct HookSpecificOutput {
-    #[serde(rename = "hookEventName")]
-    pub hook_event_name: String,
-    #[serde(rename = "permissionDecision")]
-    pub permission_decision: String,
-    #[serde(rename = "permissionDecisionReason")]
-    pub permission_decision_reason: String,
-}
+#[allow(unused_imports)]
+pub use coursers_types::hook::{HookPayload, HookSpecificOutput, PreResponse, ToolInput};
 
 /// Shared hook wiring: read stdin, load rules, state store, and capture store.
 #[allow(clippy::type_complexity, dead_code)]
 pub fn hook_context() -> Option<(
     HookPayload,
-    crs_core::loader::FsRulesLoader,
-    crs_core::store::FsStateStore,
-    crs_core::capture::SuggestionStore,
+    coursers_core::loader::FsRulesLoader,
+    coursers_core::store::FsStateStore,
+    coursers_core::capture::SuggestionStore,
 )> {
-    use crs_core::capture::SuggestionStore;
-    use crs_core::loader::{FsRulesLoader, RulesLoader};
-    use crs_core::store::FsStateStore;
-    use crs_core::store::state_path;
+    use coursers_core::capture::SuggestionStore;
+    use coursers_core::loader::{FsRulesLoader, RulesLoader};
+    use coursers_core::store::FsStateStore;
+    use coursers_core::store::state_path;
 
     let payload = read_stdin()?;
     let loader = FsRulesLoader;
     let config = loader.load().unwrap_or_else(|e| {
         eprintln!("[coursers] warning: failed to load rules: {e}");
-        crs_core::rules::RulesConfig {
+        coursers_core::rules::RulesConfig {
             rules: vec![],
-            failure_learning: crs_core::rules::FailureLearning::default(),
+            failure_learning: coursers_core::rules::FailureLearning::default(),
         }
     });
     let path = state_path(&config.failure_learning);
@@ -69,19 +33,19 @@ pub fn hook_context() -> Option<(
 }
 
 /// Profile-aware variant of [`hook_context`].
-/// Constructs loaders and stores from a resolved [`crs_core::config::ProfileConfig`].
+/// Constructs loaders and stores from a resolved [`coursers_core::config::ProfileConfig`].
 #[allow(clippy::type_complexity)]
 pub fn hook_context_with_profile(
-    profile_cfg: &crs_core::config::ProfileConfig,
+    profile_cfg: &coursers_core::config::ProfileConfig,
 ) -> Option<(
     HookPayload,
-    crs_core::loader::ProfileFsRulesLoader,
-    crs_core::store::FsStateStore,
-    crs_core::capture::SuggestionStore,
+    coursers_core::loader::ProfileFsRulesLoader,
+    coursers_core::store::FsStateStore,
+    coursers_core::capture::SuggestionStore,
 )> {
-    use crs_core::capture::SuggestionStore;
-    use crs_core::loader::ProfileFsRulesLoader;
-    use crs_core::store::FsStateStore;
+    use coursers_core::capture::SuggestionStore;
+    use coursers_core::loader::ProfileFsRulesLoader;
+    use coursers_core::store::FsStateStore;
 
     let payload = read_stdin()?;
     let loader = ProfileFsRulesLoader {
@@ -120,13 +84,13 @@ pub(crate) fn serialize_deny_response(resp: &PreResponse) -> String {
 /// Emit a deny response to stdout and exit with code 2 (Claude protocol).
 #[allow(dead_code)]
 pub fn deny(reason: &str) {
-    deny_with_protocol(crs_core::config::HookProtocol::Claude, reason);
+    deny_with_protocol(coursers_core::config::HookProtocol::Claude, reason);
 }
 
 /// Protocol-aware deny: exit code differs between Claude (2) and Codex (0).
-pub fn deny_with_protocol(proto: crs_core::config::HookProtocol, reason: &str) {
+pub fn deny_with_protocol(proto: coursers_core::config::HookProtocol, reason: &str) {
     use std::io::Write;
-    let (json, exit_code) = crs_core::hook::protocol::deny_response(proto, reason);
+    let (json, exit_code) = coursers_core::hook::protocol::deny_response(proto, reason);
     let stdout = std::io::stdout();
     let mut handle = stdout.lock();
     writeln!(handle, "{json}").ok();

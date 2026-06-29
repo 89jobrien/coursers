@@ -5,7 +5,7 @@
 //! 2. generate_filters() never panics, returns Vec<FilterSuggestion>
 //! 3. Both methods are deterministic (same input -> same output)
 
-use crs_core::obfsck::{NullObfsckMcpClient, ObfsckMcp};
+use coursers_core::obfsck::{NullObfsckMcpClient, ObfsckMcp};
 
 // ---------------------------------------------------------------------------
 // Contract assertion

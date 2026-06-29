@@ -15,7 +15,7 @@ cargo install --path crates/crs
 
 # Test
 cargo test
-cargo test -p crs-core        # core library only
+cargo test -p coursers-core        # core library only
 cargo test -p coursers        # pre/post hook binary
 cargo test -p crs             # filter/rewrite/discover binary
 
@@ -32,12 +32,12 @@ Three-crate workspace:
 
 ```
 crates/
-  core/      # crs-core — shared library (rules, state, filters, rewrite, history)
+  core/      # coursers-core — shared library (rules, state, filters, rewrite, history)
   coursers/  # `coursers` binary — pre/post hook handlers
   crs/       # `crs` binary — filter, rewrite, discover, validate, probe
 ```
 
-### crs-core
+### coursers-core
 
 All domain logic lives here. Key modules:
 
@@ -73,7 +73,7 @@ Five subcommands:
 
 ### Hexagonal boundaries
 
-`crs-core` defines traits (`CommandSource`, `RulesLoader`, `StateStore`). The `crs` binary owns
+`coursers-core` defines traits (`CommandSource`, `RulesLoader`, `StateStore`). The `crs` binary owns
 the concrete adapter (`JsonlCommandSource`). Tests inject fakes via the traits — never mock the
 file system directly.
 

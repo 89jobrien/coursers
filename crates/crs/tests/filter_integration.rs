@@ -4,7 +4,7 @@
 //! library function directly (no binary needed — the binary is just a thin
 //! stdin/stdout wrapper around `run_filter`).
 
-use crs_core::filters::{FilterMode, FilterRule, FiltersConfig};
+use coursers_core::filters::{FilterMode, FilterRule, FiltersConfig};
 use crs_lib::{FilterPayload, FilterResult, run_filter};
 
 fn payload(cmd: &str, output: &str, exit_code: i64) -> FilterPayload {
@@ -181,7 +181,7 @@ match_pattern = "FAILED|error"
 "#,
     )
     .unwrap();
-    let cfg = crs_core::filters::FiltersConfig::load_from(f.path());
+    let cfg = coursers_core::filters::FiltersConfig::load_from(f.path());
     let output = "Checking\nerror: bad\nDone";
     let p = payload("cargo kani --harness foo", output, 0);
     match run_filter(&p, &cfg) {
@@ -214,7 +214,7 @@ max_lines = 5
     )
     .unwrap();
 
-    let cfg = crs_core::filters::FiltersConfig::load_from(f.path());
+    let cfg = coursers_core::filters::FiltersConfig::load_from(f.path());
 
     // cargo test with exit 0 -> suppressed
     let p1 = payload("cargo test --release", "output", 0);

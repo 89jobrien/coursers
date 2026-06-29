@@ -1,7 +1,7 @@
 //! Conformance tests for `CommandSource` implementations.
 
-use crs_core::history::CommandSource;
-use crs_core::testing::MockCommandSource;
+use coursers_core::history::CommandSource;
+use coursers_core::testing::MockCommandSource;
 
 // ---------------------------------------------------------------------------
 // Contract assertion
@@ -39,7 +39,7 @@ fn empty_source_returns_empty_iterator() {
 
 #[test]
 fn mock_source_with_records_satisfies_contract() {
-    use crs_core::history::CommandRecord;
+    use coursers_core::history::CommandRecord;
 
     let records = vec![
         CommandRecord {
@@ -75,7 +75,7 @@ fn mock_source_with_records_satisfies_contract() {
 
 #[test]
 fn mock_source_via_mock_workspace_satisfies_contract() {
-    use crs_core::testing::MockWorkspace;
+    use coursers_core::testing::MockWorkspace;
 
     let ws = MockWorkspace::new()
         .with_command("grep foo .")

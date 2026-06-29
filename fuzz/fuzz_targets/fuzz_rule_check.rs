@@ -1,7 +1,7 @@
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;
-use crs_core::rules::{Rule, check, check_pipeline, matched_rule_id};
+use coursers_core::rules::{Rule, check, check_pipeline, matched_rule_id};
 
 fn test_rules() -> Vec<Rule> {
     vec![

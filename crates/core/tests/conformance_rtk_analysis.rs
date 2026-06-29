@@ -5,7 +5,7 @@
 //! 2. All methods are deterministic
 //! 3. NullRtkClient returns None/None for all optional methods
 
-use crs_core::rtk::{NullRtkClient, RtkAnalysis};
+use coursers_core::rtk::{NullRtkClient, RtkAnalysis};
 
 // ---------------------------------------------------------------------------
 // Contract assertion

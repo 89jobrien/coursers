@@ -3,7 +3,7 @@
 //! Tests the library function `run_rewrite` with real TOML-loaded config,
 //! verifying command rewriting semantics.
 
-use crs_core::rewrite::{RewriteConfig, RewriteRule};
+use coursers_core::rewrite::{RewriteConfig, RewriteRule};
 use crs_lib::run_rewrite;
 
 fn cfg(rules: &[(&str, &str)]) -> RewriteConfig {

@@ -7,7 +7,7 @@
 //! 4. EnvExpander resolves known env vars
 //! 5. EnvExpander leaves unknown vars as-is (no panic, no empty)
 
-use crs_core::expand::{EnvExpander, NoopExpander, VarExpander};
+use coursers_core::expand::{EnvExpander, NoopExpander, VarExpander};
 
 // ---------------------------------------------------------------------------
 // Contract assertion: properties every VarExpander must satisfy

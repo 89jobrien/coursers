@@ -6,7 +6,9 @@
 //! its backing `Vec` directly; that contract is tested via `SuggestionStore`'s
 //! own `load()` helper in the separate block below.
 
-use crs_core::capture::{CaptureStore, InMemoryCaptureStore, SuggestionRecord, SuggestionStore};
+use coursers_core::capture::{
+    CaptureStore, InMemoryCaptureStore, SuggestionRecord, SuggestionStore,
+};
 use tempfile::TempDir;
 
 // ---------------------------------------------------------------------------

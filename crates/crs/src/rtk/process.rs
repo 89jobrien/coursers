@@ -3,7 +3,7 @@
 /// All methods fail-open: if rtk is missing, returns None/false/empty.
 use std::process::Command;
 
-use crs_core::rtk::{
+use coursers_core::rtk::{
     RtkAnalysis, RtkAuditEntry, RtkDiscoverReport, RtkGainReport, RtkHookAudit, RtkProbeResult,
     RtkRewrite, RtkSessionEntry, RtkSupportedEntry, RtkUnsupportedEntry, RtkVerifyResult,
 };

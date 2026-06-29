@@ -6,7 +6,7 @@ use proptest::prelude::*;
 // rules::check — exception always overrides a matching rule
 // ---------------------------------------------------------------------------
 
-use crs_core::rules::{Rule, check};
+use coursers_core::rules::{Rule, check};
 
 fn make_rule_with_exception(pattern: &str, exception: &str) -> Rule {
     Rule {
@@ -57,7 +57,7 @@ proptest! {
 // date — validity and monotonicity
 // ---------------------------------------------------------------------------
 
-use crs_core::date::unix_secs_to_ymd;
+use coursers_core::date::unix_secs_to_ymd;
 
 proptest! {
     /// Month is always in 1..=12, day is always in 1..=31.
@@ -87,7 +87,7 @@ proptest! {
 // stats::StatsStore — record_block count invariant
 // ---------------------------------------------------------------------------
 
-use crs_core::stats::{InMemoryStatsStore, StatsStore};
+use coursers_core::stats::{InMemoryStatsStore, StatsStore};
 
 proptest! {
     /// After N calls to record_block(rule_id), blocks[rule_id] == N.
@@ -132,7 +132,7 @@ proptest! {
 // ast::parse — non-empty input produces non-empty argv
 // ---------------------------------------------------------------------------
 
-use crs_core::ast::parse;
+use coursers_core::ast::parse;
 
 proptest! {
     /// If input contains at least one non-whitespace char and is valid shell syntax,

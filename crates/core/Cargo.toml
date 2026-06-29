@@ -1,6 +1,6 @@
 [package]
-name = "crs-core"
-description = "Shared config, rules, and state for coursers and crs"
+name = "coursers-core"
+description = "Shared config, rules, and state for the coursers workspace"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -15,6 +15,7 @@ doctest = false
 testing = []
 
 [dependencies]
+coursers-types = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }

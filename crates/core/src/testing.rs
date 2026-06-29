@@ -16,7 +16,7 @@ use crate::state::State;
 /// # Example
 ///
 /// ```rust
-/// # use crs_core::testing::MockWorkspace;
+/// # use coursers_core::testing::MockWorkspace;
 /// let ws = MockWorkspace::new()
 ///     .with_command("grep foo .")
 ///     .with_command_ts("new cmd here", "2099-12-31T00:00:00Z")
@@ -24,7 +24,7 @@ use crate::state::State;
 ///     .with_cwd("/project/a");
 ///
 /// let src = ws.command_source();
-/// let report = crs_core::history::discover(&src, &ws.rules, &ws.discover_opts());
+/// let report = coursers_core::history::discover(&src, &ws.rules, &ws.discover_opts());
 /// ```
 // qual:allow(srp) reason: "builder pattern for test fixtures"
 pub struct MockWorkspace {

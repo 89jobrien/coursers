@@ -1,7 +1,7 @@
 mod hook;
 
 use clap::{Parser, Subcommand};
-use crs_core::config::ConfigBuilder;
+use coursers_core::config::ConfigBuilder;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -46,7 +46,7 @@ fn build_profile(
     profile: Option<String>,
     rules: Option<PathBuf>,
     state: Option<PathBuf>,
-) -> crs_core::config::ProfileConfig {
+) -> coursers_core::config::ProfileConfig {
     let mut b = ConfigBuilder::new();
     if let Some(p) = profile {
         b = b.profile(p);

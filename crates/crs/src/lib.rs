@@ -3,106 +3,24 @@ pub mod nu_check;
 pub mod obfsck;
 pub mod rtk;
 
-use crs_core::filters::{FilterMode, FilterRule, FiltersConfig, find_rule};
-use crs_core::rewrite::RewriteConfig;
-#[cfg(test)]
-use crs_core::rewrite::RewriteRule;
+// Re-export filter logic from coursers-core for backward compatibility.
+pub use coursers_core::hook::filter_logic::{
+    FilterPayload, FilterResult, apply_filter, run_filter,
+};
 
-/// Apply filter to output based on mode and exit code.
-/// Returns the (possibly modified) output string, or None to suppress entirely.
-pub fn apply_filter(output: &str, exit_code: i64, rule: &FilterRule) -> Option<String> {
-    match rule.mode {
-        FilterMode::Passthrough => Some(output.to_string()),
-        FilterMode::FailuresOnly => {
-            if exit_code != 0 {
-                Some(output.to_string())
-            } else {
-                None
-            }
-        }
-        FilterMode::ErrorsOnly => {
-            let filtered: Vec<&str> = output
-                .lines()
-                .filter(|l| l.to_lowercase().contains("error"))
-                .collect();
-            if filtered.is_empty() {
-                None
-            } else {
-                Some(filtered.join("\n"))
-            }
-        }
-        FilterMode::Truncate => {
-            let lines: Vec<&str> = output.lines().collect();
-            if lines.len() <= rule.max_lines {
-                Some(output.to_string())
-            } else {
-                let kept = lines[..rule.max_lines].join("\n");
-                let omitted = lines.len() - rule.max_lines;
-                Some(format!("{kept}\n... ({omitted} lines omitted)"))
-            }
-        }
-        FilterMode::MatchLines => {
-            // On failure, pass full output — error context matters.
-            if exit_code != 0 {
-                return Some(output.to_string());
-            }
-            let Some(ref pat) = rule.match_pattern else {
-                return Some(output.to_string());
-            };
-            let Ok(re) = regex::Regex::new(pat) else {
-                return Some(output.to_string());
-            };
-            let matched: Vec<&str> = output.lines().filter(|l| re.is_match(l)).collect();
-            if matched.is_empty() {
-                None
-            } else {
-                Some(matched.join("\n"))
-            }
-        }
-    }
-}
-
-/// Run the `crs filter` hook logic.
-///
-/// Returns the hook message to emit (for `decision: allow` with message), or
-/// `None` to emit nothing (passthrough silently).
-pub fn run_filter(payload: &FilterPayload, config: &FiltersConfig) -> FilterResult {
-    let Some(rule) = find_rule(&payload.command, config) else {
-        return FilterResult::Passthrough;
-    };
-
-    match apply_filter(&payload.output, payload.exit_code, rule) {
-        Some(text) if text == payload.output => FilterResult::Passthrough,
-        Some(text) => FilterResult::Replace(text),
-        None => FilterResult::Suppress,
-    }
-}
+// Re-export rewrite logic.
+pub use coursers_core::rewrite::RewriteConfig;
 
 /// Run the `crs rewrite` hook logic. Returns `Some(rewritten)` or `None`.
 pub fn run_rewrite(command: &str, config: &RewriteConfig) -> Option<String> {
-    crs_core::rewrite::apply(command, config, &crs_core::expand::EnvExpander)
-}
-
-#[derive(Debug, PartialEq)]
-pub enum FilterResult {
-    /// No change — let Claude Code proceed normally.
-    Passthrough,
-    /// Replace output with this string in the hook message.
-    Replace(String),
-    /// Suppress output entirely (emit empty message).
-    Suppress,
-}
-
-/// Parsed PostToolUse hook payload used by the `crs filter` subcommand.
-pub struct FilterPayload {
-    pub command: String,
-    pub output: String,
-    pub exit_code: i64,
+    coursers_core::rewrite::apply(command, config, &coursers_core::expand::EnvExpander)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use coursers_core::filters::{FilterMode, FilterRule, FiltersConfig};
+    use coursers_core::rewrite::RewriteRule;
 
     fn make_rule(mode: FilterMode, max_lines: usize) -> FilterRule {
         FilterRule {
@@ -288,7 +206,7 @@ mod tests {
     // Conformance: FilterRule with match-lines mode deserializes correctly.
     #[test]
     fn match_lines_rule_deserializes_from_toml() {
-        use crs_core::filters::FiltersConfig;
+        use coursers_core::filters::FiltersConfig;
         let toml = r#"
 [[filters]]
 pattern = "cargo kani"
@@ -306,7 +224,7 @@ match_pattern = "FAILED|error"
 
     #[test]
     fn match_lines_rule_without_match_pattern_deserializes() {
-        use crs_core::filters::FiltersConfig;
+        use coursers_core::filters::FiltersConfig;
         let toml = r#"
 [[filters]]
 pattern = "cargo kani"

@@ -1,6 +1,6 @@
 // qual:allow(srp) reason: "CLI entry point — subcommand dispatch is inherently large"
 use clap::{Parser, Subcommand};
-use crs_core::config::ConfigBuilder;
+use coursers_core::config::ConfigBuilder;
 use crs_lib::{FilterPayload, FilterResult, run_filter, run_rewrite};
 use serde::Deserialize;
 use serde_json::Value;
@@ -229,7 +229,7 @@ fn resolve_profile(
     profile: Option<String>,
     rules: Option<PathBuf>,
     state: Option<PathBuf>,
-) -> crs_core::config::ProfileConfig {
+) -> coursers_core::config::ProfileConfig {
     let mut b = ConfigBuilder::new();
     if let Some(p) = profile {
         b = b.profile(p);
@@ -468,11 +468,11 @@ fn command_key(cmd: &str) -> String {
 fn handle_probe_result(
     command: &str,
     exit_code: i64,
-    probe_store: &dyn crs_core::rx_prefix::ProbeStore,
-    prefix_store: &dyn crs_core::rx_prefix::PrefixStore,
-    stats_store: &dyn crs_core::rx_prefix::StatsStore,
+    probe_store: &dyn coursers_core::rx_prefix::ProbeStore,
+    prefix_store: &dyn coursers_core::rx_prefix::PrefixStore,
+    stats_store: &dyn coursers_core::rx_prefix::StatsStore,
 ) -> Option<String> {
-    use crs_core::rx_prefix::ProbeState;
+    use coursers_core::rx_prefix::ProbeState;
     let mut probes = probe_store.load();
     let cmd = command.trim();
 
@@ -526,11 +526,11 @@ fn handle_probe_result(
 /// Post-hook: when a bare command fails, create a Pending probe and suggest retry.
 fn handle_bare_failure(
     command: &str,
-    probe_store: &dyn crs_core::rx_prefix::ProbeStore,
-    prefix_store: &dyn crs_core::rx_prefix::PrefixStore,
-    stats_store: &dyn crs_core::rx_prefix::StatsStore,
+    probe_store: &dyn coursers_core::rx_prefix::ProbeStore,
+    prefix_store: &dyn coursers_core::rx_prefix::PrefixStore,
+    stats_store: &dyn coursers_core::rx_prefix::StatsStore,
 ) -> Option<String> {
-    use crs_core::rx_prefix::{OriginalCommand, ProbeEntry, ProbeState};
+    use coursers_core::rx_prefix::{OriginalCommand, ProbeEntry, ProbeState};
 
     let config = prefix_store.load();
     if config.candidate_prefixes.is_empty() {
@@ -601,7 +601,7 @@ fn cmd_filter() {
     let output = payload
         .tool_response
         .as_ref()
-        .and_then(crs_core::hook::protocol::extract_output)
+        .and_then(coursers_core::hook::protocol::extract_output)
         .unwrap_or_default();
 
     let exit_code = payload
@@ -611,7 +611,7 @@ fn cmd_filter() {
         .and_then(|v| v.as_i64())
         .unwrap_or(0);
 
-    let config = crs_core::filters::load();
+    let config = coursers_core::filters::load();
     let fp = FilterPayload {
         command: command.clone(),
         output: output.clone(),
@@ -629,19 +629,19 @@ fn cmd_filter() {
     };
 
     // Apply obfsck redaction patterns if .ctx/obfsck-filters.yaml exists.
-    let obfsck = crs_core::filters::load_obfsck_filters();
-    let final_output = crs_core::filters::apply_redaction(&filtered_output, &obfsck);
+    let obfsck = coursers_core::filters::load_obfsck_filters();
+    let final_output = coursers_core::filters::apply_redaction(&filtered_output, &obfsck);
 
     // Post-hook rx learning: reactive probe lifecycle.
     let rx_message = {
-        let probe_store = crs_core::rx_prefix::FileProbeStore {
-            path: crs_core::rx_prefix::FileProbeStore::default_path(),
+        let probe_store = coursers_core::rx_prefix::FileProbeStore {
+            path: coursers_core::rx_prefix::FileProbeStore::default_path(),
         };
-        let prefix_store = crs_core::rx_prefix::FilePrefixStore {
-            path: crs_core::rx_prefix::FilePrefixStore::default_path(),
+        let prefix_store = coursers_core::rx_prefix::FilePrefixStore {
+            path: coursers_core::rx_prefix::FilePrefixStore::default_path(),
         };
-        let stats_store = crs_core::rx_prefix::FileStatsStore::new(
-            crs_core::rx_prefix::FileStatsStore::default_path(),
+        let stats_store = coursers_core::rx_prefix::FileStatsStore::new(
+            coursers_core::rx_prefix::FileStatsStore::default_path(),
         );
 
         // 1. Check if this resolves a Probing attempt
@@ -688,9 +688,9 @@ fn cmd_rewrite() {
     };
 
     // 1. Try AST tool swap first
-    let filters_cfg = crs_core::filters::load();
-    let swap = crs_core::tool_swap::apply(command, &filters_cfg.tool_swap);
-    if let crs_core::tool_swap::ToolAction::SwapTool {
+    let filters_cfg = coursers_core::filters::load();
+    let swap = coursers_core::tool_swap::apply(command, &filters_cfg.tool_swap);
+    if let coursers_core::tool_swap::ToolAction::SwapTool {
         tool_name,
         tool_input,
     } = swap
@@ -708,8 +708,8 @@ fn cmd_rewrite() {
 
     // 3. rx prefix: check if this is a Pending probe retry
     {
-        let probe_store = crs_core::rx_prefix::FileProbeStore {
-            path: crs_core::rx_prefix::FileProbeStore::default_path(),
+        let probe_store = coursers_core::rx_prefix::FileProbeStore {
+            path: coursers_core::rx_prefix::FileProbeStore::default_path(),
         };
         if check_probe_match(command, &probe_store) {
             // Probe matched and transitioned to Probing — pass through unchanged
@@ -719,13 +719,13 @@ fn cmd_rewrite() {
 
     // 4. rx prefix injection (confirmed mappings only)
     let rx_config = {
-        use crs_core::rx_prefix::PrefixStore as _;
-        crs_core::rx_prefix::FilePrefixStore {
-            path: crs_core::rx_prefix::FilePrefixStore::default_path(),
+        use coursers_core::rx_prefix::PrefixStore as _;
+        coursers_core::rx_prefix::FilePrefixStore {
+            path: coursers_core::rx_prefix::FilePrefixStore::default_path(),
         }
         .load()
     };
-    let result = crs_core::rx_prefix::rewrite_command(command, &rx_config);
+    let result = coursers_core::rx_prefix::rewrite_command(command, &rx_config);
     if result.rewritten != command {
         emit_rewrite(&result.rewritten);
         return;
@@ -736,7 +736,7 @@ fn cmd_rewrite() {
 }
 
 fn cmd_validate_hooks() {
-    use crs_core::hook_pipeline::{
+    use coursers_core::hook_pipeline::{
         DiagLevel, HookPipelineConfig, config_source_paths, lint_config, load_config,
         validate_config,
     };
@@ -856,7 +856,7 @@ fn cmd_validate_codex_hooks() {
 }
 
 fn cmd_hook(event_str: &str) {
-    use crs_core::hook_pipeline::{HookContext, HookEvent, load_config, run_pipeline};
+    use coursers_core::hook_pipeline::{HookContext, HookEvent, load_config, run_pipeline};
 
     let event = match event_str {
         "pre-tool-use" => HookEvent::PreToolUse,
@@ -914,17 +914,20 @@ fn cmd_hook(event_str: &str) {
 
     // Log to redb only when a rule actually fired (skip silent passes).
     if !result.matched_rules.is_empty()
-        && let Ok(db) = crs_core::hook::log::open_db(&crs_core::hook::log::db_path())
+        && let Ok(db) = coursers_core::hook::log::open_db(&coursers_core::hook::log::db_path())
     {
-        let entry =
-            crs_core::hook::log::entry_from_pipeline(&ctx, &result, result.matched_rules.clone());
-        crs_core::hook::log::record(&db, &entry);
+        let entry = coursers_core::hook::log::entry_from_pipeline(
+            &ctx,
+            &result,
+            result.matched_rules.clone(),
+        );
+        coursers_core::hook::log::record(&db, &entry);
     }
 
     // Emit response based on event type and result.
     if let Some(deny_msg) = result.deny {
-        let (json, exit_code) = crs_core::hook::protocol::deny_response(
-            crs_core::config::HookProtocol::Claude,
+        let (json, exit_code) = coursers_core::hook::protocol::deny_response(
+            coursers_core::config::HookProtocol::Claude,
             &format!("[crs-hook] {deny_msg}"),
         );
         write_stdout(&json);
@@ -932,7 +935,7 @@ fn cmd_hook(event_str: &str) {
     }
 
     if let Some(ref rewritten) = result.rewrite {
-        let json = crs_core::hook::protocol::rewrite_response("crs-hook: rewrite", rewritten);
+        let json = coursers_core::hook::protocol::rewrite_response("crs-hook: rewrite", rewritten);
         write_stdout(&json);
         return;
     }
@@ -941,7 +944,7 @@ fn cmd_hook(event_str: &str) {
     if !result.messages.is_empty() {
         let combined = result.messages.join("\n");
         let json =
-            crs_core::hook::protocol::system_message_response(event_str_for(event), &combined);
+            coursers_core::hook::protocol::system_message_response(event_str_for(event), &combined);
         write_stdout(&json);
     }
 
@@ -955,7 +958,7 @@ fn cmd_log(
     format: &str,
     prune_hours: Option<u64>,
 ) {
-    use crs_core::hook::log::{LogQuery, count, db_path, open_db, prune, query};
+    use coursers_core::hook::log::{LogQuery, count, db_path, open_db, prune, query};
 
     let db_p = db_path();
     let Ok(db) = open_db(&db_p) else {
@@ -1016,17 +1019,17 @@ fn cmd_log(
             .unwrap_or_else(|| "?".into());
 
         let outcome_str = match &entry.outcome {
-            crs_core::hook::log::Outcome::Pass => "PASS".to_string(),
-            crs_core::hook::log::Outcome::Deny { message } => {
+            coursers_core::hook::log::Outcome::Pass => "PASS".to_string(),
+            coursers_core::hook::log::Outcome::Deny { message } => {
                 format!("DENY: {}", &message[..message.len().min(60)])
             }
-            crs_core::hook::log::Outcome::Rewrite { to } => {
+            coursers_core::hook::log::Outcome::Rewrite { to } => {
                 format!("REWRITE: {}", &to[..to.len().min(60)])
             }
-            crs_core::hook::log::Outcome::SideEffect { commands_run } => {
+            coursers_core::hook::log::Outcome::SideEffect { commands_run } => {
                 format!("RUN({commands_run})")
             }
-            crs_core::hook::log::Outcome::Notify { count } => format!("NOTIFY({count})"),
+            coursers_core::hook::log::Outcome::Notify { count } => format!("NOTIFY({count})"),
         };
 
         let target_short = entry
@@ -1050,8 +1053,8 @@ fn cmd_log(
     }
 }
 
-fn event_str_for(event: crs_core::hook_pipeline::HookEvent) -> &'static str {
-    use crs_core::hook_pipeline::HookEvent;
+fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
+    use coursers_core::hook_pipeline::HookEvent;
     match event {
         HookEvent::PreToolUse => "PreToolUse",
         HookEvent::PostToolUse => "PostToolUse",
@@ -1064,16 +1067,16 @@ fn event_str_for(event: crs_core::hook_pipeline::HookEvent) -> &'static str {
 }
 
 fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
-    let json = crs_core::hook::protocol::tool_swap_response(tool_name, tool_input);
+    let json = coursers_core::hook::protocol::tool_swap_response(tool_name, tool_input);
     write_stdout(&json);
 }
 
-fn load_rewrite_config() -> crs_core::rewrite::RewriteConfig {
-    let Some(path) = crs_core::filters::filters_path() else {
-        return crs_core::rewrite::RewriteConfig::default();
+fn load_rewrite_config() -> coursers_core::rewrite::RewriteConfig {
+    let Some(path) = coursers_core::filters::filters_path() else {
+        return coursers_core::rewrite::RewriteConfig::default();
     };
     let Ok(content) = std::fs::read_to_string(&path) else {
-        return crs_core::rewrite::RewriteConfig::default();
+        return coursers_core::rewrite::RewriteConfig::default();
     };
     toml::from_str::<RewriteToml>(&content)
         .map(|t| t.rewrite_config)
@@ -1084,19 +1087,22 @@ fn load_rewrite_config() -> crs_core::rewrite::RewriteConfig {
 #[derive(serde::Deserialize, Default)]
 struct RewriteToml {
     #[serde(flatten)]
-    rewrite_config: crs_core::rewrite::RewriteConfig,
+    rewrite_config: coursers_core::rewrite::RewriteConfig,
 }
 
 /// Emit a systemMessage to Claude (post-hook feedback for rx learning).
 fn emit_system_message(text: &str) {
-    let json = crs_core::hook::protocol::system_message_response("PostToolUse", text);
+    let json = coursers_core::hook::protocol::system_message_response("PostToolUse", text);
     write_stdout(&json);
 }
 
 /// Pre-hook: check if `command` matches a Pending probe's expected retry.
 /// If so, transition to Probing and return true.
-fn check_probe_match(command: &str, probe_store: &dyn crs_core::rx_prefix::ProbeStore) -> bool {
-    use crs_core::rx_prefix::ProbeState;
+fn check_probe_match(
+    command: &str,
+    probe_store: &dyn coursers_core::rx_prefix::ProbeStore,
+) -> bool {
+    use coursers_core::rx_prefix::ProbeState;
     let mut probes = probe_store.load();
     let cmd = command.trim();
 
@@ -1119,13 +1125,15 @@ fn check_probe_match(command: &str, probe_store: &dyn crs_core::rx_prefix::Probe
 }
 
 fn emit_message(text: &str) {
-    let json = crs_core::hook::protocol::filter_result_response(text);
+    let json = coursers_core::hook::protocol::filter_result_response(text);
     write_stdout(&json);
 }
 
 fn emit_rewrite(command: &str) {
-    let json =
-        crs_core::hook::protocol::rewrite_response(&format!("crs rewrite: {command}"), command);
+    let json = coursers_core::hook::protocol::rewrite_response(
+        &format!("crs rewrite: {command}"),
+        command,
+    );
     write_stdout(&json);
 }
 
@@ -1136,8 +1144,8 @@ fn write_stdout(json: &str) {
     handle.flush().ok();
 }
 
-fn cmd_validate(profile_cfg: &crs_core::config::ProfileConfig) {
-    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
+fn cmd_validate(profile_cfg: &coursers_core::config::ProfileConfig) {
+    use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
     let load_rules = || {
         ProfileFsRulesLoader {
@@ -1177,9 +1185,9 @@ fn cmd_validate(profile_cfg: &crs_core::config::ProfileConfig) {
 
     let config = load_rules().unwrap_or_else(|e| {
         eprintln!("[crs] warning: failed to load rules: {e}");
-        crs_core::rules::RulesConfig {
+        coursers_core::rules::RulesConfig {
             rules: vec![],
-            failure_learning: crs_core::rules::FailureLearning::default(),
+            failure_learning: coursers_core::rules::FailureLearning::default(),
         }
     });
     let mut any_fail = false;
@@ -1266,8 +1274,8 @@ fn cmd_validate(profile_cfg: &crs_core::config::ProfileConfig) {
     }
 }
 
-fn cmd_probe(profile_cfg: &crs_core::config::ProfileConfig) {
-    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
+fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
+    use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
     let load_rules = || {
         ProfileFsRulesLoader {
@@ -1300,9 +1308,9 @@ fn cmd_probe(profile_cfg: &crs_core::config::ProfileConfig) {
 
     let config = load_rules().unwrap_or_else(|e| {
         eprintln!("[crs] warning: failed to load rules: {e}");
-        crs_core::rules::RulesConfig {
+        coursers_core::rules::RulesConfig {
             rules: vec![],
-            failure_learning: crs_core::rules::FailureLearning::default(),
+            failure_learning: coursers_core::rules::FailureLearning::default(),
         }
     });
 
@@ -1384,7 +1392,7 @@ fn cmd_probe(profile_cfg: &crs_core::config::ProfileConfig) {
 }
 
 fn cmd_discover(
-    profile_cfg: &crs_core::config::ProfileConfig,
+    profile_cfg: &coursers_core::config::ProfileConfig,
     all: bool,
     limit: usize,
     since: u32,
@@ -1392,10 +1400,10 @@ fn cmd_discover(
     generate_filters: bool,
     min_count: u64,
 ) {
-    use crs_core::history::{DiscoverOpts, discover};
-    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
-    use crs_core::obfsck::ObfsckMcp as _;
-    use crs_core::rtk::RtkAnalysis as _;
+    use coursers_core::history::{DiscoverOpts, discover};
+    use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
+    use coursers_core::obfsck::ObfsckMcp as _;
+    use coursers_core::rtk::RtkAnalysis as _;
     use std::collections::HashMap;
 
     let root = std::env::var("CLAUDE_PROJECTS_DIR")
@@ -1411,9 +1419,9 @@ fn cmd_discover(
     .load()
     .unwrap_or_else(|e| {
         eprintln!("[crs] warning: failed to load rules: {e}");
-        crs_core::rules::RulesConfig {
+        coursers_core::rules::RulesConfig {
             rules: vec![],
-            failure_learning: crs_core::rules::FailureLearning::default(),
+            failure_learning: coursers_core::rules::FailureLearning::default(),
         }
     });
     let opts = DiscoverOpts {
@@ -1473,7 +1481,7 @@ fn cmd_discover(
 }
 
 fn write_tools_yaml(
-    report: &crs_core::history::DiscoverReport,
+    report: &coursers_core::history::DiscoverReport,
     since_days: u32,
     rtk_map: &std::collections::HashMap<String, (String, u64, f64)>,
     path: std::path::PathBuf,
@@ -1532,7 +1540,7 @@ fn write_tools_yaml(
 /// Audit content for secrets via obfsck-mcp; surface hits to stderr.
 /// Falls back silently if obfsck-mcp is not on PATH.
 fn obfsck_audit_mcp(content: &str) {
-    use crs_core::obfsck::ObfsckMcp as _;
+    use coursers_core::obfsck::ObfsckMcp as _;
     let Some(client) = crs_lib::obfsck::detect() else {
         return;
     };
@@ -1548,7 +1556,7 @@ fn obfsck_audit_mcp(content: &str) {
 /// Write filter suggestions from obfsck-mcp to `.ctx/obfsck-filters.yaml`.
 /// Merges with any existing file — new patterns whose label already appears are skipped.
 fn write_obfsck_filters(
-    suggestions: &[crs_core::obfsck::FilterSuggestion],
+    suggestions: &[coursers_core::obfsck::FilterSuggestion],
     path: std::path::PathBuf,
 ) {
     use std::io::Write as _;
@@ -1563,7 +1571,7 @@ fn write_obfsck_filters(
         })
         .collect();
 
-    let new_suggestions: Vec<&crs_core::obfsck::FilterSuggestion> = suggestions
+    let new_suggestions: Vec<&coursers_core::obfsck::FilterSuggestion> = suggestions
         .iter()
         .filter(|s| !existing_labels.contains(&s.label))
         .collect();
@@ -1598,7 +1606,7 @@ fn write_obfsck_filters(
     }
 }
 
-fn print_discover_text(report: &crs_core::history::DiscoverReport) {
+fn print_discover_text(report: &coursers_core::history::DiscoverReport) {
     println!("CRS Discover — Savings Opportunities");
     println!("{}", "=".repeat(52));
     println!(
@@ -1662,7 +1670,7 @@ fn print_discover_text(report: &crs_core::history::DiscoverReport) {
     }
 }
 
-fn print_discover_json(report: &crs_core::history::DiscoverReport) {
+fn print_discover_json(report: &coursers_core::history::DiscoverReport) {
     let out = serde_json::json!({
         "scanned_sessions": report.scanned_sessions,
         "scanned_commands": report.scanned_commands,
@@ -1691,7 +1699,7 @@ fn format_tokens(n: u64) -> String {
 }
 
 fn cmd_stats() {
-    use crs_core::stats::{load, sorted_blocks, stats_path};
+    use coursers_core::stats::{load, sorted_blocks, stats_path};
 
     let path = stats_path();
     let stats = load(&path);
@@ -1716,7 +1724,7 @@ fn cmd_stats() {
 }
 
 fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
-    use crs_core::insights::{aggregate, enrich, load_facets};
+    use coursers_core::insights::{aggregate, enrich, load_facets};
 
     let facets_dir = std::env::var("CLAUDE_FACETS_DIR")
         .map(std::path::PathBuf::from)
@@ -1759,8 +1767,8 @@ fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default()
             .as_secs()
-            .saturating_sub(days as u64 * crs_core::date::SECS_PER_DAY);
-        let cutoff = crs_core::date::unix_secs_to_date_str(cutoff_secs);
+            .saturating_sub(days as u64 * coursers_core::date::SECS_PER_DAY);
+        let cutoff = coursers_core::date::unix_secs_to_date_str(cutoff_secs);
         enriched.retain(|ef| {
             ef.git
                 .as_ref()
@@ -1780,7 +1788,7 @@ fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
 }
 
 fn cmd_audit(remove: Option<String>) {
-    use crs_core::rx_prefix::{
+    use coursers_core::rx_prefix::{
         FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _, audit_state,
     };
 
@@ -1834,15 +1842,15 @@ fn cmd_audit(remove: Option<String>) {
 }
 
 fn cmd_suggest(
-    profile_cfg: &crs_core::config::ProfileConfig,
+    profile_cfg: &coursers_core::config::ProfileConfig,
     all: bool,
     since: u32,
     limit: usize,
     format: &str,
 ) {
-    use crs_core::history::{DiscoverOpts, discover};
-    use crs_core::loader::{ProfileFsRulesLoader, RulesLoader};
-    use crs_core::suggest::suggest;
+    use coursers_core::history::{DiscoverOpts, discover};
+    use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
+    use coursers_core::suggest::suggest;
 
     let root = std::env::var("CLAUDE_PROJECTS_DIR")
         .map(std::path::PathBuf::from)
@@ -1857,9 +1865,9 @@ fn cmd_suggest(
     .load()
     .unwrap_or_else(|e| {
         eprintln!("[crs] warning: failed to load rules: {e}");
-        crs_core::rules::RulesConfig {
+        coursers_core::rules::RulesConfig {
             rules: vec![],
-            failure_learning: crs_core::rules::FailureLearning::default(),
+            failure_learning: coursers_core::rules::FailureLearning::default(),
         }
     });
     let opts = DiscoverOpts {
@@ -1904,9 +1912,9 @@ fn cmd_suggest(
 }
 
 fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
-    use crs_core::loader::{FsRulesLoader, RulesLoader};
-    use crs_core::stats::{load as load_stats, stats_path};
-    use crs_core::store::{FsStateStore, StateStore, state_path};
+    use coursers_core::loader::{FsRulesLoader, RulesLoader};
+    use coursers_core::stats::{load as load_stats, stats_path};
+    use coursers_core::store::{FsStateStore, StateStore, state_path};
 
     let rules_cfg = FsRulesLoader.load().unwrap_or_default();
     let stats_p = stats_path();
@@ -1915,7 +1923,7 @@ fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
     let state_p = state_path(&rules_cfg.failure_learning);
     let state = FsStateStore { path: state_p }.load().unwrap_or_else(|e| {
         eprintln!("[crs] warning: failed to load state: {e}");
-        crs_core::state::State::default()
+        coursers_core::state::State::default()
     });
 
     // Build per-rule history from stats last_seen + failure state entries
@@ -1933,7 +1941,7 @@ fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
         .iter()
         .filter(|(rule_id, _)| rule_filter.map(|f| f == rule_id.as_str()).unwrap_or(true))
         .map(|(rule_id, &ts)| {
-            let date = crs_core::date::unix_secs_to_date_str(ts as u64);
+            let date = coursers_core::date::unix_secs_to_date_str(ts as u64);
             let count = stats.blocks.get(rule_id).copied().unwrap_or(0);
             // Best-effort: find a matching failure state entry for a command preview
             let preview = state
@@ -1992,9 +2000,9 @@ fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
 }
 
 fn cmd_export(out_path: Option<&str>) {
-    use crs_core::loader::{FsRulesLoader, RulesLoader};
-    use crs_core::stats::{load as load_stats, stats_path};
-    use crs_core::store::{FsStateStore, StateStore, state_path};
+    use coursers_core::loader::{FsRulesLoader, RulesLoader};
+    use coursers_core::stats::{load as load_stats, stats_path};
+    use coursers_core::store::{FsStateStore, StateStore, state_path};
 
     let rules_cfg = FsRulesLoader.load().unwrap_or_default();
     let stats = load_stats(&stats_path());
@@ -2004,7 +2012,7 @@ fn cmd_export(out_path: Option<&str>) {
     .load()
     .unwrap_or_else(|e| {
         eprintln!("[crs] warning: failed to load state: {e}");
-        crs_core::state::State::default()
+        coursers_core::state::State::default()
     });
 
     let snapshot = serde_json::json!({
@@ -2045,8 +2053,8 @@ fn cmd_export(out_path: Option<&str>) {
 }
 
 fn cmd_heat(rule_filter: Option<&str>) {
-    use crs_core::heat::build;
-    use crs_core::stats::{load as load_stats, stats_path};
+    use coursers_core::heat::build;
+    use coursers_core::stats::{load as load_stats, stats_path};
 
     let stats = load_stats(&stats_path());
 
@@ -2084,8 +2092,8 @@ fn cmd_heat(rule_filter: Option<&str>) {
 }
 
 fn cmd_replay(session_path: Option<&str>, format: &str) {
-    use crs_core::loader::{FsRulesLoader, RulesLoader};
-    use crs_core::replay::{format_text, replay};
+    use coursers_core::loader::{FsRulesLoader, RulesLoader};
+    use coursers_core::replay::{format_text, replay};
 
     let rules_cfg = FsRulesLoader.load().unwrap_or_default();
 
@@ -2153,13 +2161,13 @@ fn cmd_replay(session_path: Option<&str>, format: &str) {
                 "passed": report.passed,
                 "entries": report.entries.iter().map(|e| {
                     match &e.verdict {
-                        crs_core::replay::ReplayVerdict::Blocked { rule_id, message } => serde_json::json!({
+                        coursers_core::replay::ReplayVerdict::Blocked { rule_id, message } => serde_json::json!({
                             "command": e.command,
                             "verdict": "blocked",
                             "rule_id": rule_id,
                             "message": message,
                         }),
-                        crs_core::replay::ReplayVerdict::Pass => serde_json::json!({
+                        coursers_core::replay::ReplayVerdict::Pass => serde_json::json!({
                             "command": e.command,
                             "verdict": "pass",
                         }),
@@ -2305,7 +2313,10 @@ pub fn insights_header() -> (String, String) {
     (header, sep)
 }
 
-pub fn format_insight_row(ef: &crs_core::insights::EnrichedFacet, summary_width: usize) -> String {
+pub fn format_insight_row(
+    ef: &coursers_core::insights::EnrichedFacet,
+    summary_width: usize,
+) -> String {
     let date = ef
         .git
         .as_ref()
@@ -2367,7 +2378,7 @@ pub fn format_insight_row(ef: &crs_core::insights::EnrichedFacet, summary_width:
     )
 }
 
-pub fn sort_enriched_newest_first(enriched: &mut [crs_core::insights::EnrichedFacet]) {
+pub fn sort_enriched_newest_first(enriched: &mut [coursers_core::insights::EnrichedFacet]) {
     enriched.sort_by(|a, b| {
         let ts_a = a.git.as_ref().and_then(|g| g.timestamp.as_deref());
         let ts_b = b.git.as_ref().and_then(|g| g.timestamp.as_deref());
@@ -2380,7 +2391,7 @@ pub fn sort_enriched_newest_first(enriched: &mut [crs_core::insights::EnrichedFa
     });
 }
 
-fn print_insights_table(enriched: &[crs_core::insights::EnrichedFacet]) {
+fn print_insights_table(enriched: &[coursers_core::insights::EnrichedFacet]) {
     let summary_width = 60usize;
     let (header, sep) = insights_header();
     println!("{header}");
@@ -2433,12 +2444,12 @@ mod cli_tests {
         std::fs::write(&path, existing).unwrap();
 
         let new_suggestions = vec![
-            crs_core::obfsck::FilterSuggestion {
+            coursers_core::obfsck::FilterSuggestion {
                 label: "new-label".to_string(),
                 pattern: "new-pat".to_string(),
             },
             // duplicate of existing — should not double-add
-            crs_core::obfsck::FilterSuggestion {
+            coursers_core::obfsck::FilterSuggestion {
                 label: "existing".to_string(),
                 pattern: "existing-pat".to_string(),
             },
@@ -2465,7 +2476,7 @@ mod cli_tests {
     // qual:allow(test_quality) reason: "SUT is rewrite_command from rx_prefix, not a local fn"
     #[test]
     fn rewrite_applies_rx_prefix_when_prefixes_toml_present() {
-        use crs_core::rx_prefix::{RxPrefixConfig, rewrite_command};
+        use coursers_core::rx_prefix::{RxPrefixConfig, rewrite_command};
         use std::collections::HashMap;
 
         let config = RxPrefixConfig {
@@ -2484,16 +2495,16 @@ mod cli_tests {
         assert_eq!(result.rewritten, "op plugin run -- gh issue list");
     }
 
-    fn make_stats_store(dir: &tempfile::TempDir) -> crs_core::rx_prefix::FileStatsStore {
-        crs_core::rx_prefix::FileStatsStore::new(dir.path().join("stats.toml"))
+    fn make_stats_store(dir: &tempfile::TempDir) -> coursers_core::rx_prefix::FileStatsStore {
+        coursers_core::rx_prefix::FileStatsStore::new(dir.path().join("stats.toml"))
     }
 
     fn make_probing_entry(
         key: &str,
         prefix: &[&str],
         cmd: &str,
-    ) -> crs_core::rx_prefix::ProbeEntry {
-        use crs_core::rx_prefix::{OriginalCommand, ProbeEntry, ProbeState, SuccessPredicate};
+    ) -> coursers_core::rx_prefix::ProbeEntry {
+        use coursers_core::rx_prefix::{OriginalCommand, ProbeEntry, ProbeState, SuccessPredicate};
         ProbeEntry {
             key: key.to_string(),
             prefix: prefix.iter().map(|s| s.to_string()).collect(),
@@ -2506,7 +2517,7 @@ mod cli_tests {
 
     #[test]
     fn probe_result_confirms_mapping_on_success() {
-        use crs_core::rx_prefix::{
+        use coursers_core::rx_prefix::{
             FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _,
         };
         use tempfile::TempDir;
@@ -2541,7 +2552,7 @@ mod cli_tests {
 
     #[test]
     fn probe_result_discards_on_failure() {
-        use crs_core::rx_prefix::{
+        use coursers_core::rx_prefix::{
             FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _,
         };
         use tempfile::TempDir;
@@ -2588,7 +2599,7 @@ mod cli_tests {
 
     #[test]
     fn audit_state_empty_stores_returns_empty() {
-        use crs_core::rx_prefix::{FilePrefixStore, audit_state};
+        use coursers_core::rx_prefix::{FilePrefixStore, audit_state};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
@@ -2602,7 +2613,7 @@ mod cli_tests {
 
     #[test]
     fn audit_state_returns_sorted_mappings() {
-        use crs_core::rx_prefix::{FilePrefixStore, PrefixStore as _, audit_state};
+        use coursers_core::rx_prefix::{FilePrefixStore, PrefixStore as _, audit_state};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
@@ -2660,7 +2671,7 @@ mod cli_tests {
 
     #[test]
     fn probe_result_skips_non_op_plugin_with_op_prefix() {
-        use crs_core::rx_prefix::{
+        use coursers_core::rx_prefix::{
             FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _,
         };
         use tempfile::TempDir;
@@ -2695,7 +2706,7 @@ mod cli_tests {
 
     #[test]
     fn remove_mapping_returns_true_on_hit() {
-        use crs_core::rx_prefix::{FilePrefixStore, PrefixStore as _};
+        use coursers_core::rx_prefix::{FilePrefixStore, PrefixStore as _};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
@@ -2717,7 +2728,7 @@ mod cli_tests {
 
     #[test]
     fn remove_mapping_returns_false_on_miss() {
-        use crs_core::rx_prefix::{FilePrefixStore, PrefixStore as _};
+        use coursers_core::rx_prefix::{FilePrefixStore, PrefixStore as _};
         use tempfile::TempDir;
 
         let dir = TempDir::new().unwrap();
@@ -2728,7 +2739,7 @@ mod cli_tests {
 
     #[test]
     fn filter_redacts_output_matching_obfsck_patterns() {
-        use crs_core::filters::{ObfsckFilters, RedactRule, apply_redaction};
+        use coursers_core::filters::{ObfsckFilters, RedactRule, apply_redaction};
 
         let filters = ObfsckFilters {
             filters: vec![RedactRule {
@@ -2754,8 +2765,8 @@ mod cli_tests {
         helpfulness: &str,
         friction: Vec<(&str, u64)>,
         summary: &str,
-    ) -> crs_core::insights::EnrichedFacet {
-        use crs_core::insights::{EnrichedFacet, FacetRecord, GitContext};
+    ) -> coursers_core::insights::EnrichedFacet {
+        use coursers_core::insights::{EnrichedFacet, FacetRecord, GitContext};
         use std::collections::HashMap;
         EnrichedFacet {
             facet: FacetRecord {
@@ -2806,7 +2817,7 @@ mod cli_tests {
 
     #[test]
     fn format_insight_row_no_git_context() {
-        use crs_core::insights::{EnrichedFacet, FacetRecord};
+        use coursers_core::insights::{EnrichedFacet, FacetRecord};
         use std::collections::HashMap;
         let ef = EnrichedFacet {
             facet: FacetRecord {
@@ -2892,7 +2903,7 @@ mod cli_tests {
 
     #[test]
     fn sort_enriched_newest_first_orders_correctly() {
-        use crs_core::insights::{EnrichedFacet, FacetRecord, GitContext};
+        use coursers_core::insights::{EnrichedFacet, FacetRecord, GitContext};
         use std::collections::HashMap;
         let make = |ts: Option<&str>| -> EnrichedFacet {
             EnrichedFacet {

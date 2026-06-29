@@ -80,7 +80,7 @@ After installing the hook block in your local settings file, run
 - `crs heat` — heatmap of rule firings by hour-of-day and day-of-week
 - `crs replay` — replay a session's Bash commands through the current ruleset (dry-run)
 
-## crs-core modules
+## coursers-core modules
 
 Organized into three module groups:
 
@@ -126,6 +126,6 @@ that exception patterns like `\| grep` match correctly.
 
 ## Hexagonal boundaries
 
-`crs-core` defines traits (`CommandSource`, `RulesLoader`, `StateStore`). The `crs` binary
+`coursers-core` defines traits (`CommandSource`, `RulesLoader`, `StateStore`). The `crs` binary
 owns concrete adapters (`JsonlCommandSource`). Tests inject fakes via the traits — never
 mock the file system directly.

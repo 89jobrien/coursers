@@ -240,11 +240,33 @@ name = "coursers"
 version = "0.1.0"
 dependencies = [
  "clap",
- "crs-core",
+ "coursers-core",
+ "coursers-types",
  "regex",
  "serde",
  "serde_json",
  "tempfile",
+]
+
+[[package]]
+name = "coursers-core"
+version = "0.1.0"
+dependencies = [
+ "coursers-types",
+ "dirs",
+ "fd-lock",
+ "hex",
+ "prefixe",
+ "proptest",
+ "redb",
+ "regex",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "sha2",
+ "shell-words",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -270,7 +292,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "clap",
- "crs-core",
+ "coursers-core",
  "dirs",
  "regex",
  "serde",
@@ -279,26 +301,6 @@ dependencies = [
  "tempfile",
  "toml",
  "walkdir",
-]
-
-[[package]]
-name = "crs-core"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "fd-lock",
- "hex",
- "prefixe",
- "proptest",
- "redb",
- "regex",
- "serde",
- "serde-saphyr",
- "serde_json",
- "sha2",
- "shell-words",
- "tempfile",
- "toml",
 ]
 
 [[package]]

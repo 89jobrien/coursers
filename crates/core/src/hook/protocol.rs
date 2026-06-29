@@ -140,3 +140,61 @@ mod tests {
         assert!(extract_output(&v).is_none());
     }
 }
+
+#[cfg(test)]
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        /// Invariant: extract_output concatenates stdout before output.
+        #[test]
+        fn extract_output_concatenation_order(
+            stdout in ".*",
+            output in ".*",
+        ) {
+            let v = serde_json::json!({
+                "stdout": stdout,
+                "output": output,
+            });
+            let result = extract_output(&v);
+            if stdout.is_empty() && output.is_empty() {
+                prop_assert!(result.is_none());
+            } else {
+                let combined = result.unwrap();
+                prop_assert_eq!(combined, format!("{stdout}{output}"));
+            }
+        }
+
+        /// Invariant: extract_output returns None iff both fields are absent or empty.
+        #[test]
+        fn extract_output_none_iff_both_empty(
+            has_stdout in proptest::bool::ANY,
+            has_output in proptest::bool::ANY,
+            stdout_val in ".*",
+            output_val in ".*",
+        ) {
+            let mut map = serde_json::Map::new();
+            if has_stdout {
+                map.insert("stdout".into(), serde_json::Value::String(stdout_val.clone()));
+            }
+            if has_output {
+                map.insert("output".into(), serde_json::Value::String(output_val.clone()));
+            }
+            let v = serde_json::Value::Object(map);
+            let result = extract_output(&v);
+
+            let effective_stdout = if has_stdout { &stdout_val } else { "" };
+            let effective_output = if has_output { &output_val } else { "" };
+
+            if effective_stdout.is_empty() && effective_output.is_empty() {
+                prop_assert!(result.is_none());
+            } else {
+                prop_assert_eq!(
+                    result.unwrap(),
+                    format!("{effective_stdout}{effective_output}"),
+                );
+            }
+        }
+    }
+}

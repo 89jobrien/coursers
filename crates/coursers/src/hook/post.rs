@@ -1,7 +1,7 @@
-use crs_core::capture::CaptureStore;
-use crs_core::loader::RulesLoader;
-use crs_core::state;
-use crs_core::store::StateStore;
+use coursers_core::capture::CaptureStore;
+use coursers_core::loader::RulesLoader;
+use coursers_core::state;
+use coursers_core::store::StateStore;
 
 use super::HookPayload;
 
@@ -83,9 +83,9 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
 
     let config = loader.load().unwrap_or_else(|e| {
         eprintln!("[coursers] warning: failed to load rules: {e}");
-        crs_core::rules::RulesConfig {
+        coursers_core::rules::RulesConfig {
             rules: vec![],
-            failure_learning: crs_core::rules::FailureLearning::default(),
+            failure_learning: coursers_core::rules::FailureLearning::default(),
         }
     });
     let fl = &config.failure_learning;
@@ -95,7 +95,7 @@ pub fn run_with<L: RulesLoader, S: StateStore>(
 
     let st = store.load().unwrap_or_else(|e| {
         eprintln!("[coursers] warning: failed to load state: {e}");
-        crs_core::state::State::default()
+        coursers_core::state::State::default()
     });
     let st = state::record_failure(st, command, fl);
     store
@@ -113,7 +113,7 @@ pub fn run() {
 }
 
 /// Profile-aware entry point for `coursers post --profile <name>`.
-pub fn run_with_profile(profile_cfg: &crs_core::config::ProfileConfig) {
+pub fn run_with_profile(profile_cfg: &coursers_core::config::ProfileConfig) {
     let Some((payload, loader, store, capture)) = super::hook_context_with_profile(profile_cfg)
     else {
         return;
@@ -125,10 +125,10 @@ pub fn run_with_profile(profile_cfg: &crs_core::config::ProfileConfig) {
 mod tests {
     use super::super::{HookPayload, ToolInput};
     use super::*;
-    use crs_core::capture::InMemoryCaptureStore;
-    use crs_core::loader::InMemoryRulesLoader;
-    use crs_core::rules::{FailureLearning, RulesConfig};
-    use crs_core::store::InMemoryStateStore;
+    use coursers_core::capture::InMemoryCaptureStore;
+    use coursers_core::loader::InMemoryRulesLoader;
+    use coursers_core::rules::{FailureLearning, RulesConfig};
+    use coursers_core::store::InMemoryStateStore;
     use serde_json::json;
 
     fn config_fl(enabled: bool) -> RulesConfig {

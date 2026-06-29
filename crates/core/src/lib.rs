@@ -20,7 +20,10 @@ pub mod store;
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 
-// Re-exports for backward compatibility — external crates use `crs_core::filters`, etc.
+// Re-export the types crate for incremental migration.
+pub use coursers_types as types;
+
+// Re-exports for backward compatibility — external crates use `coursers_core::filters`, etc.
 pub use analyze::capture;
 pub use analyze::heat;
 pub use analyze::history;

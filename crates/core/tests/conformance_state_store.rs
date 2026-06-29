@@ -3,8 +3,8 @@
 //! Both `FsStateStore` and `InMemoryStateStore` must satisfy the same observable
 //! contract through the `StateStore` trait.
 
-use crs_core::state::FailureEntry;
-use crs_core::store::{FsStateStore, InMemoryStateStore, StateStore};
+use coursers_core::state::FailureEntry;
+use coursers_core::store::{FsStateStore, InMemoryStateStore, StateStore};
 use tempfile::TempDir;
 
 /// Test timestamp: base entry in timestamps vec.
