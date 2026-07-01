@@ -8,6 +8,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 
 /// Minimal PostToolUse hook payload (crs-specific; coursers hook module has its own).
 #[derive(Debug, Deserialize)]
@@ -511,25 +512,11 @@ pub fn cmd_validate_codex_hooks() {
         }
     };
 
-    let expected = [
-        "coursers pre --profile codex",
-        "crs rewrite --profile codex",
-        "coursers post --profile codex",
-        "crs filter --profile codex",
-    ];
-
-    // Flatten all command strings from the hooks JSON.
-    let json_str = json.to_string();
-    let mut missing = Vec::new();
-    for cmd in &expected {
-        if !json_str.contains(cmd) {
-            missing.push(*cmd);
-        }
-    }
+    let missing = missing_codex_hooks(&json);
 
     // Check binary availability.
     let mut bin_missing = Vec::new();
-    for bin in ["coursers", "crs"] {
+    for bin in ["coursers", "crs", "crux"] {
         let result = std::process::Command::new("which").arg(bin).output();
         match result {
             Ok(out) if out.status.success() => {}
@@ -546,33 +533,218 @@ pub fn cmd_validate_codex_hooks() {
     }
 
     if missing.is_empty() && bin_missing.is_empty() {
-        println!("All 4 Codex hook commands found. Binaries available.");
+        println!("All expected Codex hook commands found. Binaries available.");
     } else {
-        for cmd in &missing {
-            println!("  MISSING hook command: {cmd}");
+        for spec in &missing {
+            println!("  MISSING hook entry: {spec}");
         }
         std::process::exit(1);
     }
 }
 
-pub fn cmd_hook(event_str: &str) {
-    use coursers_core::hook_pipeline::{HookContext, HookEvent, load_config, run_pipeline};
+fn parse_hook_event(event_str: &str) -> Option<coursers_core::hook_pipeline::HookEvent> {
+    use coursers_core::hook_pipeline::HookEvent;
 
-    let event = match event_str {
-        "pre-tool-use" => HookEvent::PreToolUse,
-        "post-tool-use" => HookEvent::PostToolUse,
-        "session-start" => HookEvent::SessionStart,
-        "session-end" => HookEvent::SessionEnd,
-        "pre-compact" => HookEvent::PreCompact,
-        "stop" => HookEvent::Stop,
-        "subagent-stop" => HookEvent::SubagentStop,
-        _ => {
-            eprintln!("crs hook: unknown event '{event_str}'");
-            std::process::exit(1);
-        }
+    match event_str {
+        "pre-tool-use" => Some(HookEvent::PreToolUse),
+        "post-tool-use" => Some(HookEvent::PostToolUse),
+        "session-start" => Some(HookEvent::SessionStart),
+        "session-end" => Some(HookEvent::SessionEnd),
+        "permission-request" => Some(HookEvent::PermissionRequest),
+        "pre-compact" => Some(HookEvent::PreCompact),
+        "post-compact" => Some(HookEvent::PostCompact),
+        "user-prompt-submit" => Some(HookEvent::UserPromptSubmit),
+        "subagent-start" => Some(HookEvent::SubagentStart),
+        "stop" => Some(HookEvent::Stop),
+        "subagent-stop" => Some(HookEvent::SubagentStop),
+        _ => None,
+    }
+}
+
+fn codex_expected_hooks() -> [(&'static str, Option<&'static str>, &'static str); 11] {
+    [
+        (
+            "SessionStart",
+            Some("startup|resume"),
+            "crs hook --target codex session-start",
+        ),
+        (
+            "PreToolUse",
+            Some("Bash"),
+            "crs hook --target codex pre-tool-use",
+        ),
+        (
+            "PostToolUse",
+            Some("Bash"),
+            "crs hook --target codex post-tool-use",
+        ),
+        (
+            "PostToolUse",
+            Some("Edit|Write"),
+            "crs hook --target codex post-tool-use",
+        ),
+        (
+            "PermissionRequest",
+            None,
+            "crs hook --target codex permission-request",
+        ),
+        ("PreCompact", None, "crs hook --target codex pre-compact"),
+        ("PostCompact", None, "crs hook --target codex post-compact"),
+        (
+            "UserPromptSubmit",
+            None,
+            "crs hook --target codex user-prompt-submit",
+        ),
+        (
+            "SubagentStart",
+            None,
+            "crs hook --target codex subagent-start",
+        ),
+        (
+            "SubagentStop",
+            None,
+            "crs hook --target codex subagent-stop",
+        ),
+        ("Stop", None, "crs hook --target codex stop"),
+    ]
+}
+
+fn hook_array_contains_command(
+    json: &Value,
+    event: &str,
+    matcher: Option<&str>,
+    command: &str,
+) -> bool {
+    let Some(entries) = json
+        .get("hooks")
+        .and_then(|hooks| hooks.get(event))
+        .and_then(|value| value.as_array())
+    else {
+        return false;
     };
 
-    let config = load_config();
+    entries.iter().any(|entry| {
+        let matcher_ok = match matcher {
+            Some(expected) => entry.get("matcher").and_then(Value::as_str) == Some(expected),
+            None => entry.get("matcher").is_none(),
+        };
+        matcher_ok
+            && entry
+                .get("hooks")
+                .and_then(Value::as_array)
+                .is_some_and(|hooks| {
+                    hooks
+                        .iter()
+                        .any(|hook| hook.get("command").and_then(Value::as_str) == Some(command))
+                })
+    })
+}
+
+fn missing_codex_hooks(json: &Value) -> Vec<String> {
+    codex_expected_hooks()
+        .into_iter()
+        .filter_map(|(event, matcher, command)| {
+            (!hook_array_contains_command(json, event, matcher, command)).then(|| match matcher {
+                Some(matcher) => format!("{event} [{matcher}] -> {command}"),
+                None => format!("{event} -> {command}"),
+            })
+        })
+        .collect()
+}
+
+fn codex_backend_filename(
+    event: coursers_core::hook_pipeline::HookEvent,
+    tool_name: Option<&str>,
+) -> Option<&'static str> {
+    use coursers_core::hook_pipeline::HookEvent;
+
+    match event {
+        HookEvent::SessionStart => Some("session-start.crux"),
+        HookEvent::PreToolUse => Some("pre-tool-use-bash.crux"),
+        HookEvent::PostToolUse => match tool_name {
+            Some("Edit") | Some("Write") => Some("post-tool-use-edit-write.crux"),
+            _ => Some("post-tool-use-bash.crux"),
+        },
+        HookEvent::PermissionRequest => Some("permission-request.crux"),
+        HookEvent::PreCompact => Some("pre-compact.crux"),
+        HookEvent::PostCompact => Some("post-compact.crux"),
+        HookEvent::UserPromptSubmit => Some("user-prompt-submit.crux"),
+        HookEvent::SubagentStart => Some("subagent-start.crux"),
+        HookEvent::Stop => Some("stop.crux"),
+        HookEvent::SubagentStop => Some("subagent-stop.crux"),
+        HookEvent::SessionEnd => None,
+    }
+}
+
+fn run_codex_backend(
+    event: coursers_core::hook_pipeline::HookEvent,
+    tool_name: Option<&str>,
+    raw_json: Option<&str>,
+) {
+    let backend = codex_backend_filename(event, tool_name).unwrap_or_else(|| {
+        eprintln!(
+            "crs hook: no Codex backend registered for event '{}'",
+            event_str_kebab(event)
+        );
+        std::process::exit(1);
+    });
+    let home = dirs::home_dir().unwrap_or_else(|| {
+        eprintln!("crs hook: cannot resolve home directory");
+        std::process::exit(1);
+    });
+    let backend_path = home.join(".codex/hooks").join(backend);
+
+    let mut command = Command::new("crux");
+    command
+        .args(["run", backend_path.to_string_lossy().as_ref(), "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    let mut child = command.spawn().unwrap_or_else(|e| {
+        eprintln!(
+            "crs hook: failed to launch Codex backend {}: {e}",
+            backend_path.display()
+        );
+        std::process::exit(1);
+    });
+
+    if let Some(input) = raw_json
+        && let Some(mut stdin) = child.stdin.take()
+    {
+        stdin.write_all(input.as_bytes()).ok();
+    }
+
+    let output = child.wait_with_output().unwrap_or_else(|e| {
+        eprintln!(
+            "crs hook: failed to collect Codex backend output from {}: {e}",
+            backend_path.display()
+        );
+        std::process::exit(1);
+    });
+
+    if !output.stdout.is_empty() {
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        handle.write_all(&output.stdout).ok();
+        handle.flush().ok();
+    }
+    if !output.status.success() {
+        if !output.stderr.is_empty() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            eprint!("{stderr}");
+        }
+        std::process::exit(output.status.code().unwrap_or(1));
+    }
+}
+
+pub fn cmd_hook(hook_target: &str, event_str: &str) {
+    use coursers_core::hook_pipeline::{HookContext, load_config, run_pipeline};
+
+    let event = parse_hook_event(event_str).unwrap_or_else(|| {
+        eprintln!("crs hook: unknown event '{event_str}'");
+        std::process::exit(1);
+    });
 
     // Parse stdin JSON (may be empty for lifecycle events like SessionStart).
     let mut buf = String::new();
@@ -602,6 +774,20 @@ pub fn cmd_hook(event_str: &str) {
         .and_then(|r| r.get("exit_code"))
         .and_then(|v| v.as_i64());
 
+    if hook_target == "codex" {
+        run_codex_backend(
+            event,
+            tool_name.as_deref(),
+            (!buf.is_empty()).then_some(buf.as_str()),
+        );
+        return;
+    }
+    if hook_target != "claude" {
+        eprintln!("crs hook: unknown target '{hook_target}'");
+        std::process::exit(1);
+    }
+
+    let config = load_config();
     let ctx = HookContext {
         event: Some(event),
         tool_name,
@@ -760,9 +946,30 @@ pub fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static
         HookEvent::PostToolUse => "PostToolUse",
         HookEvent::SessionStart => "SessionStart",
         HookEvent::SessionEnd => "SessionEnd",
+        HookEvent::PermissionRequest => "PermissionRequest",
         HookEvent::PreCompact => "PreCompact",
+        HookEvent::PostCompact => "PostCompact",
+        HookEvent::UserPromptSubmit => "UserPromptSubmit",
+        HookEvent::SubagentStart => "SubagentStart",
         HookEvent::Stop => "Stop",
         HookEvent::SubagentStop => "SubagentStop",
+    }
+}
+
+fn event_str_kebab(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
+    use coursers_core::hook_pipeline::HookEvent;
+    match event {
+        HookEvent::PreToolUse => "pre-tool-use",
+        HookEvent::PostToolUse => "post-tool-use",
+        HookEvent::SessionStart => "session-start",
+        HookEvent::SessionEnd => "session-end",
+        HookEvent::PermissionRequest => "permission-request",
+        HookEvent::PreCompact => "pre-compact",
+        HookEvent::PostCompact => "post-compact",
+        HookEvent::UserPromptSubmit => "user-prompt-submit",
+        HookEvent::SubagentStart => "subagent-start",
+        HookEvent::Stop => "stop",
+        HookEvent::SubagentStop => "subagent-stop",
     }
 }
 
@@ -2682,5 +2889,78 @@ mod cli_tests {
         );
         // Smoke: function runs without panic for 2 rows
         print_insights_table(&[ef1, ef2]);
+    }
+
+    #[test]
+    fn parse_hook_event_accepts_full_verified_set() {
+        let events = [
+            "pre-tool-use",
+            "post-tool-use",
+            "session-start",
+            "session-end",
+            "permission-request",
+            "pre-compact",
+            "post-compact",
+            "user-prompt-submit",
+            "subagent-start",
+            "stop",
+            "subagent-stop",
+        ];
+
+        for event in events {
+            assert!(
+                parse_hook_event(event).is_some(),
+                "expected event to parse: {event}"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_codex_hooks_accepts_full_front_controller_manifest() {
+        let json = serde_json::json!({
+            "hooks": {
+                "SessionStart": [{
+                    "matcher": "startup|resume",
+                    "hooks": [{"command": "crs hook --target codex session-start"}]
+                }],
+                "PreToolUse": [{
+                    "matcher": "Bash",
+                    "hooks": [{"command": "crs hook --target codex pre-tool-use"}]
+                }],
+                "PostToolUse": [
+                    {
+                        "matcher": "Bash",
+                        "hooks": [{"command": "crs hook --target codex post-tool-use"}]
+                    },
+                    {
+                        "matcher": "Edit|Write",
+                        "hooks": [{"command": "crs hook --target codex post-tool-use"}]
+                    }
+                ],
+                "PermissionRequest": [{
+                    "hooks": [{"command": "crs hook --target codex permission-request"}]
+                }],
+                "PreCompact": [{
+                    "hooks": [{"command": "crs hook --target codex pre-compact"}]
+                }],
+                "PostCompact": [{
+                    "hooks": [{"command": "crs hook --target codex post-compact"}]
+                }],
+                "UserPromptSubmit": [{
+                    "hooks": [{"command": "crs hook --target codex user-prompt-submit"}]
+                }],
+                "SubagentStart": [{
+                    "hooks": [{"command": "crs hook --target codex subagent-start"}]
+                }],
+                "SubagentStop": [{
+                    "hooks": [{"command": "crs hook --target codex subagent-stop"}]
+                }],
+                "Stop": [{
+                    "hooks": [{"command": "crs hook --target codex stop"}]
+                }]
+            }
+        });
+
+        assert!(missing_codex_hooks(&json).is_empty());
     }
 }

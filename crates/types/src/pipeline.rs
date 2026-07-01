@@ -8,7 +8,11 @@ pub enum HookEvent {
     PostToolUse,
     SessionStart,
     SessionEnd,
+    PermissionRequest,
     PreCompact,
+    PostCompact,
+    UserPromptSubmit,
+    SubagentStart,
     Stop,
     SubagentStop,
 }

@@ -27,5 +27,22 @@ different hook protocol compared to the default (Claude) profile.
 crs validate-hooks --target codex
 ```
 
-Checks `~/.codex/hooks.json` for the 4 expected hook commands and
-verifies `coursers` and `crs` binaries are on PATH.
+Checks `~/.codex/hooks.json` for the full verified Codex hook registry and
+verifies `coursers`, `crs`, and `crux` are on PATH.
+
+The expected top-level commands are:
+
+- `SessionStart` (`startup|resume`) → `crs hook --target codex session-start`
+- `PreToolUse` (`Bash`) → `crs hook --target codex pre-tool-use`
+- `PostToolUse` (`Bash`) → `crs hook --target codex post-tool-use`
+- `PostToolUse` (`Edit|Write`) → `crs hook --target codex post-tool-use`
+- `PermissionRequest` → `crs hook --target codex permission-request`
+- `PreCompact` → `crs hook --target codex pre-compact`
+- `PostCompact` → `crs hook --target codex post-compact`
+- `UserPromptSubmit` → `crs hook --target codex user-prompt-submit`
+- `SubagentStart` → `crs hook --target codex subagent-start`
+- `SubagentStop` → `crs hook --target codex subagent-stop`
+- `Stop` → `crs hook --target codex stop`
+
+Those front-controller entries fan back into the existing
+`$HOME/.codex/hooks/*.crux` backends.

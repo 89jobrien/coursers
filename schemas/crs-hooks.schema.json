@@ -48,7 +48,11 @@
         "post-tool-use",
         "session-start",
         "session-end",
+        "permission-request",
         "pre-compact",
+        "post-compact",
+        "user-prompt-submit",
+        "subagent-start",
         "stop",
         "subagent-stop"
       ]

@@ -141,8 +141,12 @@ enum Command {
         #[arg(short, long)]
         out: Option<String>,
     },
-    /// Run the generic hook pipeline for a Claude Code event
-    Hook { event: String },
+    /// Run the generic hook pipeline for a hook event
+    Hook {
+        #[arg(long, default_value = "claude")]
+        target: String,
+        event: String,
+    },
     /// Validate hook pipeline config
     ValidateHooks {
         #[arg(long, default_value = "claude")]
@@ -289,7 +293,7 @@ fn main() {
             format,
         } => crs_commands::cmd_history(limit, rule.as_deref(), &format),
         Command::Export { out } => crs_commands::cmd_export(out.as_deref()),
-        Command::Hook { event } => crs_commands::cmd_hook(&event),
+        Command::Hook { target, event } => crs_commands::cmd_hook(&target, &event),
         Command::ValidateHooks { ref target } => {
             if target == "codex" {
                 crs_commands::cmd_validate_codex_hooks();

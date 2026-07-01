@@ -5,7 +5,7 @@ Claude Code hook pipeline for course-correcting AI-generated Bash commands.
 Two tools:
 
 - **`coursers`** — PreToolUse/PostToolUse hooks that block bad commands and learn from failures
-- **`crs`** — output filter and command rewriter
+- **`crs`** — front controller, output filter, command rewriter, and hook validator
 
 ---
 
@@ -37,10 +37,9 @@ This catches commands that aren't covered by static rules but are clearly not wo
 
 ```sh
 cargo install --path crates/coursers
-cargo install --path crates/crs
 ```
 
-Install the full hook chain into your local `~/.claude/settings.json`:
+Install the front-controller hook chain into your local `~/.claude/settings.json`:
 
 ```json
 {
@@ -49,8 +48,7 @@ Install the full hook chain into your local `~/.claude/settings.json`:
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "coursers pre" },
-          { "type": "command", "command": "crs rewrite" }
+          { "type": "command", "command": "crs hook pre-tool-use" }
         ]
       }
     ],
@@ -58,8 +56,7 @@ Install the full hook chain into your local `~/.claude/settings.json`:
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "command": "coursers post" },
-          { "type": "command", "command": "crs filter" }
+          { "type": "command", "command": "crs hook post-tool-use" }
         ]
       }
     ]
@@ -69,6 +66,10 @@ Install the full hook chain into your local `~/.claude/settings.json`:
 
 Run `crs validate-hooks` after installing the hook block to verify the chain is wired
 correctly.
+
+For Codex, the top-level registry also points at `crs hook --target codex <event>`.
+Those entries dispatch to the existing `$HOME/.codex/hooks/*.crux` backends, which
+still compose `coursers pre/post` and `crs rewrite/filter` internally for Bash flows.
 
 ---
 
@@ -190,8 +191,7 @@ commands that match filter/rewrite rules but weren't intercepted.
 ```
 crates/
   core/        # shared library — rules, state, config, filters, rewrite
-  coursers/    # `coursers` binary — pre/post hook handlers
-  crs/         # `crs` binary — filter, rewrite, discover
+  coursers/    # `coursers` and `crs` binaries — hooks, rewrite, filter, discover
 agents/
   coursers-companion.md  # Claude Code agent for diagnostics
 scripts/
