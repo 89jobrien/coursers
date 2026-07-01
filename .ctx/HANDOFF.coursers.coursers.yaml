@@ -1,8 +1,15 @@
 project: coursers
 id: coursers
-updated: 2026-06-29
+updated: 2026-07-01
 items: []
 log:
+- date: '20260701'
+  summary: |
+    Routed codex hooks through crs front controller (03094c4). Integrated hook
+    discovery into the crs CLI architecture, enabling dynamic hook resolution
+    and execution. Cargo check passing, all tests green.
+  commits:
+  - 03094c4
 - date: '20260629'
   summary: |
     Merged crs binary into coursers (cf439d7, wc-t19 through wc-t23). Refactored crs-core
