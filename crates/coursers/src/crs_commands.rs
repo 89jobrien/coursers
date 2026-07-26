@@ -643,11 +643,12 @@ fn hook_array_contains_command(
 fn missing_codex_hooks(json: &Value) -> Vec<String> {
     codex_expected_hooks()
         .into_iter()
-        .filter_map(|(event, matcher, command)| {
-            (!hook_array_contains_command(json, event, matcher, command)).then(|| match matcher {
-                Some(matcher) => format!("{event} [{matcher}] -> {command}"),
-                None => format!("{event} -> {command}"),
-            })
+        .filter(|&(event, matcher, command)| {
+            !hook_array_contains_command(json, event, matcher, command)
+        })
+        .map(|(event, matcher, command)| match matcher {
+            Some(matcher) => format!("{event} [{matcher}] -> {command}"),
+            None => format!("{event} -> {command}"),
         })
         .collect()
 }

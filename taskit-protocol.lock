@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "algorithm": "sha256-normalized-core-contract-v1",
+  "surfaces": [
+    {
+      "name": "coursers-types-ports",
+      "path": "crates/types/src/ports.rs",
+      "hash": "54615484fe5da937c518d834c1b0f56329387c8e7eecc2b2fa91d1dcfb8de6d9"
+    },
+    {
+      "name": "coursers-core-rtk",
+      "path": "crates/core/src/rtk.rs",
+      "hash": "012803451618e8e85f945649c7e56d2dc15ff86b22e604bfb6b6ee4a6d4136c2"
+    },
+    {
+      "name": "coursers-core-store",
+      "path": "crates/core/src/store.rs",
+      "hash": "885bfc017580b2466853cf78c23c0939be9078fc0b5adb1722987b1437aff03d"
+    },
+    {
+      "name": "coursers-core-obfsck",
+      "path": "crates/core/src/obfsck.rs",
+      "hash": "134903158caee63cccd163e84b8e88685ae8c9c5f4c0ee4c9b39240e4e040985"
+    },
+    {
+      "name": "coursers-core-loader",
+      "path": "crates/core/src/loader.rs",
+      "hash": "d308bfaa1c64994c8b7025c4a35b5fa27e4c0a103eb316a7a248dc4c395bdd4a"
+    }
+  ]
+}

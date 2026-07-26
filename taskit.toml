@@ -1,0 +1,93 @@
+[workspace]
+crates = [
+  { dir = "crates/types", pkg = "coursers-types" },
+  { dir = "crates/core", pkg = "coursers-core" },
+  { dir = "crates/coursers", pkg = "coursers" },
+  { dir = "crates/e2e", pkg = "coursers-e2e" },
+  { dir = "crates/xtask", pkg = "xtask" },
+]
+# offline_skip = "test(/.*network.*/)"
+
+
+[[workspace.propagation]]
+source = "coursers-core"
+dependents = ["coursers", "coursers"]
+
+[[workspace.propagation]]
+source = "coursers-types"
+dependents = ["coursers-core", "coursers"]
+
+[protocol]
+# lockfile = "taskit-protocol.lock"
+
+[[protocol.surfaces]]
+name = "coursers-types-ports"
+path = "crates/types/src/ports.rs"
+
+[[protocol.surfaces]]
+name = "coursers-core-rtk"
+path = "crates/core/src/rtk.rs"
+
+[[protocol.surfaces]]
+name = "coursers-core-store"
+path = "crates/core/src/store.rs"
+
+[[protocol.surfaces]]
+name = "coursers-core-obfsck"
+path = "crates/core/src/obfsck.rs"
+
+[[protocol.surfaces]]
+name = "coursers-core-loader"
+path = "crates/core/src/loader.rs"
+
+# Coverage enforcement: run `taskit coverage` to check.
+#
+# [coverage]
+# crate_name = "my-crate"
+# threshold = 80.0
+
+[ci]
+# cruxfile = "Cruxfile"
+
+[[ci.steps]]
+name = "self-check"
+cmd = "self-check"
+gate = true
+
+[[ci.steps]]
+name = "fmt --check"
+cmd = "fmt --check"
+gate = false
+
+[[ci.steps]]
+name = "lint"
+cmd = "lint"
+gate = false
+
+[[ci.steps]]
+name = "compile-tests"
+cmd = "compile-tests"
+gate = false
+
+[[ci.steps]]
+name = "test"
+cmd = "test"
+gate = false
+
+[[ci.steps]]
+name = "check-deps"
+cmd = "check-deps"
+gate = false
+
+[[ci.steps]]
+name = "check-protocol-drift"
+cmd = "check-protocol-drift"
+gate = false
+
+# Git flow: main (stable) -> staging (work) -> release (publish) -> main
+# These are the defaults; uncomment to customize branch names.
+#
+# [flow]
+# main = "main"
+# staging = "staging"
+# release = "release"

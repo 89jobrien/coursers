@@ -1,51 +1,38 @@
-use std::process::{Command, ExitCode};
+//! Self-updating xtask shim that delegates to the `taskit` binary.
+//!
+//! Usage: `cargo xtask <subcommand> [args...]`
+//!
+//! If `taskit` is not installed, this shim installs it automatically
+//! via `cargo install taskit`.
 
-fn run(program: &str, args: &[&str]) -> Result<(), i32> {
-    let status = Command::new(program)
-        .args(args)
-        .status()
-        .unwrap_or_else(|e| panic!("failed to spawn `{program}`: {e}"));
-    if status.success() {
-        Ok(())
-    } else {
-        Err(status.code().unwrap_or(1))
-    }
-}
+use std::process::{Command, exit};
 
-fn cmd_build() -> Result<(), i32> {
-    run("cargo", &["build", "--workspace"])
-}
+fn main() {
+    let args: Vec<String> = std::env::args().skip(1).collect();
 
-fn cmd_ci() -> Result<(), i32> {
-    println!("=== fmt ===");
-    run("cargo", &["fmt", "--all", "--check"])?;
-
-    println!("=== clippy ===");
-    run("cargo", &["clippy", "--workspace", "--", "-D", "warnings"])?;
-
-    println!("=== test ===");
-    run("cargo", &["nextest", "run", "--workspace"])
-}
-
-fn main() -> ExitCode {
-    let subcommand = std::env::args().nth(1);
-    let result = match subcommand.as_deref() {
-        Some("build") => cmd_build(),
-        Some("ci") => cmd_ci(),
-        Some(other) => {
-            eprintln!("error: unknown subcommand `{other}`");
-            eprintln!("usage: cargo xtask <build|ci>");
-            return ExitCode::FAILURE;
+    // Try running taskit directly first
+    match Command::new("taskit").args(&args).status() {
+        Ok(status) => exit(status.code().unwrap_or(1)),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            eprintln!("taskit not found, installing via cargo install...");
+            let install = Command::new("cargo")
+                .args(["install", "taskit"])
+                .status()
+                .expect("failed to run cargo install");
+            if !install.success() {
+                eprintln!("failed to install taskit");
+                exit(1);
+            }
+            // Retry after install
+            let status = Command::new("taskit")
+                .args(&args)
+                .status()
+                .expect("failed to run taskit after install");
+            exit(status.code().unwrap_or(1));
         }
-        None => {
-            eprintln!("error: subcommand required");
-            eprintln!("usage: cargo xtask <build|ci>");
-            return ExitCode::FAILURE;
+        Err(e) => {
+            eprintln!("failed to run taskit: {e}");
+            exit(1);
         }
-    };
-
-    match result {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(code) => ExitCode::from(code as u8),
     }
 }

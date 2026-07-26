@@ -1,0 +1,3 @@
+# coursers-types
+
+<!-- Crate documentation -->
