@@ -129,6 +129,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::invalid_regex)]
     fn from_regex_error_display() {
         let regex_err = regex::Regex::new("[unclosed").unwrap_err();
         let err: CourserError = regex_err.into();
@@ -138,7 +139,7 @@ mod tests {
 
     #[test]
     fn display_outputs_are_non_empty() {
-        let s1 = CourserError::Io(std::io::Error::new(std::io::ErrorKind::Other, "x")).to_string();
+        let s1 = CourserError::Io(std::io::Error::other("x")).to_string();
         let s2 = CourserError::Json(serde_json::from_str::<()>("!").unwrap_err()).to_string();
         assert!(!s1.is_empty());
         assert!(!s2.is_empty());
