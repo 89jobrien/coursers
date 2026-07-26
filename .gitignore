@@ -20,3 +20,6 @@
 .worktrees/
 .DS_Store
 fuzz/corpus/
+.litho/
+.taskit-cache/
+.xtask-cache/
