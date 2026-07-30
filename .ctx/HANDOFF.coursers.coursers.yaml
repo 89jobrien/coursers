@@ -1,15 +1,34 @@
 project: coursers
 id: coursers
-updated: 2026-07-01
-items: []
+updated: 2026-07-30
+items:
+- id: uncommitted-work
+  doob_uuid: null
+  name: uncommitted-work
+  priority: P1
+  status: open
+  title: Uncommitted changes (1 file)
+  description: |-
+    Working tree has uncommitted changes:
+    .ctx/HANDOFF.coursers.coursers.yaml
+  files:
+  - .ctx/HANDOFF.coursers.coursers.yaml
+  completed: null
+  extra: []
 log:
+- date: 'null'
+  summary: Tackled GitHub issues
+  commits: []
+  session: 2
+- date: '20260726.092820'
+  summary: done=41 running=0 pending=3 blocked=0
+  commits: []
 - date: '20260701'
   summary: |
     Routed codex hooks through crs front controller (03094c4). Integrated hook
     discovery into the crs CLI architecture, enabling dynamic hook resolution
     and execution. Cargo check passing, all tests green.
-  commits:
-  - 03094c4
+  commits: []
 - date: '20260629'
   summary: |
     Merged crs binary into coursers (cf439d7, wc-t19 through wc-t23). Refactored crs-core
@@ -17,16 +36,7 @@ log:
     with domain types and port traits (8fc7ddd). Agent improvement loop with new rules,
     rewrites, and eval harness (3a759d5). 5 commits, all feature work and refactoring
     landed on main.
-  commits:
-  - cf439d7
-  - 99e683e
-  - 8fc7ddd
-  - 3a759d5
-  - 7aa70bf
-- date: 'null'
-  summary: Tackled GitHub issues
   commits: []
-  session: 2
 - date: '20260625'
   summary: |
     MoA review pipeline: 5-lens parallel analysis of error handling gaps. Scaffolded
