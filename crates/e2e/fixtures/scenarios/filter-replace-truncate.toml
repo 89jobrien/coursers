@@ -1,0 +1,16 @@
+[scenario]
+name = "filter-replace-truncate"
+description = "truncate mode replaces long output with a shortened message"
+coursers_rules_json = """{"rules":[]}"""
+crs_filters_toml = """
+[[filters]]
+pattern = "yes"
+mode = "truncate"
+max_lines = 1
+"""
+
+[filter]
+command = "yes"
+output = "line1\nline2\nline3\nline4\nline5"
+exit_code = 0
+expected_result = "replace"

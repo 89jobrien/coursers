@@ -187,7 +187,7 @@ fn run_scenario(path: &Path) {
         let stdout = String::from_utf8_lossy(&out.stdout);
         match fil.expected_result.as_str() {
             "suppress" => assert!(
-                stdout.contains(r#""message":""#),
+                stdout.contains("\"message\":\"\""),
                 "[{name}] filter: expected suppress (empty message), got: {stdout}"
             ),
             "passthrough" => assert!(
@@ -195,7 +195,7 @@ fn run_scenario(path: &Path) {
                 "[{name}] filter: expected passthrough (no stdout), got: {stdout}"
             ),
             "replace" => assert!(
-                stdout.contains(r#""message""#) && !stdout.contains(r#""message":""#),
+                stdout.contains(r#""message""#) && !stdout.contains("\"message\":\"\""),
                 "[{name}] filter: expected replace (non-empty message), got: {stdout}"
             ),
             other => panic!("[{name}] unknown expected_result: {other:?}"),
@@ -209,6 +209,123 @@ fn run_scenario(path: &Path) {
 
 fn fixtures_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/scenarios")
+}
+
+// ---------------------------------------------------------------------------
+// Scenario schema unit tests (no process spawn — pure parsing logic)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn scenario_file_parses_minimal_meta_only() {
+    let toml_str = r#"
+        [scenario]
+        name = "minimal"
+    "#;
+    let sf: ScenarioFile = toml::from_str(toml_str).expect("minimal scenario should parse");
+    assert_eq!(sf.scenario.name, "minimal");
+    assert!(sf.scenario.description.is_none());
+    assert!(sf.scenario.coursers_rules_json.is_none());
+    assert!(sf.scenario.crs_filters_toml.is_none());
+    assert!(sf.pre.is_none());
+    assert!(sf.filter.is_none());
+    assert!(sf.post_failures.is_none());
+}
+
+#[test]
+fn scenario_file_parses_all_phases() {
+    let toml_str = r#"
+        [scenario]
+        name = "full"
+        description = "exercises every phase"
+        coursers_rules_json = '{"rules":[]}'
+        crs_filters_toml = "[[filters]]\npattern = \"ls\"\nmode = \"passthrough\"\n"
+
+        [pre]
+        command = "ls -la"
+        expected_verdict = "allow"
+
+        [filter]
+        command = "ls -la"
+        output = "total 0"
+        exit_code = 0
+        expected_result = "passthrough"
+
+        [post_failures]
+        command = "flaky-cmd"
+        count = 3
+    "#;
+    let sf: ScenarioFile = toml::from_str(toml_str).expect("full scenario should parse");
+    assert_eq!(
+        sf.scenario.description.as_deref(),
+        Some("exercises every phase")
+    );
+    let pre = sf.pre.expect("pre phase present");
+    assert_eq!(pre.command, "ls -la");
+    assert_eq!(pre.expected_verdict, "allow");
+    let filter = sf.filter.expect("filter phase present");
+    assert_eq!(filter.exit_code, 0);
+    assert_eq!(filter.expected_result, "passthrough");
+    let post_failures = sf.post_failures.expect("post_failures phase present");
+    assert_eq!(post_failures.count, 3);
+}
+
+#[test]
+fn scenario_file_rejects_missing_required_name() {
+    let toml_str = r#"
+        [scenario]
+        description = "no name field"
+    "#;
+    let result: Result<ScenarioFile, _> = toml::from_str(toml_str);
+    assert!(
+        result.is_err(),
+        "expected parse error when required `name` field is missing"
+    );
+}
+
+#[test]
+fn scenario_file_rejects_malformed_toml() {
+    let toml_str = "this is not valid toml [[[";
+    let result: Result<ScenarioFile, _> = toml::from_str(toml_str);
+    assert!(result.is_err(), "expected parse error for malformed TOML");
+}
+
+#[test]
+fn scenario_file_rejects_unknown_expected_verdict_at_runtime() {
+    // Parsing succeeds even with a nonsense verdict string — validation
+    // happens later in run_scenario(), not during deserialization.
+    let toml_str = r#"
+        [scenario]
+        name = "weird-verdict"
+
+        [pre]
+        command = "ls"
+        expected_verdict = "maybe"
+    "#;
+    let sf: ScenarioFile = toml::from_str(toml_str).expect("parses despite unknown verdict");
+    assert_eq!(sf.pre.unwrap().expected_verdict, "maybe");
+}
+
+#[test]
+fn pre_payload_embeds_command_as_json_string() {
+    let payload = pre_payload(r#"echo "hi""#);
+    let v: serde_json::Value = serde_json::from_str(&payload).expect("payload is valid JSON");
+    assert_eq!(v["tool_name"], "Bash");
+    assert_eq!(v["tool_input"]["command"], r#"echo "hi""#);
+}
+
+#[test]
+fn post_payload_includes_exit_code() {
+    let payload = post_payload("false", 1);
+    let v: serde_json::Value = serde_json::from_str(&payload).expect("payload is valid JSON");
+    assert_eq!(v["tool_response"]["exit_code"], 1);
+}
+
+#[test]
+fn post_filter_payload_includes_output_and_exit_code() {
+    let payload = post_filter_payload("ls", "total 0\n", 0);
+    let v: serde_json::Value = serde_json::from_str(&payload).expect("payload is valid JSON");
+    assert_eq!(v["tool_response"]["output"], "total 0\n");
+    assert_eq!(v["tool_response"]["exit_code"], 0);
 }
 
 #[test]

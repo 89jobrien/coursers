@@ -1,0 +1,10 @@
+[scenario]
+name = "filter-passthrough"
+description = "no matching filter rule leaves output untouched (passthrough)"
+coursers_rules_json = """{"rules":[]}"""
+
+[filter]
+command = "echo e2e-passthrough-unique-xyz123"
+output = "e2e-passthrough-unique-xyz123"
+exit_code = 0
+expected_result = "passthrough"
