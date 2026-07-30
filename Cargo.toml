@@ -20,9 +20,17 @@ chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 coursers-types = { path = "crates/types", version = "^0.1.0" }
 coursers-core = { path = "crates/core", version = "^0.1.0" }
+# TODO(deny-dupe-windows-sys): dirs v5.0.1 pulls windows-sys 0.48 while fd-lock v4.0.4
+# pulls windows-sys 0.59, producing 4 duplicate windows_* lock entries
+# (cargo deny check bans). A dirs bump would likely collapse this. (2026-07-30 gm-audit)
 dirs = "5"
 fd-lock = "4"
 hex = "0.4"
+# TODO(outdated-path-dep-breaks-tooling): this path dep resolves outside the repo
+# (~/dev/prefixe), which breaks `cargo outdated --workspace` — it copies the
+# manifest to a tmp dir and can't follow the relative path back out. Vendor, publish,
+# or otherwise remove the external path dep to restore `cargo outdated`.
+# (2026-07-30 gm-audit)
 prefixe = { path = "../prefixe/crates/prefixe" }
 redb = "4.1"
 regex = "1"

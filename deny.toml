@@ -1,10 +1,23 @@
 # cargo-deny configuration
 # See: embarkstudios.github.io/cargo-deny/
+# TODO(deny-config-path): CLAUDE.md/skill docs invoke `cargo deny check --config
+# .config/deny.toml`, but this file lives at the repo root. That path falls back to
+# defaults with a warning instead of failing — either move this file to
+# .config/deny.toml or fix the invocations to point here. (2026-07-30 gm-audit)
 
 [advisories]
+# TODO(deny-advisories-cvss4): `cargo deny check advisories` currently crashes with
+# "unsupported CVSS version: 4.0" parsing RUSTSEC-2026-0073.md (libcrux-poly1305) in
+# the cached advisory-db. Upstream cargo-deny 0.18.3 bug, not fixable here — track
+# for a cargo-deny upgrade; until then advisory/CVE scanning is unavailable.
+# (2026-07-30 gm-audit)
 ignore = []
 
 [licenses]
+# TODO(deny-license-allowlist-drift): "CC0-1.0", "ISC", "Unicode-DFS-2016", and
+# "Zlib" are unmatched — no dependency in the current tree carries them. Prune once
+# confirmed, or leave a rationale comment per entry if kept intentionally.
+# (2026-07-30 gm-audit)
 allow = [
   "MIT",
   "Apache-2.0",

@@ -2955,4 +2955,122 @@ mod cli_tests {
 
         assert!(missing_codex_hooks(&json).is_empty());
     }
+
+    #[test]
+    fn missing_codex_hooks_reports_all_when_hooks_key_absent() {
+        let json = serde_json::json!({});
+        let missing = missing_codex_hooks(&json);
+        assert_eq!(missing.len(), codex_expected_hooks().len());
+    }
+
+    #[test]
+    fn missing_codex_hooks_reports_only_absent_entries() {
+        let json = serde_json::json!({
+            "hooks": {
+                "SessionStart": [{
+                    "matcher": "startup|resume",
+                    "hooks": [{"command": "crs hook --target codex session-start"}]
+                }]
+            }
+        });
+
+        let missing = missing_codex_hooks(&json);
+        assert_eq!(missing.len(), codex_expected_hooks().len() - 1);
+        assert!(!missing.iter().any(|m| m.starts_with("SessionStart")));
+        assert!(missing.iter().any(|m| m.starts_with("Stop ->")));
+    }
+
+    #[test]
+    fn missing_codex_hooks_formats_entries_with_and_without_matcher() {
+        let json = serde_json::json!({});
+        let missing = missing_codex_hooks(&json);
+
+        assert!(
+            missing
+                .iter()
+                .any(|m| m == "PreToolUse [Bash] -> crs hook --target codex pre-tool-use"),
+            "expected matcher-bracketed entry, got: {missing:?}"
+        );
+        assert!(
+            missing
+                .iter()
+                .any(|m| m == "Stop -> crs hook --target codex stop"),
+            "expected matcher-less entry, got: {missing:?}"
+        );
+    }
+
+    #[test]
+    fn hook_array_contains_command_rejects_wrong_matcher() {
+        let json = serde_json::json!({
+            "hooks": {
+                "PreToolUse": [{
+                    "matcher": "Edit",
+                    "hooks": [{"command": "crs hook --target codex pre-tool-use"}]
+                }]
+            }
+        });
+
+        assert!(!hook_array_contains_command(
+            &json,
+            "PreToolUse",
+            Some("Bash"),
+            "crs hook --target codex pre-tool-use"
+        ));
+    }
+
+    #[test]
+    fn hook_array_contains_command_rejects_wrong_command() {
+        let json = serde_json::json!({
+            "hooks": {
+                "PreToolUse": [{
+                    "matcher": "Bash",
+                    "hooks": [{"command": "some other command"}]
+                }]
+            }
+        });
+
+        assert!(!hook_array_contains_command(
+            &json,
+            "PreToolUse",
+            Some("Bash"),
+            "crs hook --target codex pre-tool-use"
+        ));
+    }
+
+    #[test]
+    fn hook_array_contains_command_rejects_unexpected_matcher_when_none_expected() {
+        let json = serde_json::json!({
+            "hooks": {
+                "Stop": [{
+                    "matcher": "unexpected",
+                    "hooks": [{"command": "crs hook --target codex stop"}]
+                }]
+            }
+        });
+
+        assert!(!hook_array_contains_command(
+            &json,
+            "Stop",
+            None,
+            "crs hook --target codex stop"
+        ));
+    }
+
+    #[test]
+    fn hook_array_contains_command_true_when_matcher_absent_as_expected() {
+        let json = serde_json::json!({
+            "hooks": {
+                "Stop": [{
+                    "hooks": [{"command": "crs hook --target codex stop"}]
+                }]
+            }
+        });
+
+        assert!(hook_array_contains_command(
+            &json,
+            "Stop",
+            None,
+            "crs hook --target codex stop"
+        ));
+    }
 }
