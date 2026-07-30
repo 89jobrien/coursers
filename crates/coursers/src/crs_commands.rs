@@ -940,38 +940,29 @@ pub fn cmd_log(
     }
 }
 
-pub fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
+fn event_str_table(event: coursers_core::hook_pipeline::HookEvent) -> (&'static str, &'static str) {
     use coursers_core::hook_pipeline::HookEvent;
     match event {
-        HookEvent::PreToolUse => "PreToolUse",
-        HookEvent::PostToolUse => "PostToolUse",
-        HookEvent::SessionStart => "SessionStart",
-        HookEvent::SessionEnd => "SessionEnd",
-        HookEvent::PermissionRequest => "PermissionRequest",
-        HookEvent::PreCompact => "PreCompact",
-        HookEvent::PostCompact => "PostCompact",
-        HookEvent::UserPromptSubmit => "UserPromptSubmit",
-        HookEvent::SubagentStart => "SubagentStart",
-        HookEvent::Stop => "Stop",
-        HookEvent::SubagentStop => "SubagentStop",
+        HookEvent::PreToolUse => ("PreToolUse", "pre-tool-use"),
+        HookEvent::PostToolUse => ("PostToolUse", "post-tool-use"),
+        HookEvent::SessionStart => ("SessionStart", "session-start"),
+        HookEvent::SessionEnd => ("SessionEnd", "session-end"),
+        HookEvent::PermissionRequest => ("PermissionRequest", "permission-request"),
+        HookEvent::PreCompact => ("PreCompact", "pre-compact"),
+        HookEvent::PostCompact => ("PostCompact", "post-compact"),
+        HookEvent::UserPromptSubmit => ("UserPromptSubmit", "user-prompt-submit"),
+        HookEvent::SubagentStart => ("SubagentStart", "subagent-start"),
+        HookEvent::Stop => ("Stop", "stop"),
+        HookEvent::SubagentStop => ("SubagentStop", "subagent-stop"),
     }
 }
 
+pub fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
+    event_str_table(event).0
+}
+
 fn event_str_kebab(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
-    use coursers_core::hook_pipeline::HookEvent;
-    match event {
-        HookEvent::PreToolUse => "pre-tool-use",
-        HookEvent::PostToolUse => "post-tool-use",
-        HookEvent::SessionStart => "session-start",
-        HookEvent::SessionEnd => "session-end",
-        HookEvent::PermissionRequest => "permission-request",
-        HookEvent::PreCompact => "pre-compact",
-        HookEvent::PostCompact => "post-compact",
-        HookEvent::UserPromptSubmit => "user-prompt-submit",
-        HookEvent::SubagentStart => "subagent-start",
-        HookEvent::Stop => "stop",
-        HookEvent::SubagentStop => "subagent-stop",
-    }
+    event_str_table(event).1
 }
 
 pub fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
