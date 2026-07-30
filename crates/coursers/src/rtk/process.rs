@@ -237,4 +237,89 @@ mod tests {
             "All checks passed.\n3/3 tests passed"
         ));
     }
+
+    #[test]
+    fn str_field_extracts_present_string() {
+        let v = serde_json::json!({"command": "git status"});
+        assert_eq!(str_field(&v, "command"), "git status");
+    }
+
+    #[test]
+    fn str_field_defaults_to_empty_when_missing() {
+        let v = serde_json::json!({});
+        assert_eq!(str_field(&v, "command"), "");
+    }
+
+    #[test]
+    fn str_field_defaults_to_empty_when_wrong_type() {
+        let v = serde_json::json!({"command": 42});
+        assert_eq!(str_field(&v, "command"), "");
+    }
+
+    #[test]
+    fn u64_field_extracts_present_number() {
+        let v = serde_json::json!({"count": 7});
+        assert_eq!(u64_field(&v, "count"), 7);
+    }
+
+    #[test]
+    fn u64_field_defaults_to_zero_when_missing() {
+        let v = serde_json::json!({});
+        assert_eq!(u64_field(&v, "count"), 0);
+    }
+
+    #[test]
+    fn u64_field_defaults_to_zero_when_wrong_type() {
+        let v = serde_json::json!({"count": "not a number"});
+        assert_eq!(u64_field(&v, "count"), 0);
+    }
+
+    #[test]
+    fn f64_field_extracts_present_number() {
+        let v = serde_json::json!({"pct": 42.5});
+        assert_eq!(f64_field(&v, "pct"), 42.5);
+    }
+
+    #[test]
+    fn f64_field_defaults_to_zero_when_missing() {
+        let v = serde_json::json!({});
+        assert_eq!(f64_field(&v, "pct"), 0.0);
+    }
+
+    #[test]
+    fn parse_test_count_extracts_numerator() {
+        let s = "running tests\n3/3 tests passed\nother line";
+        assert_eq!(parse_test_count(s, "tests passed"), Some(3));
+    }
+
+    #[test]
+    fn parse_test_count_returns_none_when_suffix_absent() {
+        let s = "running tests\nno matching line here";
+        assert_eq!(parse_test_count(s, "tests passed"), None);
+    }
+
+    #[test]
+    fn parse_test_count_returns_none_on_unparseable_numerator() {
+        let s = "abc/3 tests passed";
+        assert_eq!(parse_test_count(s, "tests passed"), None);
+    }
+
+    #[test]
+    fn stdout_if_success_returns_none_on_failure() {
+        let status = std::process::Command::new("false")
+            .status()
+            .expect("run false");
+        assert_eq!(stdout_if_success(&status, b"ignored"), None);
+    }
+
+    #[test]
+    fn stdout_if_success_returns_stdout_on_success() {
+        let status = std::process::Command::new("true")
+            .status()
+            .expect("run true");
+        assert_eq!(
+            stdout_if_success(&status, b"hello"),
+            Some("hello".to_owned())
+        );
+    }
 }

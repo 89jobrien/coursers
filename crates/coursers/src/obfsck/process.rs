@@ -193,4 +193,40 @@ mod tests {
         let resp = serde_json::json!({ "result": {} });
         assert!(parse_filter_suggestions(&resp).is_empty());
     }
+
+    #[test]
+    fn parse_audit_hits_defaults_count_to_zero_when_missing() {
+        let resp = serde_json::json!({
+            "result": { "hits": [ { "label": "secret" } ] }
+        });
+        let hits = parse_audit_hits(&resp);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].count, 0);
+    }
+
+    #[test]
+    fn parse_audit_hits_skips_entries_missing_label() {
+        let resp = serde_json::json!({
+            "result": { "hits": [ { "count": 3 }, { "label": "ok", "count": 1 } ] }
+        });
+        let hits = parse_audit_hits(&resp);
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].label, "ok");
+    }
+
+    #[test]
+    fn parse_filter_suggestions_skips_entries_missing_pattern() {
+        let resp = serde_json::json!({
+            "result": { "suggestions": [ { "label": "no pattern" }, { "pattern": "x", "label": "y" } ] }
+        });
+        let suggestions = parse_filter_suggestions(&resp);
+        assert_eq!(suggestions.len(), 1);
+        assert_eq!(suggestions[0].pattern, "x");
+    }
+
+    #[test]
+    fn parse_jsonrpc_response_returns_none_on_no_parseable_lines() {
+        let stdout = b"not json at all\nalso not json\n";
+        assert!(parse_jsonrpc_response(true, stdout).is_none());
+    }
 }
