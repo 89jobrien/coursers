@@ -71,3 +71,94 @@ pub fn default_max_entries() -> usize {
 pub fn default_cleanup() -> u64 {
     3600
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rule_deserializes_with_defaults() {
+        let json = r#"{"id": "no-find", "pattern": "\\bfind\\b"}"#;
+        let rule: Rule = serde_json::from_str(json).unwrap();
+        assert_eq!(rule.id, "no-find");
+        assert!(rule.enabled);
+        assert_eq!(rule.pattern_flags, "");
+        assert!(rule.exceptions.is_empty());
+        assert!(rule.target_commands.is_empty());
+        assert!(rule.message.is_none());
+    }
+
+    #[test]
+    fn rule_deserializes_with_explicit_fields() {
+        let json = r#"{
+            "id": "no-find",
+            "enabled": false,
+            "pattern": "\\bfind\\b",
+            "pattern_flags": "i",
+            "exceptions": ["git log"],
+            "target_commands": ["find"],
+            "message": "use glob instead"
+        }"#;
+        let rule: Rule = serde_json::from_str(json).unwrap();
+        assert!(!rule.enabled);
+        assert_eq!(rule.pattern_flags, "i");
+        assert_eq!(rule.exceptions, vec!["git log".to_string()]);
+        assert_eq!(rule.message.as_deref(), Some("use glob instead"));
+    }
+
+    #[test]
+    fn failure_learning_default_matches_default_impl() {
+        let json = "{}";
+        let fl: FailureLearning = serde_json::from_str(json).unwrap();
+        let default = FailureLearning::default();
+        assert_eq!(fl.enabled, default.enabled);
+        assert_eq!(fl.block_threshold, default.block_threshold);
+        assert_eq!(fl.window_seconds, default.window_seconds);
+        assert_eq!(fl.max_tracked_commands, default.max_tracked_commands);
+        assert_eq!(fl.cleanup_after_seconds, default.cleanup_after_seconds);
+        assert_eq!(fl.state_file, None);
+        assert_eq!(fl.message_template, None);
+    }
+
+    #[test]
+    fn failure_learning_default_values() {
+        let fl = FailureLearning::default();
+        assert!(fl.enabled);
+        assert_eq!(fl.block_threshold, 3);
+        assert_eq!(fl.window_seconds, 300);
+        assert_eq!(fl.max_tracked_commands, 200);
+        assert_eq!(fl.cleanup_after_seconds, 3600);
+    }
+
+    #[test]
+    fn rules_config_default_is_empty() {
+        let cfg = RulesConfig::default();
+        assert!(cfg.rules.is_empty());
+        assert!(cfg.failure_learning.enabled);
+    }
+
+    #[test]
+    fn rules_config_deserializes_full_document() {
+        let json = r#"{
+            "rules": [
+                {"id": "r1", "pattern": "rm -rf"}
+            ],
+            "failure_learning": {"block_threshold": 5}
+        }"#;
+        let cfg: RulesConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(cfg.rules.len(), 1);
+        assert_eq!(cfg.rules[0].id, "r1");
+        assert_eq!(cfg.failure_learning.block_threshold, 5);
+        // untouched fields still fall back to their own field defaults
+        assert_eq!(cfg.failure_learning.window_seconds, 300);
+    }
+
+    #[test]
+    fn default_helper_functions_return_documented_values() {
+        assert!(default_true());
+        assert_eq!(default_block_threshold(), 3);
+        assert_eq!(default_window(), 300);
+        assert_eq!(default_max_entries(), 200);
+        assert_eq!(default_cleanup(), 3600);
+    }
+}

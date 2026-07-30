@@ -24,3 +24,35 @@ pub struct ProfileConfig {
     /// Hook I/O protocol (Claude vs Codex).
     pub protocol: HookProtocol,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hook_protocol_default_is_claude() {
+        assert_eq!(HookProtocol::default(), HookProtocol::Claude);
+    }
+
+    #[test]
+    fn hook_protocol_variants_are_distinct() {
+        assert_ne!(HookProtocol::Claude, HookProtocol::Codex);
+    }
+
+    #[test]
+    fn bytes_per_token_is_four() {
+        assert_eq!(BYTES_PER_TOKEN, 4);
+    }
+
+    #[test]
+    fn profile_config_holds_paths() {
+        let cfg = ProfileConfig {
+            rules_path: PathBuf::from("/rules.json"),
+            global_state_path: PathBuf::from("/global.json"),
+            local_state_path: PathBuf::from(".ctx/local.json"),
+            protocol: HookProtocol::Codex,
+        };
+        assert_eq!(cfg.rules_path, PathBuf::from("/rules.json"));
+        assert_eq!(cfg.protocol, HookProtocol::Codex);
+    }
+}
