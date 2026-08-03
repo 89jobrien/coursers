@@ -1,25 +1,15 @@
 project: coursers
 id: coursers
 updated: 2026-08-03
-items:
-- id: uncommitted-work
-  doob_uuid: null
-  name: uncommitted-work
-  priority: P1
-  status: open
-  title: Uncommitted changes (1 file)
-  description: |-
-    Working tree has uncommitted changes:
-    .ctx/HANDOFF.coursers.coursers.yaml
-  files:
-  - .ctx/HANDOFF.coursers.coursers.yaml
-  completed: null
-  extra: []
+items: []
 log:
 - date: 'null'
   summary: Tackled GitHub issues
   commits: []
   session: 2
+- date: '20260803.113751'
+  summary: done=44 running=0 pending=0 blocked=0
+  commits: []
 - date: '20260726.092820'
   summary: done=41 running=0 pending=3 blocked=0
   commits: []

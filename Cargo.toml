@@ -33,10 +33,7 @@ hex = "0.4"
 # Pinned to a specific rev (not a local path) so `cargo outdated --workspace` and other
 # tooling that copies the manifest to a tmp dir can resolve it. Bump `rev` to pick up
 # prefixe changes; see https://github.com/89jobrien/prefixe. (2026-08-03)
-# Pinned to the latest rev actually pushed to origin/main (as of 2026-08-03) — the
-# local ~/dev/prefixe checkout was 2 commits ahead unpushed; bump this rev after
-# pushing newer prefixe work.
-prefixe = { git = "https://github.com/89jobrien/prefixe.git", rev = "c0cbf3c443242fc9d0bbde1b8fc7b0c9a15d4de2" }
+prefixe = { git = "https://github.com/89jobrien/prefixe.git", rev = "91ce4d8f97e2748d07b3d870c28946b28881adc4" }
 redb = "4.1"
 regex = "1"
 # nu-parser/nu-protocol removed: nu-engine 0.111-0.113 has a compilation bug
