@@ -641,6 +641,7 @@ dependencies = [
 [[package]]
 name = "prefixe"
 version = "0.4.0"
+source = "git+https://github.com/89jobrien/prefixe.git?rev=c0cbf3c443242fc9d0bbde1b8fc7b0c9a15d4de2#c0cbf3c443242fc9d0bbde1b8fc7b0c9a15d4de2"
 dependencies = [
  "glob",
  "serde",

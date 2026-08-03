@@ -1,9 +1,12 @@
 # cargo-deny configuration
 # See: embarkstudios.github.io/cargo-deny/
-# TODO(deny-config-path): CLAUDE.md/skill docs invoke `cargo deny check --config
-# .config/deny.toml`, but this file lives at the repo root. That path falls back to
-# defaults with a warning instead of failing — either move this file to
-# .config/deny.toml or fix the invocations to point here. (2026-07-30 gm-audit)
+#
+# This file at the repo root IS cargo-deny's standard auto-discovery location —
+# `cargo deny check` with no flags finds it here, no `--config` needed. The global
+# `dep-audit` skill (~/.claude/skills/dep-audit) documents
+# `--config .config/deny.toml`, which doesn't exist in this repo and silently falls
+# back to defaults; that invocation should be fixed (or just drop the flag), not
+# this file's location. (resolved 2026-08-03, was TODO(deny-config-path))
 
 [advisories]
 # TODO(deny-advisories-cvss4): `cargo deny check advisories` currently crashes with
@@ -14,22 +17,17 @@
 ignore = []
 
 [licenses]
-# TODO(deny-license-allowlist-drift): "CC0-1.0", "ISC", "Unicode-DFS-2016", and
-# "Zlib" are unmatched — no dependency in the current tree carries them. Prune once
-# confirmed, or leave a rationale comment per entry if kept intentionally.
-# (2026-07-30 gm-audit)
+# Re-confirmed unmatched on 2026-08-03 (after the prefixe/dirs dependency changes
+# above) via `cargo deny check licenses`: CC0-1.0, ISC, Unicode-DFS-2016, Zlib.
+# Pruned. Re-add with a rationale comment if a future dependency needs one.
 allow = [
   "MIT",
   "Apache-2.0",
   "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause",
   "BSD-3-Clause",
-  "ISC",
   "Unicode-3.0",
-  "Unicode-DFS-2016",
-  "Zlib",
   "MPL-2.0",
-  "CC0-1.0",
 ]
 confidence-threshold = 0.8
 

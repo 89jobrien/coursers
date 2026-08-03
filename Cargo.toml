@@ -20,18 +20,23 @@ chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
 coursers-types = { path = "crates/types", version = "^0.1.0" }
 coursers-core = { path = "crates/core", version = "^0.1.0" }
-# TODO(deny-dupe-windows-sys): dirs v5.0.1 pulls windows-sys 0.48 while fd-lock v4.0.4
-# pulls windows-sys 0.59, producing 4 duplicate windows_* lock entries
-# (cargo deny check bans). A dirs bump would likely collapse this. (2026-07-30 gm-audit)
+# dirs v5.0.1 pulls windows-sys 0.48 while fd-lock v4.0.4 (latest as of 2026-08-03)
+# pulls windows-sys 0.59, producing duplicate windows_* lock entries (cargo deny
+# check bans). Tried bumping to dirs 6.0.0: it upgrades windows-sys but does NOT
+# converge with fd-lock (still split, now 0.59 vs 0.61) and additionally introduces
+# new duplicate groups (getrandom x3, r-efi x2, thiserror/thiserror-impl x2) via
+# redox_users 0.5. Net loss — reverted. Revisit once fd-lock ships a windows-sys
+# 0.6x release.
 dirs = "5"
 fd-lock = "4"
 hex = "0.4"
-# TODO(outdated-path-dep-breaks-tooling): this path dep resolves outside the repo
-# (~/dev/prefixe), which breaks `cargo outdated --workspace` — it copies the
-# manifest to a tmp dir and can't follow the relative path back out. Vendor, publish,
-# or otherwise remove the external path dep to restore `cargo outdated`.
-# (2026-07-30 gm-audit)
-prefixe = { path = "../prefixe/crates/prefixe" }
+# Pinned to a specific rev (not a local path) so `cargo outdated --workspace` and other
+# tooling that copies the manifest to a tmp dir can resolve it. Bump `rev` to pick up
+# prefixe changes; see https://github.com/89jobrien/prefixe. (2026-08-03)
+# Pinned to the latest rev actually pushed to origin/main (as of 2026-08-03) — the
+# local ~/dev/prefixe checkout was 2 commits ahead unpushed; bump this rev after
+# pushing newer prefixe work.
+prefixe = { git = "https://github.com/89jobrien/prefixe.git", rev = "c0cbf3c443242fc9d0bbde1b8fc7b0c9a15d4de2" }
 redb = "4.1"
 regex = "1"
 # nu-parser/nu-protocol removed: nu-engine 0.111-0.113 has a compilation bug

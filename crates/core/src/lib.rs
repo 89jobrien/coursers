@@ -1,6 +1,5 @@
-// TODO(unreachable-pub): add `#![warn(unreachable_pub)]` once the public API
-// surface is intentionally locked down. Currently many items are `pub` for
-// test/integration use; audit and tighten to `pub(crate)` where appropriate.
+#![warn(unreachable_pub)]
+
 pub mod error;
 pub use error::CourserError;
 

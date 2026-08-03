@@ -16,7 +16,7 @@ path = "src/main.rs"
 
 [[bin]]
 name = "crs"
-path = "src/main.rs"
+path = "src/bin/crs.rs"
 
 [dependencies]
 chrono = { workspace = true }
