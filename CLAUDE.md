@@ -9,33 +9,47 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 cargo build
 cargo build --release
 
-# Install binaries locally
+# Install binaries locally — one crate produces both the `coursers` and `crs` bins
 cargo install --path crates/coursers
-cargo install --path crates/crs
 
 # Test
 cargo test
-cargo test -p coursers-core        # core library only
-cargo test -p coursers        # pre/post hook binary
-cargo test -p crs             # filter/rewrite/discover binary
+cargo test -p coursers-types  # domain types and port traits only
+cargo test -p coursers-core   # core library only
+cargo test -p coursers        # coursers/crs binaries (both bin targets, one package)
+cargo test -p coursers-e2e    # end-to-end pipeline/scenario tests
 
 # Lint
 cargo clippy --workspace -- -D warnings
 
 # Smoke test (end-to-end)
 nu scripts/smoke.nu
+
+# Workspace task runner (taskit, package `xtask`) — wired as pre-commit/pre-push git hooks
+cargo run -p xtask -- --help
 ```
 
 ## Architecture
 
-Three-crate workspace:
+Five-crate workspace:
 
 ```
 crates/
+  types/     # coursers-types — domain types and port traits
   core/      # coursers-core — shared library (rules, state, filters, rewrite, history)
-  coursers/  # `coursers` binary — pre/post hook handlers
-  crs/       # `crs` binary — filter, rewrite, discover, validate, probe
+  coursers/  # coursers package — TWO bin targets sharing one `src/main.rs`/CLI:
+             #   `coursers` and `crs` are the same binary under two names, full command
+             #   set on both (pre, post, filter, rewrite, discover, validate, probe,
+             #   stats, insights, audit, suggest, history, export, hook, validate-hooks,
+             #   log, heat, replay, nu-check)
+  e2e/       # coursers-e2e — end-to-end pipeline/scenario integration tests
+  xtask/     # taskit-based workspace CI runner (fmt/lint/test/coverage/pre-commit/pre-push/release)
 ```
+
+There is no separate `crs` crate — `crs` is a second `[[bin]]` entry in
+`crates/coursers/Cargo.toml`, both pointing at `src/main.rs`. Whichever name you invoke,
+you get the identical CLI surface; the name only matters for which hook-chain command
+convention you're following in `settings.json`.
 
 ### coursers-core
 
@@ -50,42 +64,52 @@ All domain logic lives here. Key modules:
 - `history` — `CommandSource` trait + `discover()` function; scans Claude Code `.jsonl` session
   files to surface missed savings; uses `output_bytes / 4` for token estimates
 
-### coursers binary
+### coursers / crs binary (one CLI, two bin names)
 
-Two subcommands wired as Claude Code hooks:
+Run `coursers --help` or `crs --help` — both print the same 19-subcommand list. The hook
+chain in `settings.json` conventionally calls `coursers` for the pre/post rule gate and
+`crs` for everything else, but this is a naming convention, not an enforced split:
 
-- `coursers pre` — reads `PreToolUse` JSON from stdin; blocks if command matches a rule and no
+- `pre` — reads `PreToolUse` JSON from stdin; blocks if command matches a rule and no
   exception overrides; also blocks commands that have hit the failure threshold
-- `coursers post` — reads `PostToolUse` JSON from stdin; records non-zero exits to the
+- `post` — reads `PostToolUse` JSON from stdin; records non-zero exits to the
   failure-learning state file
-
-### crs binary
-
-Five subcommands:
-
-- `crs filter` — PostToolUse hook; compresses/suppresses output per filter rules
-- `crs rewrite` — PreToolUse hook; rewrites commands (e.g. force `--message-format json`);
+- `filter` — PostToolUse hook; compresses/suppresses output per filter rules
+- `rewrite` — PreToolUse hook; rewrites commands (e.g. force `--message-format json`);
   exit 1 = passthrough unchanged, exit 0 + JSON = rewritten
-- `crs discover` — scans `~/.claude/projects/**/*.jsonl` for unhandled Bash commands
-- `crs validate` — rule health check: pattern compiles, known triggers fire, exceptions work,
+- `discover` — scans `~/.claude/projects/**/*.jsonl` for unhandled Bash commands
+- `validate` — rule health check: pattern compiles, known triggers fire, exceptions work,
   alternative tools (bun, uv) on PATH
-- `crs probe` — interactive: read command from stdin (raw string or JSON), show per-rule verdict
+- `probe` — interactive: read command from stdin (raw string or JSON), show per-rule verdict
+- `stats` — cumulative block counts by rule
+- `insights` — session facets enriched with git context
+- `audit` — rx prefix learning state
+- `suggest` — suggest new rules from unhandled commands
+- `history` — recent blocked commands
+- `export` — dump rules + stats + state as portable JSON
+- `hook` — run the generic hook pipeline for a hook event (also routes Codex hooks via
+  `--target codex`, see `crates/coursers/src/crs_commands.rs`)
+- `validate-hooks` — validate hook pipeline config
+- `log` — query the hook execution log
+- `heat` — heatmap of rule firings
+- `replay` — replay a session's Bash commands through the current ruleset
+- `nu-check` — validate nu scripts using `nu --ide-check`
 
 ### Hexagonal boundaries
 
-`coursers-core` defines traits (`CommandSource`, `RulesLoader`, `StateStore`). The `crs` binary owns
-the concrete adapter (`JsonlCommandSource`). Tests inject fakes via the traits — never mock the
-file system directly.
+`coursers-core` defines traits (`CommandSource`, `RulesLoader`, `StateStore`). The `coursers`
+crate owns the concrete adapter (`JsonlCommandSource`). Tests inject fakes via the traits —
+never mock the file system directly.
 
 ## Configuration files
 
-| File                                           | Used by                                            | Purpose                                                 |
-| ---------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------- |
-| `~/.config/coursers/course-correct-rules.json` | `coursers pre/post`, `crs validate/probe/discover` | Block rules + failure-learning config                   |
-| `~/.config/coursers/course-correct-state.json` | `coursers post`                                    | Global fallback failure-learning state                  |
-| `.ctx/course-correct-state.json`               | `coursers post`                                    | Project-local failure-learning state (wins over global) |
-| `.ctx/crs-filters.toml`                        | `crs filter/rewrite`                               | Project-local filter and rewrite rules                  |
-| `~/.config/crs/filters.toml`                   | `crs filter/rewrite`                               | Global fallback filter and rewrite rules                |
+| File                                           | Used by subcommand(s)                          | Purpose                                                 |
+| ---------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------- |
+| `~/.config/coursers/course-correct-rules.json` | `pre`, `post`, `validate`, `probe`, `discover`  | Block rules + failure-learning config                   |
+| `~/.config/coursers/course-correct-state.json` | `post`                                          | Global fallback failure-learning state                  |
+| `.ctx/course-correct-state.json`               | `post`                                          | Project-local failure-learning state (wins over global) |
+| `.ctx/crs-filters.toml`                        | `filter`, `rewrite`                            | Project-local filter and rewrite rules                  |
+| `~/.config/crs/filters.toml`                   | `filter`, `rewrite`                            | Global fallback filter and rewrite rules                |
 
 ## Hook wiring (settings.json)
 
@@ -114,7 +138,7 @@ file system directly.
 }
 ```
 
-## Hook wiring
+## Hook wiring verification
 
 The standard hook chain is documented above and mirrored in
 `agents/coursers-companion.md`. After installing the hook block in your local
@@ -126,6 +150,10 @@ The standard hook chain is documented above and mirrored in
 op run --account=my.1password.com --env-file=/Users/joe/.secrets -- devkit council
 # Run from repo root. No --repo flag. Output: ~/.dev-agents/coursers/ai-logs/
 ```
+
+`devkit` is on PATH, but this command requires 1Password secrets injection and was
+not re-run to verify the output path during the last doc pass — treat as
+`[UNVERIFIED]` until confirmed.
 
 ## Coursers Rules Gotchas
 
@@ -152,7 +180,9 @@ Claude Code session. Relevant skills for coursers development:
 | `godmode:pr-author`               | Compose PR descriptions from branch diff + commit history |
 
 Invoke via `/godmode:<skill-name>` in the Claude Code prompt, or use the `Skill` tool directly.
-Agents live at `~/dev/godmode/agents/` — prefixed by domain (`dbg__`, `qual__`, `plan__`, etc.).
+Agents live at `~/dev/godmode/agents/`. Some are domain-prefixed (`dbg__`, `git__`, `agent__`,
+etc.); many others (`forge.md`, `conductor.md`, `envoy.md`, ...) have no prefix at all —
+check `~/dev/godmode/agents/INDEX.md` rather than assuming a naming pattern.
 
 ## HANDOFF Dependency Fields
 
