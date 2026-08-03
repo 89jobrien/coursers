@@ -196,5 +196,19 @@ mod proptests {
                 );
             }
         }
+
+        /// Invariant: non-string JSON values in stdout/output are treated as absent
+        /// (extract_output only reads string-typed fields via as_str()).
+        #[test]
+        fn extract_output_ignores_non_string_fields(
+            stdout_num in proptest::num::i64::ANY,
+            output_flag in proptest::bool::ANY,
+        ) {
+            let v = serde_json::json!({
+                "stdout": stdout_num,
+                "output": output_flag,
+            });
+            prop_assert!(extract_output(&v).is_none());
+        }
     }
 }
