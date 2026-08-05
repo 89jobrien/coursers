@@ -21,6 +21,8 @@ path = "src/bin/crs.rs"
 [dependencies]
 chrono = { workspace = true }
 clap = { workspace = true }
+clap_complete = "4"
+clap_complete_nushell = "4"
 coursers-types = { workspace = true }
 coursers-core = { workspace = true }
 dirs = { workspace = true }
