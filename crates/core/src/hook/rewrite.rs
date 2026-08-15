@@ -148,6 +148,29 @@ mod tests {
     }
 
     #[test]
+    fn real_world_cargo_test_pipe_cascade() {
+        // Shape mirrors the three real rules in ~/.config/crs/filters.toml that
+        // exposed the bug: grep->rg, 2>&1 strip, and cargo test->nextest, in that
+        // file order. All three must fire on one command.
+        let c = cfg(&[
+            (r"(\|\s*)grep(\s)", "${1}rg${2}"),
+            (r"\s+2>&1", " out+err>"),
+            (r"^(cargo\s+test\b)(.*)", "cargo nextest run$2"),
+        ]);
+        let outcome = apply(
+            r#"cargo test --workspace 2>&1 | grep -E "FAILED|error""#,
+            &c,
+            &NoopExpander,
+        )
+        .unwrap();
+        assert_eq!(
+            outcome.command,
+            r#"cargo nextest run --workspace out+err> | rg -E "FAILED|error""#
+        );
+        assert_eq!(outcome.applied_rules.len(), 3);
+    }
+
+    #[test]
     fn invalid_regex_skipped() {
         let c = cfg(&[
             ("[(invalid", "replace"),
