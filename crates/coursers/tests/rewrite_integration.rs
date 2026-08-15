@@ -3,9 +3,9 @@
 //! Tests the library function `run_rewrite` with real TOML-loaded config,
 //! verifying command rewriting semantics.
 
-use coursers_core::rewrite::{RewriteConfig, RewriteRule};
+use coursers_core::rewrite::{RewriteConfig, RewriteOutcome, RewriteRule};
 
-fn run_rewrite(command: &str, config: &RewriteConfig) -> Option<String> {
+fn run_rewrite(command: &str, config: &RewriteConfig) -> Option<RewriteOutcome> {
     coursers_core::rewrite::apply(command, config, &coursers_core::expand::EnvExpander)
 }
 
@@ -29,14 +29,14 @@ fn cfg(rules: &[(&str, &str)]) -> RewriteConfig {
 fn rewrite_matching_rule_returns_rewritten() {
     let config = cfg(&[("^cargo test(.*)", "cargo nextest run$1")]);
     let result = run_rewrite("cargo test --release", &config);
-    assert_eq!(result.unwrap(), "cargo nextest run --release");
+    assert_eq!(result.unwrap().command, "cargo nextest run --release");
 }
 
 #[test]
 fn rewrite_full_replacement() {
     let config = cfg(&[("^git status$", "git status --short")]);
     let result = run_rewrite("git status", &config);
-    assert_eq!(result.unwrap(), "git status --short");
+    assert_eq!(result.unwrap().command, "git status --short");
 }
 
 // ---------------------------------------------------------------------------
@@ -57,21 +57,47 @@ fn rewrite_no_match_returns_none() {
 fn rewrite_capture_groups() {
     let config = cfg(&[("^(cargo build)(.*)", "$1 --color always$2")]);
     let result = run_rewrite("cargo build --release", &config);
-    assert_eq!(result.unwrap(), "cargo build --color always --release");
+    assert_eq!(
+        result.unwrap().command,
+        "cargo build --color always --release"
+    );
 }
 
 // ---------------------------------------------------------------------------
-// first matching rule wins
+// all matching rules cascade, each firing once on the previous rule's output
 // ---------------------------------------------------------------------------
 
 #[test]
-fn rewrite_first_match_wins() {
+fn rewrite_cascades_through_all_matching_rules() {
     let config = cfg(&[
-        ("^cargo nextest(.*)", "cargo nextest run --no-fail-fast$1"),
-        ("^cargo(.*)", "cargo --color always$1"),
+        ("^cargo test(.*)", "cargo nextest run$1"),
+        (
+            "^cargo nextest run(.*)",
+            "cargo nextest run$1 --no-fail-fast",
+        ),
     ]);
-    let result = run_rewrite("cargo nextest run", &config);
-    assert_eq!(result.unwrap(), "cargo nextest run --no-fail-fast run");
+    let outcome = run_rewrite("cargo test --release", &config).unwrap();
+    assert_eq!(
+        outcome.command,
+        "cargo nextest run --release --no-fail-fast"
+    );
+    assert_eq!(outcome.applied_rules.len(), 2);
+}
+
+#[test]
+fn rewrite_reason_lists_all_applied_rules() {
+    // Mirrors emit_rewrite's formatting decision — kept as a documentation
+    // test so the reason-string contract is pinned here too.
+    let config = cfg(&[
+        ("^cargo test(.*)", "cargo nextest run$1"),
+        (
+            "^cargo nextest run(.*)",
+            "cargo nextest run$1 --no-fail-fast",
+        ),
+    ]);
+    let outcome = run_rewrite("cargo test --release", &config).unwrap();
+    assert_eq!(outcome.applied_rules.len(), 2);
+    assert!(!outcome.applied_rules.is_empty());
 }
 
 // ---------------------------------------------------------------------------
@@ -112,11 +138,11 @@ replace = "git status --short"
     let config: RewriteConfig = toml::from_str(&content).unwrap();
 
     assert_eq!(
-        run_rewrite("cargo test -p foo", &config).unwrap(),
+        run_rewrite("cargo test -p foo", &config).unwrap().command,
         "cargo nextest run -p foo"
     );
     assert_eq!(
-        run_rewrite("git status", &config).unwrap(),
+        run_rewrite("git status", &config).unwrap().command,
         "git status --short"
     );
     assert!(run_rewrite("doob todo list", &config).is_none());
