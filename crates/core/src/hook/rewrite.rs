@@ -16,37 +16,59 @@ pub struct RewriteConfig {
     pub rewrites: Vec<RewriteRule>,
 }
 
-/// Try to rewrite `command` using the first matching rule.
+/// Result of running a command through the rewrite pipeline.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RewriteOutcome {
+    /// The command after all matching rules were applied, in order.
+    pub command: String,
+    /// The `pattern` string of each rule that fired, in application order.
+    pub applied_rules: Vec<String>,
+}
+
+/// Rewrite `command` by folding it through every matching rule, in file order.
 ///
 /// The command is first passed through `expander` to resolve shell env references
 /// (`$HOME`, `${VAR}`, `$env.VAR`, `~`) before rule matching. Pass [`crate::expand::EnvExpander`]
 /// for production use or [`crate::expand::NoopExpander`] to skip expansion.
 ///
-/// If a rule matches, the expanded form is rewritten and returned.
-/// If no rule matches but expansion changed the command, the expanded form is returned
-/// (so that env refs are always resolved even without an explicit rewrite rule).
+/// Every rule whose pattern matches the *current* (possibly already-rewritten) command
+/// fires exactly once, in a single linear pass over `config.rewrites` — a rule is never
+/// re-evaluated after it fires, and there is no re-scanning to a fixed point.
 ///
-/// Returns `Some(rewritten_or_expanded)` if the command changed, `None` if unchanged.
+/// Returns `Some(outcome)` if the command changed (by any rule, or by expansion alone),
+/// `None` if unchanged.
 pub fn apply(
     command: &str,
     config: &RewriteConfig,
     expander: &impl crate::expand::VarExpander,
-) -> Option<String> {
+) -> Option<RewriteOutcome> {
     let expanded = expander.expand(command);
 
+    let mut current = expanded.clone();
+    let mut applied = Vec::new();
     for rule in &config.rewrites {
         let Ok(re) = regex::Regex::new(&rule.pattern) else {
             continue;
         };
-        if re.is_match(&expanded) {
-            let result = re.replace(&expanded, rule.replace.as_str()).into_owned();
-            return Some(result);
+        if re.is_match(&current) {
+            current = re.replace(&current, rule.replace.as_str()).into_owned();
+            applied.push(rule.pattern.clone());
         }
+    }
+
+    if !applied.is_empty() {
+        return Some(RewriteOutcome {
+            command: current,
+            applied_rules: applied,
+        });
     }
 
     // No rule matched. Return expanded form if it differs from the original.
     if expanded != command {
-        Some(expanded)
+        Some(RewriteOutcome {
+            command: expanded,
+            applied_rules: Vec::new(),
+        })
     } else {
         None
     }
@@ -79,20 +101,22 @@ mod tests {
     fn rewrites_matching_command() {
         let c = cfg(&[("^git status$", "git status --short")]);
         assert_eq!(
-            apply("git status", &c, &NoopExpander).unwrap(),
+            apply("git status", &c, &NoopExpander).unwrap().command,
             "git status --short"
         );
     }
 
     #[test]
-    fn uses_first_matching_rule() {
+    fn applies_all_matching_rules_in_sequence() {
         let c = cfg(&[
             ("^cargo nextest.*", "cargo nextest run --no-fail-fast"),
-            ("^cargo.*", "cargo --color always"),
+            ("^cargo.*", "cargo --color always run --no-fail-fast"),
         ]);
+        let outcome = apply("cargo nextest run", &c, &NoopExpander).unwrap();
+        assert_eq!(outcome.command, "cargo --color always run --no-fail-fast");
         assert_eq!(
-            apply("cargo nextest run", &c, &NoopExpander).unwrap(),
-            "cargo nextest run --no-fail-fast"
+            outcome.applied_rules,
+            vec!["^cargo nextest.*".to_string(), "^cargo.*".to_string()]
         );
     }
 
@@ -100,7 +124,9 @@ mod tests {
     fn supports_capture_groups() {
         let c = cfg(&[("^(cargo test)(.*)", "cargo nextest run$2")]);
         assert_eq!(
-            apply("cargo test --release", &c, &NoopExpander).unwrap(),
+            apply("cargo test --release", &c, &NoopExpander)
+                .unwrap()
+                .command,
             "cargo nextest run --release"
         );
     }
@@ -118,7 +144,7 @@ mod tests {
             ("^cargo build$", "cargo --color always build"),
         ]);
         assert_eq!(
-            apply("cargo build", &c, &NoopExpander).unwrap(),
+            apply("cargo build", &c, &NoopExpander).unwrap().command,
             "cargo --color always build"
         );
     }
