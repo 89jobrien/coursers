@@ -138,6 +138,16 @@ mod tests {
     }
 
     #[test]
+    fn each_rule_fires_at_most_once() {
+        // Rule's own replacement text still matches its own pattern — must NOT
+        // re-fire (single linear pass, not loop-to-convergence).
+        let c = cfg(&[("cargo", "cargo cargo")]);
+        let outcome = apply("cargo build", &c, &NoopExpander).unwrap();
+        assert_eq!(outcome.command, "cargo cargo build");
+        assert_eq!(outcome.applied_rules, vec!["cargo".to_string()]);
+    }
+
+    #[test]
     fn invalid_regex_skipped() {
         let c = cfg(&[
             ("[(invalid", "replace"),
