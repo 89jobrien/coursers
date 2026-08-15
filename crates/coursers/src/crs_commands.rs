@@ -42,7 +42,10 @@ pub fn resolve_profile(
 }
 
 /// Run the crs rewrite hook logic. Returns Some(rewritten) or None.
-fn run_rewrite(command: &str, config: &RewriteConfig) -> Option<String> {
+fn run_rewrite(
+    command: &str,
+    config: &RewriteConfig,
+) -> Option<coursers_core::rewrite::RewriteOutcome> {
     coursers_core::rewrite::apply(command, config, &coursers_core::expand::EnvExpander)
 }
 
@@ -402,8 +405,8 @@ pub fn cmd_rewrite() {
 
     // 2. Regex rewrite rules from crs-filters.toml
     let config = load_rewrite_config();
-    if let Some(rewritten) = run_rewrite(command, &config) {
-        emit_rewrite(&rewritten);
+    if let Some(outcome) = run_rewrite(command, &config) {
+        emit_rewrite(&outcome.command, &outcome.applied_rules);
         return;
     }
 
@@ -428,7 +431,7 @@ pub fn cmd_rewrite() {
     };
     let result = coursers_core::rx_prefix::rewrite_command(command, &rx_config);
     if result.rewritten != command {
-        emit_rewrite(&result.rewritten);
+        emit_rewrite(&result.rewritten, &[]);
         return;
     }
 
@@ -971,10 +974,7 @@ pub fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
 }
 
 pub fn load_rewrite_config() -> coursers_core::rewrite::RewriteConfig {
-    let Some(path) = coursers_core::filters::filters_path() else {
-        return coursers_core::rewrite::RewriteConfig::default();
-    };
-    let Ok(content) = std::fs::read_to_string(&path) else {
+    let Some(content) = coursers_core::filters::merged_content() else {
         return coursers_core::rewrite::RewriteConfig::default();
     };
     toml::from_str::<RewriteToml>(&content)
@@ -1028,11 +1028,13 @@ pub fn emit_message(text: &str) {
     write_stdout(&json);
 }
 
-pub fn emit_rewrite(command: &str) {
-    let json = coursers_core::hook::protocol::rewrite_response(
-        &format!("crs rewrite: {command}"),
-        command,
-    );
+pub fn emit_rewrite(command: &str, applied_rules: &[String]) {
+    let reason = if applied_rules.is_empty() {
+        format!("crs rewrite: {command}")
+    } else {
+        format!("crs rewrite ({} rule(s)): {command}", applied_rules.len())
+    };
+    let json = coursers_core::hook::protocol::rewrite_response(&reason, command);
     write_stdout(&json);
 }
 
