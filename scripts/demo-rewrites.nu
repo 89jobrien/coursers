@@ -28,7 +28,9 @@ let examples = [
     { label: "2>&1 (bash-ism) -> out+err>"
       command: 'cargo build 2>&1' }
     { label: "2>/dev/null (bash-ism) -> stripped"
-      command: 'hash -r 2>/dev/null' }
+      command: 'mise ls-remote cargo-deny 2>/dev/null' }
+    { label: "hash -r (bash PATH-cache clear, no-op in nu) -> true"
+      command: 'mise reshim; hash -r 2>/dev/null; which cargo-deny' }
     { label: "bare cargo clippy -> append -- -D warnings"
       command: 'cargo clippy --workspace' }
     { label: "sudo ... -> routed through GUI askpass"
