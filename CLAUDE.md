@@ -160,6 +160,33 @@ not re-run to verify the output path during the last doc pass — treat as
 - `no-find-use-glob` rule matches any command containing `\bfind\s+[./~$"']` —
   this includes git commit messages with phrases like "find .ctx". Exception added
   for `git (commit|log|tag|stash)` including `git -C` form.
+- Two godmode trace-log files exist and are easy to confuse: `.ctx/GODMODE.trace.jsonl`
+  (repo root) vs `.ctx/godmode/traces/trace.jsonl` (the one
+  `skills/observability-as-infrastructure/helpers/*.nu` actually read). Check which
+  one before diagnosing "broken" trace tooling.
+- `.ctx/*` is gitignored except explicitly allow-listed files — edits to
+  `.ctx/GODMODE.tasks.yaml` are invisible to `git status` and `godmode handoff`'s
+  uncommitted-file warning. Don't assume a clean handoff report means no local state
+  changed there.
+- `cargo deny check advisories` crashing with "unsupported CVSS version: 4.0" is a
+  `cargo-deny` binary bug (fixed in 0.20.2, broken in 0.18.3), not a `deny.toml`
+  config problem — ignoring the advisory ID doesn't help since the crash happens
+  loading the advisory DB, before ignore-filtering applies. Upgrade the binary
+  (mise-managed: `mise use -g cargo:cargo-deny@latest`, then start a fresh shell —
+  an already-running shell's `PATH` has the old version's dir baked in).
+- After editing `crates/core` or `crates/coursers`, `cargo build`/`cargo nextest run`
+  do NOT update the globally-installed `~/.cargo/bin/crs` and `coursers` binaries.
+  Run `cargo install --path crates/coursers` before trusting live `crs`/`coursers`
+  behavior against the new code — this cost two separate debugging detours on
+  2026-08-15/16 (rewrite-engine cascade fix, hook-log fix) before the pattern was
+  recognized.
+- When a rule seems to behave differently through the real hook chain than
+  expected, compare `crs probe` (matches the raw whole command string, no
+  pipeline segmentation) against `crs pre` fed the identical JSON payload
+  (goes through the real hook path, including `check_pipeline`'s segment-
+  splitting on `;`/`&&`/`||`). This divergence isolated the `no-bash-use-nu`
+  pipeline-splitting bug (doob todo `b6ff3600-0733-41fd-95c4-cfc5bf03b385`)
+  in one step.
 
 ## Godmode Skills
 
