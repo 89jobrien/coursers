@@ -1,5 +1,5 @@
 #!/usr/bin/env nu
-# xtest.nu — divergence testing between `crs probe` (matches the raw whole
+# probe-vs-pre.nu — divergence testing between `crs probe` (matches the raw whole
 # command string, no pipeline segmentation) and `crs pre` (the real
 # PreToolUse hook path, which runs check_pipeline()'s ;/&&/|| segmentation
 # before matching). When these two disagree on a command, a rule behaves
@@ -16,15 +16,15 @@
 # just the ones already known about.
 #
 # Usage:
-#   nu scripts/xtest.nu "some command"     # test one command, all 5 forms
-#   nu scripts/xtest.nu --suite            # run the auto-generated rule suite
-#   nu scripts/xtest.nu --suite --json     # machine-readable suite output
+#   nu scripts/probe-vs-pre.nu "some command"     # test one command, all 5 forms
+#   nu scripts/probe-vs-pre.nu --suite            # run the auto-generated rule suite (also the default with no args)
+#   nu scripts/probe-vs-pre.nu --suite --json     # machine-readable suite output
 #
 # Planned: wire the --suite run into taskit (xtask) as a CI-checkable task
 # once the nu-script version is validated. Not yet done.
 
 # One known-good trigger example per course-correct rule id — the same
-# examples used by scripts/demo-rewrites.nu, kept here so xtest can fuzz
+# examples used by scripts/demo-rewrites.nu, kept here so this script can fuzz
 # around each one independently. Update when rules are added/removed/renamed
 # in ~/.config/coursers/course-correct-rules.json.
 def rule_triggers [] {
@@ -118,7 +118,7 @@ def run_suite [] {
 
 def print_suite_report [results: list] {
     print ""
-    print "xtest — auto-generated crs probe vs crs pre divergence suite"
+    print "probe-vs-pre — auto-generated crs probe vs crs pre divergence suite"
     print "════════════════════════════════════════════════════════════════"
 
     let by_rule = ($results | group-by rule)
@@ -139,6 +139,10 @@ def print_suite_report [results: list] {
 }
 
 def main [command?: string, --suite, --json] {
+    # No command and no explicit --suite: default to running the suite,
+    # since that's the useful thing to do with no arguments.
+    let suite = ($suite or $command == null)
+
     if $suite {
         let results = (run_suite)
 
@@ -159,10 +163,6 @@ def main [command?: string, --suite, --json] {
             print $"  0 divergences — ($rules_total) rules × 5 chain forms all agree between probe and pre"
         }
         return
-    }
-
-    if $command == null {
-        error make { msg: "usage: nu scripts/xtest.nu \"<command>\"  OR  nu scripts/xtest.nu --suite" }
     }
 
     mut results = []
