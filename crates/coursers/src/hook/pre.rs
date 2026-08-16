@@ -73,6 +73,38 @@ fn file_tree(path: &str) -> String {
     "(could not list directory)".to_string()
 }
 
+/// Record a blocked command to the shared hook execution log (`crs log`), so
+/// course-correct denials from the `pre` hook are queryable the same way the
+/// generic `crs hook` pipeline's blocks already are. Non-blocking — silently
+/// no-ops if the log db can't be opened.
+// qual:allow(iosp) reason: "I/O boundary — writes to the hook-log redb"
+fn record_correction(
+    db_path: &std::path::Path,
+    event: &str,
+    tool_name: Option<&str>,
+    target: &str,
+    matched_rules: Vec<String>,
+    message: String,
+) {
+    let Ok(db) = coursers_core::hook::log::open_db(db_path) else {
+        return;
+    };
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos() as u64;
+    let entry = coursers_core::hook::log::LogEntry {
+        timestamp,
+        event: event.to_string(),
+        tool_name: tool_name.map(str::to_string),
+        target: Some(target.to_string()),
+        exit_code: None,
+        matched_rules,
+        outcome: coursers_core::hook::log::Outcome::Deny { message },
+    };
+    coursers_core::hook::log::record(&db, &entry);
+}
+
 // TODO(hook-ordering-semantics): document whether Claude Code short-circuits on
 // the first deny response from a hook chain or runs all hooks in the chain.
 // If short-circuit: the failure-learning check below (step 2) is skipped when a
@@ -155,6 +187,14 @@ pub fn run_with_proto<L: RulesLoader, S: StateStore>(
             .unwrap_or_else(|e| eprintln!("[coursers] warning: failed to record suggestion: {e}"));
 
         let full_msg = enrich_message(&rule_id, command, &msg);
+        record_correction(
+            &coursers_core::hook::log::db_path(),
+            "PreToolUse",
+            payload.tool_name.as_deref(),
+            command,
+            vec![rule_id.clone()],
+            full_msg.clone(),
+        );
         deny_with_protocol(protocol, &full_msg);
     }
 
@@ -165,6 +205,14 @@ pub fn run_with_proto<L: RulesLoader, S: StateStore>(
             coursers_core::state::State::default()
         });
         if let Some(msg) = state::check_learned(command, &st, fl) {
+            record_correction(
+                &coursers_core::hook::log::db_path(),
+                "PreToolUse",
+                payload.tool_name.as_deref(),
+                command,
+                vec!["learned-failure".to_string()],
+                msg.clone(),
+            );
             deny_with_protocol(protocol, &msg);
         }
     }
@@ -246,6 +294,34 @@ mod tests {
             },
         );
         State { failures }
+    }
+
+    #[test]
+    fn record_correction_writes_deny_entry_to_hook_log() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("hook-log.redb");
+
+        record_correction(
+            &db_path,
+            "PreToolUse",
+            Some("Bash"),
+            "grep foo .",
+            vec!["no-grep-use-tool".to_string()],
+            "Use the Grep tool instead.".to_string(),
+        );
+
+        let db = coursers_core::hook::log::open_db(&db_path).unwrap();
+        let entries = coursers_core::hook::log::query(&db, &Default::default());
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].event, "PreToolUse");
+        assert_eq!(entries[0].tool_name.as_deref(), Some("Bash"));
+        assert_eq!(entries[0].target.as_deref(), Some("grep foo ."));
+        assert_eq!(entries[0].matched_rules, vec!["no-grep-use-tool"]);
+        assert!(matches!(
+            &entries[0].outcome,
+            coursers_core::hook::log::Outcome::Deny { message }
+                if message == "Use the Grep tool instead."
+        ));
     }
 
     #[test]
