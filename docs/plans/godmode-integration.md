@@ -107,10 +107,12 @@ is stable — `State { failures: HashMap<String, FailureEntry> }` where each
 
 ### Acceptance criteria
 
-- [ ] `godmode handon` shows failing commands when state file has entries
-- [ ] `godmode context --json` includes `coursers_failures` array
-- [ ] Missing state file produces no output, no error
-- [ ] Entries older than the failure-learning window are excluded
+- [x] `godmode handon` shows failing commands when state file has entries
+      (2026-08-16 — threshold hardcoded to 3 failures / 3600s window, not
+      read from coursers' rules.json, per "no subprocess" design)
+- [x] `godmode context --json` includes `coursers_failures` array (2026-08-16)
+- [x] Missing state file produces no output, no error (2026-08-16)
+- [x] Entries older than the failure-learning window are excluded (2026-08-16)
 
 ---
 
@@ -229,11 +231,14 @@ matching a glob against 0-5 running task titles adds <0.5ms. Acceptable.
 
 ### Acceptance criteria
 
-- [ ] Rule with `task_override: "migrate*"` is suppressed when a running
-      task title matches
-- [ ] Missing godmode cache file has no effect (rule fires normally)
-- [ ] `crs probe` shows override status per rule
-- [ ] No new dependencies added to `crs-core`
+- [x] Rule with `task_override: "migrate*"` is suppressed when a running
+      task title matches (2026-08-16 — glob match is substring-based on the
+      literal prefix, not strict-prefix-of-string, since real godmode running
+      titles are formatted `"[t1] <title>"`; a strict prefix match against
+      `"migrate*"` would never match)
+- [x] Missing godmode cache file has no effect (rule fires normally) (2026-08-16)
+- [x] `crs probe` shows override status per rule (2026-08-16)
+- [x] No new dependencies added to `crs-core` (2026-08-16)
 
 ---
 

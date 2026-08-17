@@ -111,6 +111,7 @@ impl MockWorkspace {
             exceptions: vec![],
             target_commands: vec![],
             message: None,
+            task_override: None,
         });
         self
     }
@@ -125,6 +126,7 @@ impl MockWorkspace {
             exceptions: vec![exception.to_string()],
             target_commands: vec![],
             message: None,
+            task_override: None,
         });
         self
     }

@@ -62,6 +62,7 @@ mod tests {
             exceptions: vec![],
             target_commands: vec![],
             message: Some("Use Grep tool".to_string()),
+            task_override: None,
         };
         let config = RulesConfig {
             rules: vec![rule],

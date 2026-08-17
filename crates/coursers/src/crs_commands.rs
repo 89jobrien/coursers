@@ -1250,13 +1250,26 @@ pub fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
                 .unwrap_or(None)
         });
 
+        let running_titles = coursers_core::config::running_task_titles();
+        let task_overridden = coursers_core::rules::task_overrides_rule(rule, &running_titles);
+
         if let Some(exc) = matched_exc {
             println!("ALLOW  [{}]", rule.id);
             println!("       pattern `{}` matched", rule.pattern);
             println!("       exception `{exc}` overrides → passthrough");
+        } else if task_overridden {
+            println!("ALLOW  [{}]", rule.id);
+            println!("       pattern `{}` matched", rule.pattern);
+            println!(
+                "       task_override `{}` matches a running task → passthrough",
+                rule.task_override.as_deref().unwrap_or_default()
+            );
         } else {
             println!("BLOCK  [{}]", rule.id);
             println!("       pattern `{}` matched", rule.pattern);
+            if let Some(ref pat) = rule.task_override {
+                println!("       task_override `{pat}` set but no running task matches");
+            }
             if let Some(ref msg) = rule.message {
                 // Wrap message at 72 cols with 7-space indent
                 let indent = "       ";

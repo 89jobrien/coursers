@@ -17,6 +17,7 @@ fn make_rule_with_exception(pattern: &str, exception: &str) -> Rule {
         exceptions: vec![exception.to_string()],
         target_commands: vec![],
         message: None,
+        task_override: None,
     }
 }
 
@@ -48,6 +49,7 @@ proptest! {
             exceptions: vec![],
             target_commands: vec![],
             message: None,
+            task_override: None,
         };
         prop_assert!(check(&command, &[rule]).is_none());
     }

@@ -161,8 +161,18 @@ pub fn run_with_proto<L: RulesLoader, S: StateStore>(
     });
     let fl = &config.failure_learning;
 
-    // 1. Predefined rules
-    if let Some((rule_id, msg)) = rules::check_pipeline(command, &config.rules) {
+    // 1. Predefined rules — a matching `task_override` glob against a running
+    // godmode task title suppresses the block for that task's duration.
+    let matched_rule = rules::check_pipeline(command, &config.rules).filter(|(rule_id, _)| {
+        !config
+            .rules
+            .iter()
+            .find(|r| &r.id == rule_id)
+            .is_some_and(|r| {
+                rules::task_overrides_rule(r, &coursers_core::config::running_task_titles())
+            })
+    });
+    if let Some((rule_id, msg)) = matched_rule {
         coursers_core::stats::record_block(&coursers_core::stats::stats_path(), &rule_id);
 
         // Capture (original, suggestion) pair for fine-tuning dataset.
@@ -276,6 +286,23 @@ mod tests {
                 exceptions: vec![],
                 target_commands: vec![],
                 message: Some("blocked".to_string()),
+                task_override: None,
+            }],
+            failure_learning: FailureLearning::default(),
+        }
+    }
+
+    fn config_with_overridden_rule(pattern: &str, task_override: &str) -> RulesConfig {
+        RulesConfig {
+            rules: vec![Rule {
+                id: "test-rule".to_string(),
+                enabled: true,
+                pattern: pattern.to_string(),
+                pattern_flags: String::new(),
+                exceptions: vec![],
+                target_commands: vec![],
+                message: Some("blocked".to_string()),
+                task_override: Some(task_override.to_string()),
             }],
             failure_learning: FailureLearning::default(),
         }
@@ -411,6 +438,7 @@ mod tests {
                 exceptions: vec![],
                 target_commands: vec![],
                 message: Some("blocked".to_string()),
+                task_override: None,
             }],
             failure_learning: FailureLearning {
                 enabled: true,
@@ -458,5 +486,69 @@ mod tests {
             &InMemoryCaptureStore::new(),
             &bash_payload("grep foo ."),
         );
+    }
+
+    // ── task_override wiring ──────────────────────────────────────────────
+    //
+    // `running_task_titles()` reads `$HOME/.cache/godmode/status.json` directly
+    // (no injectable trait — matches the plan's "no subprocess" design), so
+    // these tests point HOME at a temp dir. Serialized via a mutex since HOME
+    // is process-global and tests run in parallel threads within this binary.
+    static HOME_ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn overridden_rule_allows_command_when_task_running() {
+        let _guard = HOME_ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".cache/godmode")).unwrap();
+        std::fs::write(
+            tmp.path().join(".cache/godmode/status.json"),
+            r#"{"running":["[t1] migrate grep to rg"]}"#,
+        )
+        .unwrap();
+        let prev = std::env::var("HOME").ok();
+        unsafe { std::env::set_var("HOME", tmp.path()) };
+
+        let loader = InMemoryRulesLoader(config_with_overridden_rule(r"\bgrep\b", "migrate*"));
+        let store = InMemoryStateStore::new();
+        // Would panic (process::exit) on deny if not overridden — command must
+        // pass through cleanly.
+        run_with(
+            &loader,
+            &store,
+            &InMemoryCaptureStore::new(),
+            &bash_payload("grep foo ."),
+        );
+
+        match prev {
+            Some(v) => unsafe { std::env::set_var("HOME", v) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
+    }
+
+    #[test]
+    fn overridden_rule_with_no_matching_task_still_blocks() {
+        let _guard = HOME_ENV_LOCK.lock().unwrap();
+        let tmp = tempfile::TempDir::new().unwrap();
+        std::fs::create_dir_all(tmp.path().join(".cache/godmode")).unwrap();
+        std::fs::write(
+            tmp.path().join(".cache/godmode/status.json"),
+            r#"{"running":["[t1] add filter tests"]}"#,
+        )
+        .unwrap();
+        let prev = std::env::var("HOME").ok();
+        unsafe { std::env::set_var("HOME", tmp.path()) };
+
+        let overridden = coursers_core::rules::task_overrides_rule(
+            &config_with_overridden_rule(r"\bgrep\b", "migrate*").rules[0],
+            &coursers_core::config::running_task_titles(),
+        );
+
+        match prev {
+            Some(v) => unsafe { std::env::set_var("HOME", v) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
+
+        assert!(!overridden, "non-matching running task must not override");
     }
 }

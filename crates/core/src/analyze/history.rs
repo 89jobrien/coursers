@@ -297,6 +297,7 @@ mod tests {
             exceptions: vec![],
             target_commands: vec![],
             message: None,
+            task_override: None,
         }
     }
 

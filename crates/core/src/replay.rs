@@ -92,6 +92,7 @@ mod tests {
             exceptions: vec![],
             target_commands: vec![],
             message: Some(format!("Use tool instead of {id}.")),
+            task_override: None,
         }
     }
 

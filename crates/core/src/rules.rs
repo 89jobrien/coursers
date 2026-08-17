@@ -22,6 +22,13 @@ pub struct Rule {
     #[serde(default)]
     pub target_commands: Vec<String>,
     pub message: Option<String>,
+    /// Glob pattern matched against running godmode task titles
+    /// (`~/.cache/godmode/status.json`). When a running task title matches,
+    /// this rule is suppressed for the duration of that task. Supports a
+    /// single trailing `*` wildcard (e.g. `"migrate*"`); no `*` means exact
+    /// match. See [`task_overrides_rule`].
+    #[serde(default)]
+    pub task_override: Option<String>,
 }
 
 /// Configuration for the failure-learning subsystem.
@@ -200,6 +207,28 @@ pub fn matched_rule_id_pipeline(command: &str, rules: &[Rule]) -> Option<String>
         .find_map(|seg| matched_rule_id(seg, rules))
 }
 
+/// Simple glob match supporting a single trailing `*` wildcard. Real godmode
+/// running-task titles are formatted `"[t1] <title>"` (see
+/// `godmode-core::integrations::mod::build_handon`'s `running_tasks`), so a
+/// trailing `*` matches anywhere in the text rather than only as a strict
+/// prefix — `"migrate*"` matches `"[t1] migrate grep to rg"`. Falls back to
+/// an exact match when `pattern` has no `*`.
+fn glob_match(pattern: &str, text: &str) -> bool {
+    match pattern.strip_suffix('*') {
+        Some(prefix) => text.contains(prefix),
+        None => text == pattern,
+    }
+}
+
+/// Returns true if `rule.task_override` matches any currently running
+/// godmode task title, suppressing the rule for that task's duration.
+pub fn task_overrides_rule(rule: &Rule, running_titles: &[String]) -> bool {
+    let Some(pattern) = &rule.task_override else {
+        return false;
+    };
+    running_titles.iter().any(|t| glob_match(pattern, t))
+}
+
 #[cfg(kani)]
 mod kani_proofs {
     use super::*;
@@ -249,6 +278,7 @@ mod tests {
             exceptions: vec![],
             target_commands: vec![],
             message: None,
+            task_override: None,
         }
     }
 
@@ -261,6 +291,7 @@ mod tests {
             exceptions: vec![],
             target_commands: targets.into_iter().map(String::from).collect(),
             message: Some(format!("Use the dedicated tool instead of {id}.")),
+            task_override: None,
         }
     }
 
@@ -377,6 +408,7 @@ mod tests {
                  Example: `mise use node@20` or `mise use --global node@lts`."
                     .to_string(),
             ),
+            task_override: None,
         }
     }
 
@@ -550,6 +582,7 @@ mod tests {
                  (e.g. `gh run view`). If blocked, find other productive work to do."
                     .to_string(),
             ),
+            task_override: None,
         }
     }
 
@@ -764,5 +797,71 @@ mod tests {
             "expected empty rules on malformed JSON, got {} rules",
             cfg.rules.len()
         );
+    }
+
+    // ── task_override ──────────────────────────────────────────────────
+
+    fn rule_with_override(pattern: &str, task_override: &str) -> Rule {
+        let mut r = make_rule("no-grep", pattern);
+        r.task_override = Some(task_override.to_string());
+        r
+    }
+
+    #[test]
+    fn task_override_none_never_overrides() {
+        let rule = make_rule("no-grep", r"\bgrep\b");
+        assert!(!task_overrides_rule(&rule, &["migrate stuff".to_string()]));
+    }
+
+    #[test]
+    fn task_override_exact_match() {
+        let rule = rule_with_override(r"\bgrep\b", "migrate legacy config");
+        assert!(task_overrides_rule(
+            &rule,
+            &["migrate legacy config".to_string()]
+        ));
+    }
+
+    #[test]
+    fn task_override_exact_no_match() {
+        let rule = rule_with_override(r"\bgrep\b", "migrate legacy config");
+        assert!(!task_overrides_rule(&rule, &["unrelated task".to_string()]));
+    }
+
+    #[test]
+    fn task_override_wildcard_prefix_match() {
+        let rule = rule_with_override(r"\bgrep\b", "migrate*");
+        assert!(task_overrides_rule(
+            &rule,
+            &["[t1] migrate grep to rg".to_string()]
+        ));
+    }
+
+    #[test]
+    fn task_override_wildcard_no_match_without_prefix() {
+        let rule = rule_with_override(r"\bgrep\b", "migrate*");
+        assert!(!task_overrides_rule(
+            &rule,
+            &["[t1] add filter tests".to_string()]
+        ));
+    }
+
+    #[test]
+    fn task_override_no_running_tasks_never_matches() {
+        let rule = rule_with_override(r"\bgrep\b", "migrate*");
+        assert!(!task_overrides_rule(&rule, &[]));
+    }
+
+    #[test]
+    fn task_override_suppresses_rule_in_find_matching_rule() {
+        let rule = rule_with_override(r"\bgrep\b", "migrate*");
+        // Sanity: without override consideration, the rule matches normally.
+        assert!(check("grep foo .", &[rule.clone()]).is_some());
+        // With a matching running task, find_matching_rule should be skippable
+        // by callers checking task_overrides_rule before denying.
+        assert!(task_overrides_rule(
+            &rule,
+            &["[t1] migrate grep usage".to_string()]
+        ));
     }
 }

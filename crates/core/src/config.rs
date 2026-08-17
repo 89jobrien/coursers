@@ -58,6 +58,30 @@ pub fn state_path(fl: &crate::rules::FailureLearning) -> std::path::PathBuf {
         .unwrap_or_else(state_path_default)
 }
 
+#[derive(serde::Deserialize, Default)]
+struct GodmodeStatus {
+    #[serde(default)]
+    running: Vec<String>,
+}
+
+/// Read running godmode task titles from `~/.cache/godmode/status.json`, a
+/// file godmode writes on every status change. Used by the pre-hook to check
+/// `Rule::task_override` glob matches without shelling out.
+///
+/// Missing or malformed cache file returns an empty vec — never errors. A
+/// single small JSON read stays well under the pre-hook's 5ms budget.
+pub fn running_task_titles() -> Vec<String> {
+    let path = dirs::home_dir()
+        .unwrap_or_default()
+        .join(".cache/godmode/status.json");
+    let Ok(raw) = std::fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    serde_json::from_str::<GodmodeStatus>(&raw)
+        .map(|s| s.running)
+        .unwrap_or_default()
+}
+
 /// Which hook protocol to use for output formatting and exit codes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum HookProtocol {
@@ -347,6 +371,29 @@ mod tests {
             .protocol(HookProtocol::Claude)
             .build();
         assert_eq!(cfg.protocol, HookProtocol::Claude);
+    }
+
+    // ── running_task_titles ────────────────────────────────────────────
+
+    #[test]
+    fn running_task_titles_parses_status_json() {
+        let json = r#"{"running":["[t1] migrate stuff","[t2] add tests"],"pending":3}"#;
+        let status: GodmodeStatus = serde_json::from_str(json).unwrap();
+        assert_eq!(status.running, vec!["[t1] migrate stuff", "[t2] add tests"]);
+    }
+
+    #[test]
+    fn running_task_titles_defaults_empty_when_field_missing() {
+        let status: GodmodeStatus = serde_json::from_str("{}").unwrap();
+        assert!(status.running.is_empty());
+    }
+
+    #[test]
+    fn running_task_titles_missing_cache_file_returns_empty() {
+        // No env override for the cache path exists yet, so this exercises
+        // the real ~/.cache/godmode/status.json — either absent (empty vec)
+        // or present (some vec). Just assert it never panics.
+        let _ = running_task_titles();
     }
 
     #[test]

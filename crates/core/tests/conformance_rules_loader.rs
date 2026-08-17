@@ -51,6 +51,7 @@ fn in_memory_loader_satisfies_contract_with_rules() {
                 exceptions: vec![r"\| grep".to_string()],
                 target_commands: vec![],
                 message: Some("Use Grep tool".to_string()),
+                task_override: None,
             },
             Rule {
                 id: "no-cat".to_string(),
@@ -60,6 +61,7 @@ fn in_memory_loader_satisfies_contract_with_rules() {
                 exceptions: vec![],
                 target_commands: vec![],
                 message: None,
+                task_override: None,
             },
         ],
         failure_learning: FailureLearning::default(),
@@ -86,6 +88,7 @@ fn in_memory_loader_returns_exact_config() {
             exceptions: vec![],
             target_commands: vec![],
             message: Some("blocked".to_string()),
+            task_override: None,
         }],
         failure_learning: FailureLearning {
             enabled: false,

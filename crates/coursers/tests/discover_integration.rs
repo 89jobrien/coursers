@@ -14,6 +14,7 @@ fn fixture_rules() -> Vec<Rule> {
         exceptions: vec![],
         target_commands: vec!["cargo".to_string()],
         message: None,
+        task_override: None,
     }]
 }
 
@@ -51,6 +52,7 @@ fn regression_discover_unhandled_empty_with_catch_all_rule() {
         exceptions: vec![r"^nu\b".to_string()],
         target_commands: vec![],
         message: None,
+        task_override: None,
     }];
     let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/discover");
     let src = coursers_core::jsonl_source::JsonlCommandSource::new(fixtures, true, None);
