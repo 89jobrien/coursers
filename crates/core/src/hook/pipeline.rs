@@ -79,7 +79,7 @@ pub struct HookRule {
     /// Regex pattern matched against the command (Bash) or file_path (Edit/Write).
     #[serde(default)]
     pub pattern: Option<String>,
-    /// Skip this rule if the command/path contains this string.
+    /// Skip this rule if this regex matches the command/path.
     #[serde(default)]
     pub unless: Option<String>,
     /// When to fire (PostToolUse only).
@@ -242,9 +242,13 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
             }
         }
 
-        // Unless filter
+        // Unless filter — a regex, matching what validate_config enforces.
+        // A non-compiling unless is treated as non-matching so the rule
+        // still applies (deny-guards must not fail open on a bad exception).
         if let Some(ref unless) = rule.unless
-            && target.contains(unless.as_str())
+            && regex::Regex::new(unless)
+                .map(|re| re.is_match(target))
+                .unwrap_or(false)
         {
             continue;
         }
@@ -680,6 +684,57 @@ mod tests {
             &ctx(HookEvent::PreToolUse, "doob todo add fix bug"),
         );
         assert_eq!(r.messages.len(), 1);
+    }
+
+    #[test]
+    fn unless_is_a_regex_not_a_substring() {
+        // Mirrors the drop-database guard: an alternation exception that a
+        // substring match could never satisfy.
+        let config = HookPipelineConfig {
+            hooks: vec![HookRule {
+                pattern: Some(r"(?i)DROP\s+DATABASE".into()),
+                unless: Some("IF EXISTS test|IF EXISTS dev".into()),
+                ..rule(
+                    HookEvent::PreToolUse,
+                    HookAction::Deny {
+                        message: "no drops".into(),
+                    },
+                )
+            }],
+        };
+        // Exception branch matches -> rule skipped
+        let r = run_pipeline(
+            &config,
+            &ctx(
+                HookEvent::PreToolUse,
+                "psql -c 'DROP DATABASE IF EXISTS dev'",
+            ),
+        );
+        assert!(r.deny.is_none());
+        // No exception branch matches -> rule fires
+        let r = run_pipeline(
+            &config,
+            &ctx(HookEvent::PreToolUse, "psql -c 'DROP DATABASE prod'"),
+        );
+        assert!(r.deny.is_some());
+    }
+
+    #[test]
+    fn invalid_unless_regex_does_not_disable_rule() {
+        let config = HookPipelineConfig {
+            hooks: vec![HookRule {
+                pattern: Some("git push".into()),
+                unless: Some("[unclosed".into()),
+                ..rule(
+                    HookEvent::PreToolUse,
+                    HookAction::Deny {
+                        message: "blocked".into(),
+                    },
+                )
+            }],
+        };
+        let r = run_pipeline(&config, &ctx(HookEvent::PreToolUse, "git push origin main"));
+        assert!(r.deny.is_some());
     }
 
     #[test]
