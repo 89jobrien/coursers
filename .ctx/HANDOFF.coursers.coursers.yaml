@@ -1,27 +1,41 @@
 project: coursers
 id: coursers
-updated: 2026-08-16
-items: []
+updated: 2026-08-17
+items:
+- id: gm3
+  doob_uuid: null
+  name: godmode-pipeline--coursers-rule-lifecycle--job-472
+  priority: P2
+  status: open
+  title: 'godmode pipeline: coursers rule lifecycle (JOB-472)'
+  description: Task gm3 in progress
+  files: []
+  completed: null
+  extra: []
+- id: uncommitted-work
+  doob_uuid: null
+  name: uncommitted-work
+  priority: P1
+  status: open
+  title: Uncommitted changes (1 file)
+  description: |-
+    Working tree has uncommitted changes:
+    .ctx/HANDOFF.coursers.coursers.yaml
+  files:
+  - .ctx/HANDOFF.coursers.coursers.yaml
+  completed: null
+  extra: []
 log:
-- date: 2026-08-16
-  summary: |
-    Task-aware rule overrides via godmode running-task title context (bc3dbe7).
-    Fixed project+global filter merging and rewrite pattern/replace regex confusion
-    (bdfca53). Refactored probe test tooling: renamed xtest.nu to probe-vs-pre.nu,
-    added auto-generated probe vs pre divergence tester (af3d040, b724a62).
-    Updated CLAUDE.md with agent-improvement-loop gotchas (ad505fe).
-    Enhanced hook execution log to record course-correct blocks (latest).
-    Tests: 332 passing. Clippy clean. Cargo check passing.
-  commits:
-  - bc3dbe7
-  - bdfca53
-  - b724a62
-  - af3d040
-  - ad505fe
 - date: 'null'
   summary: Tackled GitHub issues
   commits: []
   session: 2
+- date: '20260817.071129'
+  summary: done=9 running=1 pending=5 blocked=0
+  commits: []
+- date: '20260817.065131'
+  summary: done=8 running=0 pending=7 blocked=0
+  commits: []
 - date: '20260817.001140'
   summary: done=5 running=0 pending=0 blocked=0
   commits: []
@@ -105,4 +119,14 @@ log:
 - date: '20260418'
   summary: |
     handjobs triage — 1 HANDOFF item open (coursers-5), 5 GH issues. VarExpander trait + with_env! macro refactor committed (5d8cfa2).
+  commits: []
+- date: 2026-08-16
+  summary: |
+    Task-aware rule overrides via godmode running-task title context (bc3dbe7).
+    Fixed project+global filter merging and rewrite pattern/replace regex confusion
+    (bdfca53). Refactored probe test tooling: renamed xtest.nu to probe-vs-pre.nu,
+    added auto-generated probe vs pre divergence tester (af3d040, b724a62).
+    Updated CLAUDE.md with agent-improvement-loop gotchas (ad505fe).
+    Enhanced hook execution log to record course-correct blocks (latest).
+    Tests: 332 passing. Clippy clean. Cargo check passing.
   commits: []

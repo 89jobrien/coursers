@@ -791,6 +791,19 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
         std::process::exit(1);
     }
 
+    // Course-correct rules (course-correct-rules.json) run first for
+    // PreToolUse/Bash — this is the same logic as the standalone `crs pre`
+    // entry point, which settings.json no longer wires directly. A matching
+    // rule prints its deny response and exits(2), short-circuiting the TOML
+    // pipeline below; otherwise this falls through silently.
+    if event == coursers_core::hook_pipeline::HookEvent::PreToolUse
+        && tool_name.as_deref() == Some("Bash")
+        && let Ok(payload) = serde_json::from_str::<crate::hook::HookPayload>(&buf)
+    {
+        let (loader, store, capture) = crate::hook::hook_stores();
+        crate::hook::pre::run_with(&loader, &store, &capture, &payload);
+    }
+
     let config = load_config();
     let ctx = HookContext {
         event: Some(event),

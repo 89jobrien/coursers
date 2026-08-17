@@ -12,12 +12,25 @@ pub fn hook_context() -> Option<(
     coursers_core::store::FsStateStore,
     coursers_core::capture::SuggestionStore,
 )> {
+    let payload = read_stdin()?;
+    let (loader, store, capture) = hook_stores();
+    Some((payload, loader, store, capture))
+}
+
+/// The loader/store/capture triple from [`hook_context`], for callers that
+/// already hold a payload (e.g. `crs hook pre-tool-use`, which reads stdin
+/// itself before dispatching).
+#[allow(clippy::type_complexity)]
+pub fn hook_stores() -> (
+    coursers_core::loader::FsRulesLoader,
+    coursers_core::store::FsStateStore,
+    coursers_core::capture::SuggestionStore,
+) {
     use coursers_core::capture::SuggestionStore;
     use coursers_core::loader::{FsRulesLoader, RulesLoader};
     use coursers_core::store::FsStateStore;
     use coursers_core::store::state_path;
 
-    let payload = read_stdin()?;
     let loader = FsRulesLoader;
     let config = loader.load().unwrap_or_else(|e| {
         eprintln!("[coursers] warning: failed to load rules: {e}");
@@ -29,7 +42,7 @@ pub fn hook_context() -> Option<(
     let path = state_path(&config.failure_learning);
     let store = FsStateStore { path };
     let capture = SuggestionStore::new(SuggestionStore::default_path());
-    Some((payload, loader, store, capture))
+    (loader, store, capture)
 }
 
 /// Profile-aware variant of [`hook_context`].

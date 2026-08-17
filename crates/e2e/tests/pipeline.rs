@@ -221,3 +221,45 @@ fn pipeline_cargo_test_rewritten_and_filtered() {
         "expected suppress on success, got: {stdout}"
     );
 }
+
+#[test]
+fn crs_hook_pre_tool_use_runs_course_correct_rules() {
+    // Regression: settings.json wires PreToolUse to `crs hook pre-tool-use`,
+    // which used to run only the TOML pipeline — course-correct rules from
+    // the JSON rules file never fired through the real hook path.
+    let pipe = Pipeline::new(
+        r#"{"rules":[{"id":"no-bash-use-nu","pattern":"(;|&&|\\|\\|)","message":"Use nu","exceptions":["^nu\\b"]}]}"#,
+        "",
+    );
+    let run = |command: &str| -> Output {
+        let payload = format!(r#"{{"tool_name":"Bash","tool_input":{{"command":{command:?}}}}}"#);
+        let mut cmd = Command::new(workspace_bin("crs"));
+        cmd.args(["hook", "pre-tool-use"])
+            .env("COURSERS_RULES", pipe.rules.path())
+            .env("COURSERS_STATE", pipe.state_file())
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        let mut child = cmd.spawn().expect("spawn crs hook pre-tool-use");
+        child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(payload.as_bytes())
+            .unwrap();
+        child.wait_with_output().unwrap()
+    };
+
+    // Sequential operators → course-correct deny (exit 2).
+    let out = run("foo && bar");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert_eq!(out.status.code(), Some(2), "expected deny, got: {stdout}");
+    assert!(
+        stdout.contains("\"deny\""),
+        "expected deny response: {stdout}"
+    );
+
+    // The ^nu exception applies to the whole command → allowed.
+    let out = run("nu -c ls");
+    assert_eq!(out.status.code(), Some(0), "expected allow for nu-wrapped");
+}
