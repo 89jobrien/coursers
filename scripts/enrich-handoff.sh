@@ -76,8 +76,12 @@ JQ_LIB=$(cd "$(dirname "$0")" && pwd)
 # stderr diagnostic if mktemp cannot create a temp file.
 TMP=$(mktemp)
 trap 'rm -f "$TMP" "$TMP_TOOLS" "$TMP_STATE"' EXIT
-TMP_TOOLS=$(mktemp)
-TMP_STATE=$(mktemp)
+# Output temp files live in $CTX (same directory as their destinations) so
+# the final mv is a same-filesystem rename — atomic. mktemp's default /tmp
+# may be a different filesystem, where mv degrades to copy+delete and a
+# crash mid-write leaves a truncated HANDOFF file.
+TMP_TOOLS=$(mktemp "$CTX/.HANDOFF.tools.yaml.XXXXXX")
+TMP_STATE=$(mktemp "$CTX/.HANDOFF.state.yaml.XXXXXX")
 
 # --- yaml_quote: emit a JSON-quoted string safe for YAML plain scalars ---
 # Usage: yaml_quote <string>
