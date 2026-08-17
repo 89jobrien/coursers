@@ -1,3 +1,4 @@
+pub mod chain;
 pub mod filter_logic;
 pub mod filters;
 pub mod log;
