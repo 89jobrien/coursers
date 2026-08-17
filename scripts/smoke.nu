@@ -90,8 +90,12 @@ for r in $results {
 }
 print "────────────────────────────────────────"
 let failures = ($results | where pass == false | length)
-if $failures > 0 {
-    print $"  ($failures) test(s) failed"
+if $failures == 1 {
+    print $"  ($failures) test failed"
+    exit 1
+}
+if $failures > 1 {
+    print $"  ($failures) tests failed"
     exit 1
 } else {
     print "  all tests passed"
