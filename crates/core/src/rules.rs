@@ -194,17 +194,28 @@ pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
 
 /// Pipeline-aware variant of `check`. Splits `command` on sequential operators
 /// (`&&`, `||`, `;`) and returns a block decision if any segment matches a rule.
+///
+/// Falls back to checking the whole raw command when no segment matches:
+/// splitting eats the sequential operators themselves, so a rule whose
+/// pattern targets `;`/`&&`/`||` (e.g. `no-bash-use-nu`) could otherwise
+/// never fire through this path. Segment matches keep priority, so existing
+/// per-segment behavior is unchanged. Whole-command exceptions (like
+/// `^nu\b`) are evaluated against the full command in the fallback, which
+/// is exactly the anchoring those exceptions assume.
 pub fn check_pipeline(command: &str, rules: &[Rule]) -> Option<(String, String)> {
     crate::pipeline::sequential_segments(command)
         .into_iter()
         .find_map(|seg| check(seg, rules))
+        .or_else(|| check(command, rules))
 }
 
-/// Pipeline-aware variant of `matched_rule_id`.
+/// Pipeline-aware variant of `matched_rule_id`. Same whole-command fallback
+/// as [`check_pipeline`].
 pub fn matched_rule_id_pipeline(command: &str, rules: &[Rule]) -> Option<String> {
     crate::pipeline::sequential_segments(command)
         .into_iter()
         .find_map(|seg| matched_rule_id(seg, rules))
+        .or_else(|| matched_rule_id(command, rules))
 }
 
 /// Simple glob match supporting a single trailing `*` wildcard. Real godmode
@@ -381,6 +392,45 @@ mod tests {
     fn pipeline_or_or_split() {
         let rules = vec![make_rule("no-grep", r"\bgrep\b")];
         assert!(check_pipeline("cargo build || grep foo .", &rules).is_some());
+    }
+
+    #[test]
+    fn pipeline_fires_on_sequential_operators_themselves() {
+        // Splitting eats `;`/`&&`/`||`, so operator-targeting rules (like
+        // no-bash-use-nu) need the whole-command fallback to fire.
+        let rules = vec![make_rule("no-bash-use-nu", r"(;|&&|\|\|)")];
+        assert!(check_pipeline("foo && bar", &rules).is_some());
+        assert!(check_pipeline("foo; bar", &rules).is_some());
+        assert!(check_pipeline("foo || bar", &rules).is_some());
+        assert!(check_pipeline("plain command", &rules).is_none());
+    }
+
+    #[test]
+    fn pipeline_segment_match_takes_priority_over_fallback() {
+        let rules = vec![
+            make_rule("no-grep", r"\bgrep\b"),
+            make_rule("no-bash-use-nu", r"(;|&&|\|\|)"),
+        ];
+        let (id, _) = check_pipeline("grep foo . && ls", &rules).unwrap();
+        assert_eq!(id, "no-grep");
+    }
+
+    #[test]
+    fn pipeline_fallback_respects_whole_command_exceptions() {
+        let mut rule = make_rule("no-bash-use-nu", r"(;|&&|\|\|)");
+        rule.exceptions = vec![r"^nu\b".to_string()];
+        // Operators inside an `nu -c` invocation are nu syntax, not bash.
+        assert!(check_pipeline("nu -c 'foo; bar'", &[rule.clone()]).is_none());
+        assert!(check_pipeline("foo; bar", &[rule]).is_some());
+    }
+
+    #[test]
+    fn matched_rule_id_pipeline_uses_fallback_too() {
+        let rules = vec![make_rule("no-bash-use-nu", r"(;|&&|\|\|)")];
+        assert_eq!(
+            matched_rule_id_pipeline("foo && bar", &rules).as_deref(),
+            Some("no-bash-use-nu")
+        );
     }
 
     #[test]
