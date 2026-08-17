@@ -30,6 +30,7 @@ pub use analyze::history;
 pub use analyze::insights;
 pub use analyze::stats;
 pub use analyze::suggest;
+pub use hook::chain;
 pub use hook::filters;
 pub use hook::pipeline as hook_pipeline;
 pub use hook::rewrite;
