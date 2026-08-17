@@ -1,12 +1,54 @@
 project: coursers
 id: coursers
-updated: 2026-08-03
-items: []
+updated: 2026-08-16
+items:
+- id: uncommitted-work
+  doob_uuid: null
+  name: uncommitted-work
+  priority: P1
+  status: open
+  title: Uncommitted changes (8 files)
+  description: |-
+    Working tree has uncommitted changes:
+    .ctx/HANDOFF.coursers.coursers.yaml
+    .ctx/HANDOFF.tools.yaml
+    CLAUDE.md
+    Cargo.lock
+    crates/core/src/hook/filters.rs
+    crates/core/src/hook/pipeline.rs
+    deny.toml
+    docs/plans/godmode-integration.md
+  files:
+  - .ctx/HANDOFF.coursers.coursers.yaml
+  - .ctx/HANDOFF.tools.yaml
+  - CLAUDE.md
+  - Cargo.lock
+  - crates/core/src/hook/filters.rs
+  - crates/core/src/hook/pipeline.rs
+  - deny.toml
+  - docs/plans/godmode-integration.md
+  completed: null
+  extra: []
 log:
 - date: 'null'
   summary: Tackled GitHub issues
   commits: []
   session: 2
+- date: '20260815.115639'
+  summary: done=5 running=0 pending=0 blocked=0
+  commits: []
+- date: '20260804.214836'
+  summary: done=44 running=0 pending=0 blocked=0
+  commits: []
+- date: '20260804.214625'
+  summary: done=44 running=0 pending=0 blocked=0
+  commits: []
+- date: '20260803.124603'
+  summary: done=44 running=0 pending=0 blocked=0
+  commits: []
+- date: '20260803.122742'
+  summary: done=44 running=0 pending=0 blocked=0
+  commits: []
 - date: '20260803.113751'
   summary: done=44 running=0 pending=0 blocked=0
   commits: []

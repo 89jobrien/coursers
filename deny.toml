@@ -9,11 +9,6 @@
 # this file's location. (resolved 2026-08-03, was TODO(deny-config-path))
 
 [advisories]
-# TODO(deny-advisories-cvss4): `cargo deny check advisories` currently crashes with
-# "unsupported CVSS version: 4.0" parsing RUSTSEC-2026-0073.md (libcrux-poly1305) in
-# the cached advisory-db. Upstream cargo-deny 0.18.3 bug, not fixable here — track
-# for a cargo-deny upgrade; until then advisory/CVE scanning is unavailable.
-# (2026-07-30 gm-audit)
 ignore = []
 
 [licenses]

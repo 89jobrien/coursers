@@ -119,29 +119,66 @@ pub fn filters_path() -> Option<PathBuf> {
         return Some(PathBuf::from(p));
     }
 
-    if let Ok(mut dir) = std::env::current_dir() {
-        loop {
-            let candidate = dir.join(".ctx/crs-filters.toml");
-            if candidate.exists() {
-                return Some(candidate);
-            }
-            if !dir.pop() {
-                break;
-            }
-        }
+    if let Some(p) = project_filters_path() {
+        return Some(p);
     }
 
-    let global = dirs::home_dir()?.join(".config/crs/filters.toml");
-    if global.exists() {
-        return Some(global);
-    }
-
-    None
+    global_filters_path()
 }
 
-/// Load the active filters config (project-local wins over global).
+/// `.ctx/crs-filters.toml` walking up from CWD to filesystem root, if present.
+fn project_filters_path() -> Option<PathBuf> {
+    let mut dir = std::env::current_dir().ok()?;
+    loop {
+        let candidate = dir.join(".ctx/crs-filters.toml");
+        if candidate.exists() {
+            return Some(candidate);
+        }
+        if !dir.pop() {
+            return None;
+        }
+    }
+}
+
+/// `~/.config/crs/filters.toml`, if present.
+fn global_filters_path() -> Option<PathBuf> {
+    let global = dirs::home_dir()?.join(".config/crs/filters.toml");
+    global.exists().then_some(global)
+}
+
+/// Concatenated TOML content of project-local and global filters, project rules first
+/// so they win any first-match-wins resolution (filters, rewrites, tool_swap all use
+/// array-of-tables sections, so string concatenation of independently-valid TOML files
+/// is itself valid TOML). `CRS_FILTERS` is an explicit full override — no merge.
+pub fn merged_content() -> Option<String> {
+    if let Ok(p) = std::env::var("CRS_FILTERS") {
+        return std::fs::read_to_string(p).ok();
+    }
+
+    let mut combined = String::new();
+    if let Some(p) = project_filters_path()
+        && let Ok(c) = std::fs::read_to_string(p)
+    {
+        combined.push_str(&c);
+        combined.push('\n');
+    }
+    if let Some(p) = global_filters_path()
+        && let Ok(c) = std::fs::read_to_string(p)
+    {
+        combined.push_str(&c);
+        combined.push('\n');
+    }
+
+    (!combined.is_empty()).then_some(combined)
+}
+
+/// Load the active filters config — project-local rules supplement (and take
+/// precedence over) global rules, rather than replacing them.
 pub fn load() -> FiltersConfig {
-    FsFiltersLoader.load().unwrap_or_default()
+    match merged_content() {
+        Some(c) => toml::from_str(&c).unwrap_or_default(),
+        None => FiltersConfig::default(),
+    }
 }
 
 /// Find the first matching filter rule for `command`.

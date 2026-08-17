@@ -41,10 +41,14 @@ impl VerifyStep for CrsValidateStep {
 
 ### Acceptance criteria
 
-- [ ] `godmode verify` in a repo with `integrations.coursers = true` runs
-      `crs validate` and reports pass/fail
-- [ ] Missing `crs` binary does not break `godmode verify`
-- [ ] Broken rule pattern causes verify to fail
+- [x] `godmode verify` in a repo with `integrations.crs = true` runs
+      `crs validate` and reports pass/fail (2026-08-03 — field named `crs`,
+      not `coursers`, to match the existing `Integrations` struct's naming
+      convention)
+- [x] Missing `crs` binary does not break `godmode verify` (2026-08-03)
+- [ ] Broken rule pattern causes verify to fail — not separately tested;
+      relies on `crs validate`'s own exit code, which `CrsValidateStep`
+      passes through
 
 ---
 

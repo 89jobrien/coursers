@@ -1,85 +1,120 @@
-generated: 2026-06-27
+generated: 2026-08-15
 since_days: 30
-sessions_scanned: 28
-total_commands: 1242
+sessions_scanned: 6
+total_commands: 536
 top_supported:
-  - command: cargo test
-    count: 78
+  - command: cd /Users/joe/dev/coursers;
+    count: 50
     rule: no-bash-use-nu
-    rtk_equivalent: rtk cargo
-    est_savings_tokens: 38825
-    est_savings_pct: 80
-  - command: cargo kani
-    count: 46
-    rule: no-bash-use-nu
-    est_savings_tokens: 4183
-  - command: git
-    count: 44
-    rule: no-bash-use-nu
-    est_savings_tokens: 5054
-  - command: cargo nextest
-    count: 39
-    rule: no-bash-use-nu
-    est_savings_tokens: 8629
-  - command: cargo clippy
-    count: 39
-    rule: no-bash-use-nu
-    est_savings_tokens: 3047
-  - command: doob todo
-    count: 31
-    rule: no-bash-use-nu
-    est_savings_tokens: 4762
-  - command: gh issue
-    count: 27
-    rule: no-bash-use-nu
-    rtk_equivalent: rtk gh
-    est_savings_tokens: 7410
-    est_savings_pct: 80
-  - command: rustqual /Users/joe/dev/coursers
-    count: 26
-    rule: no-bash-use-nu
-    est_savings_tokens: 6533
-  - command: godmode task
-    count: 24
-    rule: no-bash-use-nu
-    est_savings_tokens: 3001
-  - command: cargo check
-    count: 19
-    rule: no-bash-use-nu
-    est_savings_tokens: 3275
-  - command: python3
-    count: 17
-    rule: no-bash-use-nu
-    est_savings_tokens: 1336
-  - command: git diff
-    count: 15
-    rule: no-bash-use-nu
-    est_savings_tokens: 4668
-  - command: cargo install
-    count: 14
-    rule: no-bash-use-nu
-    est_savings_tokens: 1318
-  - command: sed
-    count: 14
-    rule: no-bash-use-nu
-    est_savings_tokens: 5041
-  - command: git log
+    est_savings_tokens: 10582
+  - command: cd /Users/joe/dev/godmode
     count: 12
     rule: no-bash-use-nu
-    est_savings_tokens: 815
+    est_savings_tokens: 2963
+  - command: cat
+    count: 4
+    rule: no-cat-use-read
+    est_savings_tokens: 5413
+  - command: rm
+    count: 2
+    rule: no-bash-use-nu
+    est_savings_tokens: 761
+  - command: cat /Users/joe/dev/coursers/Cargo.toml
+    count: 1
+    rule: no-cat-use-read
+    est_savings_tokens: 414
+  - command: ls
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 160
+  - command: find /Users/joe/dev/godmode
+    count: 1
+    rule: no-find-use-glob
+    est_savings_tokens: 102
+  - command: tail
+    count: 1
+    rule: no-head-tail-use-read
+    est_savings_tokens: 432
+  - command: git branch
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 205
+  - command: git status;
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 270
+  - command: cat /tmp/audit_outdated.log;
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 549
+  - command: grep
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 92
+  - command: cargo fmt
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 132
+  - command: echo "---
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 1070
+  - command: find /Users/joe/dev/coursers
+    count: 1
+    rule: no-find-use-glob
+    est_savings_tokens: 95
+  - command: for c
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 59
+  - command: diff /Users/joe/dev/coursers/xtask/src/main.rs
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 63
+  - command: cargo deny
+    count: 1
+    rule: no-bash-use-nu
+    est_savings_tokens: 525
 top_unhandled:
   - base_command: nu
-    count: 447
-    example: 'nu -c "ls /Users/joe/dev/crux/crates/crux/src/; cat /Users/joe/dev/crux/Cargo.to...'
-  - base_command: git add
-    count: 9
-    example: "git add crates/core/tests/conformance_var_expander.rs crates/core/tests/conforma..."
-  - base_command: git commit
-    count: 9
-    example: "git commit -m \"$(cat <<'EOF'\nfeat: hook pipeline validation, matched-rules track..."
-  - base_command: cargo fmt
-    count: 4
-    example: 'cargo fmt --all && git add crates/core/src/hook/pipeline.rs && git commit -m "$(...'
-  - base_command: nu /Users/joe/.claude/skills/observability-as-infrastructure/helpers/trace-stats.nu
+    count: 412
+    example: "nu -c 'if (\".ctx/HANDOFF.md\" | path exists) { open .ctx/HANDOFF.md } else { \"no ..."
+  - base_command: grep
+    count: 12
+    example: "grep -n \"fn event_str_table\" -A1 /Users/joe/dev/coursers/crates/coursers/src/crs..."
+  - base_command: git
+    count: 11
+    example: "git diff"
+  - base_command: cargo test
+    count: 6
+    example: "cargo test --workspace 2>&1 | grep -E \"FAILED|test result|error\\[\" "
+  - base_command: cargo deny
+    count: 2
+    example: "cargo deny check advisories 2>&1 | tail -30"
+  - base_command: nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/session-summary.nu
+    count: 2
+    example: "nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/session..."
+  - base_command: nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/trace-stats.nu
+    count: 2
+    example: "nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/trace-s..."
+  - base_command: cargo-deny
     count: 1
-    example: "nu /Users/joe/.claude/skills/observability-as-infrastructure/helpers/trace-stats..."
+    example: "/Users/joe/.local/share/mise/installs/cargo-cargo-deny/0.20.2/bin/cargo-deny --v..."
+  - base_command: ls
+    count: 1
+    example: "/bin/ls -la docs/ .cargo/ .litho/ .githooks/ xtask/ .xtask-cache/ 2>&1 | head -8..."
+  - base_command: nu ~/dev/godmode/skills/code-review/helpers/run-review.nu
+    count: 1
+    example: "nu ~/dev/godmode/skills/code-review/helpers/run-review.nu 2>&1 | tail -n 60"
+  - base_command: git branch
+    count: 1
+    example: "git branch --show-current"
+  - base_command: git log
+    count: 1
+    example: "git log --oneline --all --grep=\"JOB-47\" | head -30"
+  - base_command: grep '"name"'
+    count: 1
+    example: "grep '\"name\"' /Users/joe/.claude/projects/-Users-joe-dev-coursers/9512eb1a-2b1a-..."
+  - base_command: git checkout
+    count: 1
+    example: "git checkout -b refactor/dedupe-event-str-tables"

@@ -289,6 +289,7 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
                     &current,
                     inject.as_deref(),
                     prepend.as_deref(),
+                    rule.pattern.as_deref(),
                     replace.as_deref(),
                 );
                 if rewritten != current {
@@ -325,9 +326,20 @@ fn apply_rewrite(
     command: &str,
     inject: Option<&str>,
     prepend: Option<&str>,
+    pattern: Option<&str>,
     replace: Option<&str>,
 ) -> String {
     let mut result = command.to_string();
+
+    // `replace` is a regex replacement template (may use `$1`, `${name}`, ...)
+    // applied via the rule's own `pattern` — which already matched the
+    // pre-transform command — so capture groups line up correctly.
+    if let Some(replace) = replace
+        && let Some(pattern) = pattern
+        && let Ok(re) = regex::Regex::new(pattern)
+    {
+        result = re.replace(&result, replace).into_owned();
+    }
 
     if let Some(prepend) = prepend {
         let expanded = expand_env_vars(prepend);
@@ -337,15 +349,6 @@ fn apply_rewrite(
     if let Some(inject) = inject {
         let expanded = expand_env_vars(inject);
         result = format!("{result} {expanded}");
-    }
-
-    if let Some(replace) = replace {
-        // `replace` is treated as a regex replacement string.
-        // The rule's `pattern` already matched, so we apply the replacement
-        // to the full command.
-        if let Ok(re) = regex::Regex::new(replace) {
-            result = re.replace_all(&result, replace).to_string();
-        }
     }
 
     result
