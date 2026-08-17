@@ -162,10 +162,18 @@ godmode pipeline status  # shows progress
 
 ### Acceptance criteria
 
-- [ ] `godmode pipeline start coursers-rules` runs all 4 steps sequentially
-- [ ] Candidates with <3 occurrences are filtered out
+- [x] `godmode pipeline start coursers-rules` runs all 4 steps sequentially
+      (2026-08-17 — pipeline yaml + four skills landed in godmode;
+      show/start/status/stop verified. Note: `crs-propose-rules` IS
+      defined, contrary to the "Files touched" list above which omitted it)
+- [x] Candidates with <3 occurrences are filtered out (2026-08-17 —
+      encoded as `--min-count 3` in the crs-discover skill)
 - [ ] `crs-validate` failure stops the pipeline (does not install bad rules)
-- [ ] Installed rules appear in `crs validate` output on next run
+      — encoded as instructions in crs-validate/crs-install (install
+      re-validates and refuses on failure) but not yet exercised in a
+      live pipeline run
+- [ ] Installed rules appear in `crs validate` output on next run — needs
+      a first live run of the pipeline
 
 ---
 
