@@ -4,13 +4,9 @@ use std::path::PathBuf;
 /// Used by both `history` (discover token estimation) and `tool_swap` (budget clamping).
 pub const BYTES_PER_TOKEN: usize = 4;
 
-// TODO(config-path-inconsistency): README says hooks live at ~/.claude/hooks/ but
-// CLAUDE.md and this code use ~/.config/coursers/. Pick one canonical location and
-// update all docs, smoke tests, and example configs to match.
-
-// TODO(config-defaults-migrate): migrate config default paths from ~/.claude/hooks/
-// to ~/.config/coursers/ everywhere (docs, smoke.nu, agent companion). The XDG path
-// used here is correct; the legacy ~/.claude/hooks/ references are stale.
+// Canonical config location is XDG: ~/.config/coursers/. The only intentional
+// ~/.claude/hooks/ reference left is `nu-check`'s scripts dir
+// (~/.claude/hooks/nu), which holds live hook scripts, not config.
 
 /// Resolve the rules config path: `COURSERS_RULES` env var or XDG default.
 pub fn rules_path() -> PathBuf {

@@ -23,7 +23,7 @@ let bin = if (which coursers | length) > 0 {
     error make { msg: "coursers binary not found — run: cargo install --path crates/coursers" }
 }
 
-let rules_path = ($env.HOME | path join ".claude/hooks/course-correct-rules.json")
+let rules_path = ($env.HOME | path join ".config/coursers/course-correct-rules.json")
 if not ($rules_path | path exists) {
     error make { msg: $"Rules file not found: ($rules_path)" }
 }
