@@ -317,42 +317,6 @@ mod tests {
         }
     }
 
-    /// Counts how many times on_pre / on_post were called.
-    struct CountingObserver {
-        pre_calls: std::cell::Cell<usize>,
-        post_calls: std::cell::Cell<usize>,
-    }
-
-    impl CountingObserver {
-        fn new() -> Self {
-            Self {
-                pre_calls: std::cell::Cell::new(0),
-                post_calls: std::cell::Cell::new(0),
-            }
-        }
-    }
-
-    impl Observer for CountingObserver {
-        fn on_pre(
-            &self,
-            _ctx: &HookContext,
-            _outcome: &PreHookOutcome,
-        ) -> Result<(), CourserError> {
-            self.pre_calls.set(self.pre_calls.get() + 1);
-            Ok(())
-        }
-
-        fn on_post(
-            &self,
-            _ctx: &HookContext,
-            _output: &ToolOutput,
-            _outcome: &PostHookOutcome,
-        ) -> Result<(), CourserError> {
-            self.post_calls.set(self.post_calls.get() + 1);
-            Ok(())
-        }
-    }
-
     // --- Pre-chain tests ---------------------------------------------------
 
     #[test]
@@ -428,30 +392,6 @@ mod tests {
 
     #[test]
     fn observer_called_on_pre() {
-        use std::sync::Arc;
-
-        let obs = Arc::new(CountingObserver::new());
-
-        // We can't use Arc<T> directly with with_observer (needs 'static + sized),
-        // so test via a wrapping approach using a raw pointer-based fake.
-        // Instead, build a chain with a simple observer:
-        struct TrackingObs(std::cell::RefCell<usize>);
-        impl Observer for TrackingObs {
-            fn on_pre(&self, _: &HookContext, _: &PreHookOutcome) -> Result<(), CourserError> {
-                *self.0.borrow_mut() += 1;
-                Ok(())
-            }
-            fn on_post(
-                &self,
-                _: &HookContext,
-                _: &ToolOutput,
-                _: &PostHookOutcome,
-            ) -> Result<(), CourserError> {
-                Ok(())
-            }
-        }
-
-        // We need to verify after the chain is consumed, so use a global counter.
         use std::sync::atomic::{AtomicUsize, Ordering};
         static PRE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
@@ -476,9 +416,6 @@ mod tests {
         assert_eq!(PRE_COUNT.load(Ordering::SeqCst), 1);
         chain.run_pre(&bash_ctx("ls")).unwrap();
         assert_eq!(PRE_COUNT.load(Ordering::SeqCst), 2);
-
-        // suppress unused warning
-        drop(obs);
     }
 
     #[test]

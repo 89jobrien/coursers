@@ -856,7 +856,7 @@ mod tests {
     fn task_override_suppresses_rule_in_find_matching_rule() {
         let rule = rule_with_override(r"\bgrep\b", "migrate*");
         // Sanity: without override consideration, the rule matches normally.
-        assert!(check("grep foo .", &[rule.clone()]).is_some());
+        assert!(check("grep foo .", std::slice::from_ref(&rule)).is_some());
         // With a matching running task, find_matching_rule should be skippable
         // by callers checking task_overrides_rule before denying.
         assert!(task_overrides_rule(
