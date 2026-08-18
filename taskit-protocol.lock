@@ -15,7 +15,7 @@
     {
       "name": "coursers-core-store",
       "path": "crates/core/src/store.rs",
-      "hash": "885bfc017580b2466853cf78c23c0939be9078fc0b5adb1722987b1437aff03d"
+      "hash": "1a0b27eb9591e592e6ca431a6366ef3701eac268614486afd12e78ad95270df2"
     },
     {
       "name": "coursers-core-obfsck",

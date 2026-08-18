@@ -94,6 +94,20 @@ impl StateStore for InMemoryStateStore {
     }
 }
 
+/// Allow passing `&InMemoryStateStore` to types that require `S: StateStore`.
+/// Useful in tests where the store must be inspected after passing it to a hook.
+#[cfg(any(test, feature = "testing"))]
+impl StateStore for &InMemoryStateStore {
+    fn load(&self) -> Result<State, CourserError> {
+        Ok(self.inner.borrow().clone())
+    }
+
+    fn save(&self, state: &State) -> Result<(), CourserError> {
+        *self.inner.borrow_mut() = state.clone();
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
