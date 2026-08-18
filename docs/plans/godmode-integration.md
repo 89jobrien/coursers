@@ -170,10 +170,14 @@ godmode pipeline status  # shows progress
       encoded as `--min-count 3` in the crs-discover skill)
 - [ ] `crs-validate` failure stops the pipeline (does not install bad rules)
       — encoded as instructions in crs-validate/crs-install (install
-      re-validates and refuses on failure) but not yet exercised in a
-      live pipeline run
-- [ ] Installed rules appear in `crs validate` output on next run — needs
-      a first live run of the pipeline
+      re-validates and refuses on failure). Partial evidence 2026-08-18:
+      `crs validate --rules <broken>` confirmed to exit 1; the full
+      stop-on-failure path still needs a run with real bad proposals
+- [ ] Installed rules appear in `crs validate` output on next run — not
+      yet exercisable: the first live run (2026-08-18) completed 4/4 steps
+      but `crs discover` returned zero unhandled candidates, so nothing
+      was proposed or installed. Re-check after the backlog of unhandled
+      commands grows
 
 ---
 
