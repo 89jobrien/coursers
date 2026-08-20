@@ -214,7 +214,11 @@ pub fn run(cli: Cli) {
             state,
         } => {
             let profile_cfg = build_profile(profile, rules, state);
-            hook::pre::run_with_profile(&profile_cfg);
+            if hook::chain_runner::chain_enabled() {
+                hook::chain_runner::run_pre(&profile_cfg);
+            } else {
+                hook::pre::run_with_profile(&profile_cfg);
+            }
         }
         Command::Post {
             profile,
@@ -222,7 +226,11 @@ pub fn run(cli: Cli) {
             state,
         } => {
             let profile_cfg = build_profile(profile, rules, state);
-            hook::post::run_with_profile(&profile_cfg);
+            if hook::chain_runner::chain_enabled() {
+                hook::chain_runner::run_post(&profile_cfg);
+            } else {
+                hook::post::run_with_profile(&profile_cfg);
+            }
         }
         Command::Filter {
             profile,
