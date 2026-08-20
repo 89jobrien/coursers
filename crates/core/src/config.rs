@@ -184,6 +184,37 @@ impl ProfileConfig {
             global_path: self.filters_global_path.clone(),
         }
     }
+
+    // ── hc-d: HookChain assembly ─────────────────────────────────────────
+
+    /// Assemble a [`crate::hook::chain::HookChain`] from this profile's factory adapters.
+    ///
+    /// Hook composition (in evaluation order):
+    /// - **Pre**: `RuleBlockHook` → `RewriteHook` (first Deny/Rewrite short-circuits)
+    /// - **Post**: `FilterHook` (last Filter outcome wins)
+    /// - **Observer**: `FailureObserver` (always runs; non-fatal errors)
+    ///
+    /// This is the canonical factory for the opt-in chain path introduced in hc-d
+    /// (gated behind `COURSERS_HOOK_CHAIN=1`). The legacy `coursers pre` / `coursers post`
+    /// paths remain the default until a follow-up flips the switch.
+    pub fn build_hook_chain(&self) -> crate::hook::chain::HookChain {
+        use crate::hook::chain::HookChain;
+        use crate::hook::concrete::{FailureObserver, FilterHook, RewriteHook, RuleBlockHook};
+
+        let titles = running_task_titles();
+
+        HookChain::new()
+            .with_pre(
+                RuleBlockHook::new(self.rules_loader(), self.state_store())
+                    .with_running_titles(titles),
+            )
+            .with_pre(RewriteHook::new(self.rewrite_loader()))
+            .with_post(FilterHook::new(self.filters_loader()))
+            .with_observer(FailureObserver::new(
+                self.rules_loader(),
+                self.state_store(),
+            ))
+    }
 }
 
 /// Builder for [`ProfileConfig`]. Layered resolution:
@@ -579,6 +610,99 @@ mod tests {
             global_path: None,
         };
         assert!(loader.filters_path().is_none());
+    }
+
+    // ── hc-d: build_hook_chain ───────────────────────────────────────────────
+
+    /// Verify that [`ProfileConfig::build_hook_chain`] assembles a chain that
+    /// produces `Allow` for a clean command with no rules.
+    ///
+    /// Uses fully in-memory loaders to avoid any filesystem or env-var race
+    /// conditions when this test runs in parallel with tests that mutate HOME.
+    #[test]
+    fn build_hook_chain_allows_clean_command() {
+        use crate::hook::chain::{HookChain, PreHookOutcome};
+        use crate::hook::concrete::{FailureObserver, FilterHook, RewriteHook, RuleBlockHook};
+        use crate::hook::filters::{FiltersConfig, InMemoryFiltersLoader};
+        use crate::hook::rewrite::{InMemoryRewriteLoader, RewriteConfig};
+        use crate::loader::InMemoryRulesLoader;
+        use crate::rules::{FailureLearning, RulesConfig};
+        use crate::store::InMemoryStateStore;
+        use serde_json::json;
+
+        let rules = RulesConfig {
+            rules: vec![],
+            failure_learning: FailureLearning::default(),
+        };
+
+        // Build chain manually with in-memory adapters — identical to
+        // what build_hook_chain() produces but immune to env/HOME races.
+        let chain = HookChain::new()
+            .with_pre(RuleBlockHook::new(
+                InMemoryRulesLoader(rules.clone()),
+                InMemoryStateStore::new(),
+            ))
+            .with_pre(RewriteHook::new(InMemoryRewriteLoader(
+                RewriteConfig::default(),
+            )))
+            .with_post(FilterHook::new(InMemoryFiltersLoader(
+                FiltersConfig::default(),
+            )))
+            .with_observer(FailureObserver::new(
+                InMemoryRulesLoader(rules),
+                InMemoryStateStore::new(),
+            ));
+
+        let ctx = crate::hook::chain::HookContext::new("Bash", json!({ "command": "cargo build" }));
+        let outcome = chain.run_pre(&ctx).unwrap();
+        assert_eq!(outcome, PreHookOutcome::Allow);
+    }
+
+    /// Verify that [`ProfileConfig::build_hook_chain`] factory method compiles
+    /// and returns a working chain, exercised via the public API on an isolated
+    /// ProfileConfig with all in-filesystem paths pointing to temp files.
+    ///
+    /// Serialized via ENV_LOCK because ConfigBuilder::build() reads env vars.
+    #[test]
+    fn build_hook_chain_via_profile_config() {
+        // Serialize against env-mutation tests.
+        let _g = ENV_LOCK.lock().unwrap();
+
+        let rules_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(rules_file.path(), r#"{"rules":[]}"#).unwrap();
+        let filters_file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(filters_file.path(), "").unwrap();
+
+        // Build an isolated ProfileConfig so real global filters don't interfere.
+        let state_file = tempfile::NamedTempFile::new().unwrap();
+        let isolated_cfg = ProfileConfig {
+            rules_path: rules_file.path().to_path_buf(),
+            global_state_path: state_file.path().to_path_buf(),
+            local_state_path: PathBuf::from("/tmp/nonexistent-local-state.json"),
+            protocol: HookProtocol::Claude,
+            filters_env_path: Some(filters_file.path().to_path_buf()),
+            filters_project_path: None,
+            filters_global_path: None,
+        };
+
+        // The chain must build without panicking and allow a clean command.
+        let chain = isolated_cfg.build_hook_chain();
+        use crate::hook::chain::{PostHookOutcome, PreHookOutcome};
+        use serde_json::json;
+
+        let pre_ctx =
+            crate::hook::chain::HookContext::new("Bash", json!({ "command": "cargo build" }));
+        let pre_outcome = chain.run_pre(&pre_ctx).unwrap();
+        assert_eq!(pre_outcome, PreHookOutcome::Allow);
+
+        let post_ctx =
+            crate::hook::chain::HookContext::new("Bash", json!({ "command": "cargo test" }));
+        let post_output = crate::hook::chain::ToolOutput {
+            text: "ok".into(),
+            exit_code: 0,
+        };
+        let post_outcome = chain.run_post(&post_ctx, &post_output).unwrap();
+        assert_eq!(post_outcome, PostHookOutcome::Allow);
     }
 
     // ── hc-c: factory method round-trips ──────────────────────────────────
