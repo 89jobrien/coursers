@@ -94,6 +94,43 @@ impl FiltersLoader for FsFiltersLoader {
     }
 }
 
+/// Loads filters from paths captured at [`crate::config::ConfigBuilder::build`] time.
+///
+/// Priority order mirrors [`FsFiltersLoader`]:
+/// - If `env_path` is set it is used exclusively (explicit CRS_FILTERS override).
+/// - Otherwise tries `project_path` first, then `global_path`.
+/// - Returns [`FiltersConfig::default`] when all paths are `None` or absent.
+pub struct ProfileFsFiltersLoader {
+    /// Path from the `CRS_FILTERS` env var, captured at config-build time.
+    pub env_path: Option<PathBuf>,
+    /// Project-local `.ctx/crs-filters.toml`, captured at config-build time.
+    pub project_path: Option<PathBuf>,
+    /// Global `~/.config/crs/filters.toml`, captured at config-build time.
+    pub global_path: Option<PathBuf>,
+}
+
+impl FiltersLoader for ProfileFsFiltersLoader {
+    fn load(&self) -> Result<FiltersConfig, CourserError> {
+        match self.filters_path() {
+            Some(p) => {
+                let content = std::fs::read_to_string(&p).map_err(CourserError::Io)?;
+                toml::from_str(&content).map_err(CourserError::Toml)
+            }
+            None => Ok(FiltersConfig::default()),
+        }
+    }
+
+    fn filters_path(&self) -> Option<PathBuf> {
+        if let Some(p) = &self.env_path {
+            return Some(p.clone());
+        }
+        if let Some(p) = &self.project_path {
+            return Some(p.clone());
+        }
+        self.global_path.clone()
+    }
+}
+
 /// In-memory filters loader for tests. Returns the config it was constructed with.
 #[cfg(any(test, feature = "testing"))]
 #[derive(Clone)]
@@ -127,7 +164,7 @@ pub fn filters_path() -> Option<PathBuf> {
 }
 
 /// `.ctx/crs-filters.toml` walking up from CWD to filesystem root, if present.
-fn project_filters_path() -> Option<PathBuf> {
+pub fn project_filters_path() -> Option<PathBuf> {
     let mut dir = std::env::current_dir().ok()?;
     loop {
         let candidate = dir.join(".ctx/crs-filters.toml");
@@ -141,7 +178,7 @@ fn project_filters_path() -> Option<PathBuf> {
 }
 
 /// `~/.config/crs/filters.toml`, if present.
-fn global_filters_path() -> Option<PathBuf> {
+pub fn global_filters_path() -> Option<PathBuf> {
     let global = dirs::home_dir()?.join(".config/crs/filters.toml");
     global.exists().then_some(global)
 }
