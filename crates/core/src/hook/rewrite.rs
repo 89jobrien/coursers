@@ -20,6 +20,53 @@ impl RewriteLoader for FsRewriteLoader {
     }
 }
 
+/// Loads rewrite configuration from paths captured at
+/// [`crate::config::ConfigBuilder::build`] time.
+///
+/// Mirrors [`FsRewriteLoader`]'s merge semantics:
+/// - `env_path` is an exclusive override: if set, only that file is read.
+/// - Otherwise merges `project_path` (first) and `global_path` content, so
+///   project rewrites take precedence on first-match-wins evaluation.
+/// - Returns [`RewriteConfig::default`] when all paths are `None` or absent.
+pub struct ProfileFsRewriteLoader {
+    /// Path from the `CRS_FILTERS` env var, captured at config-build time.
+    pub env_path: Option<std::path::PathBuf>,
+    /// Project-local `.ctx/crs-filters.toml`, captured at config-build time.
+    pub project_path: Option<std::path::PathBuf>,
+    /// Global `~/.config/crs/filters.toml`, captured at config-build time.
+    pub global_path: Option<std::path::PathBuf>,
+}
+
+impl RewriteLoader for ProfileFsRewriteLoader {
+    fn load(&self) -> Result<RewriteConfig, crate::error::CourserError> {
+        // Env override: read exclusively.
+        if let Some(p) = &self.env_path {
+            let content = std::fs::read_to_string(p).map_err(crate::error::CourserError::Io)?;
+            return toml::from_str(&content).map_err(crate::error::CourserError::Toml);
+        }
+
+        // Merge project + global (project first so its rules win on first-match).
+        let mut combined = String::new();
+        if let Some(p) = &self.project_path
+            && let Ok(c) = std::fs::read_to_string(p)
+        {
+            combined.push_str(&c);
+            combined.push('\n');
+        }
+        if let Some(p) = &self.global_path
+            && let Ok(c) = std::fs::read_to_string(p)
+        {
+            combined.push_str(&c);
+            combined.push('\n');
+        }
+
+        if combined.is_empty() {
+            return Ok(RewriteConfig::default());
+        }
+        toml::from_str(&combined).map_err(crate::error::CourserError::Toml)
+    }
+}
+
 /// In-memory rewrite loader for tests. Returns the config it was constructed with.
 #[cfg(any(test, feature = "testing"))]
 #[derive(Clone)]
