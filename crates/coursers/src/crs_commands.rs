@@ -778,6 +778,17 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
         .and_then(|r| r.get("exit_code"))
         .and_then(|v| v.as_i64());
 
+    // Claude sends `output`, Codex sends `stdout` — mirrors protocol::extract_output.
+    let output = json
+        .as_ref()
+        .and_then(|j| j.get("tool_response"))
+        .and_then(|r| {
+            r.get("output")
+                .or_else(|| r.get("stdout"))
+                .and_then(|v| v.as_str())
+        })
+        .map(String::from);
+
     if hook_target == "codex" {
         run_codex_backend(
             event,
@@ -811,6 +822,7 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
         target,
         exit_code,
         raw_json: if buf.is_empty() { None } else { Some(buf) },
+        output,
     };
 
     let result = run_pipeline(&config, &ctx);
@@ -839,6 +851,12 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
 
     if let Some(ref rewritten) = result.rewrite {
         let json = coursers_core::hook::protocol::rewrite_response("crs-hook: rewrite", rewritten);
+        write_stdout(&json);
+        return;
+    }
+
+    if let Some(ref redacted) = result.replace_output {
+        let json = coursers_core::hook::protocol::filter_result_response(redacted);
         write_stdout(&json);
         return;
     }

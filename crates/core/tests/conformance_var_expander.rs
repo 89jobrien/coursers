@@ -4,8 +4,13 @@
 //! 1. expand() returns a String (never panics on valid input)
 //! 2. expand() is idempotent for plain commands (no vars)
 //! 3. NoopExpander returns input unchanged for any input
-//! 4. EnvExpander resolves known env vars
-//! 5. EnvExpander leaves unknown vars as-is (no panic, no empty)
+//! 4. EnvExpander leaves `$VAR`/`${VAR}`/`$env.VAR` references untouched —
+//!    dollar-variable resolution is disabled (see expand.rs::expand_dollar
+//!    doc comment: this pipeline always dispatches through Nushell, which
+//!    resolves its own `$env.VAR`/`$name` references at run time, so
+//!    pre-resolving them against the hook process's environment only ever
+//!    corrupted Nushell syntax).
+//! 5. EnvExpander still expands `~` to `$HOME` (tilde expansion is unaffected)
 
 use coursers_core::expand::{EnvExpander, NoopExpander, VarExpander};
 
@@ -70,13 +75,14 @@ fn env_expander_satisfies_base_contract() {
 }
 
 #[test]
-fn env_expander_resolves_known_var() {
-    // Set a test-only env var to avoid depending on real env
+fn env_expander_leaves_known_var_unresolved() {
+    // Dollar-variable resolution is disabled — even a var that IS set in the
+    // real environment must be left as literal Nushell/shell syntax.
     unsafe { std::env::set_var("_CRS_CONFORM_TEST", "resolved") };
     let expander = EnvExpander;
     let result = expander.expand("echo $_CRS_CONFORM_TEST");
     unsafe { std::env::remove_var("_CRS_CONFORM_TEST") };
-    assert_eq!(result, "echo resolved");
+    assert_eq!(result, "echo $_CRS_CONFORM_TEST");
 }
 
 #[test]

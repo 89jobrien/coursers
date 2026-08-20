@@ -65,6 +65,12 @@ pub enum HookAction {
     },
     /// Emit a system message (informational, non-blocking).
     Notify { template: String },
+    /// Pipe the tool's output through the `redact` binary and replace it
+    /// (PostToolUse only). Requires `redact` (obfsck) on PATH.
+    Redact {
+        #[serde(default)]
+        level: Option<String>,
+    },
 }
 
 /// A single hook rule.
@@ -191,6 +197,8 @@ pub struct HookContext {
     pub exit_code: Option<i64>,
     /// Raw stdin JSON, available for side-effect commands.
     pub raw_json: Option<String>,
+    /// Tool output text (PostToolUse only) — candidate input for Redact.
+    pub output: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -208,6 +216,8 @@ pub struct PipelineResult {
     pub messages: Vec<String>,
     /// Labels of rules that matched (for logging).
     pub matched_rules: Vec<String>,
+    /// If set, the tool output should be replaced with this redacted text.
+    pub replace_output: Option<String>,
 }
 
 /// Run all rules matching `ctx.event` against the given context.
@@ -307,10 +317,42 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
                 let expanded = expand_template(template, ctx);
                 result.messages.push(expanded);
             }
+            HookAction::Redact { level } => {
+                if let Some(ref text) = ctx.output {
+                    result.replace_output = Some(run_redact(text, level.as_deref()));
+                }
+            }
         }
     }
 
     result
+}
+
+/// Pipe `text` through the `redact` binary. Fails open (returns `text`
+/// unchanged) if `redact` is missing or errors — a hook must never crash
+/// the tool call it's observing.
+fn run_redact(text: &str, level: Option<&str>) -> String {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
+    let mut cmd = Command::new("redact");
+    cmd.arg("--level").arg(level.unwrap_or("minimal"));
+    cmd.stdin(Stdio::piped());
+    cmd.stdout(Stdio::piped());
+    cmd.stderr(Stdio::null());
+
+    let Ok(mut child) = cmd.spawn() else {
+        return text.to_string();
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(text.as_bytes());
+    }
+    match child.wait_with_output() {
+        Ok(out) if out.status.success() => {
+            String::from_utf8_lossy(&out.stdout).trim_end().to_string()
+        }
+        _ => text.to_string(),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -609,6 +651,7 @@ mod tests {
             target: Some(target.into()),
             exit_code: Some(0),
             raw_json: None,
+            output: None,
         }
     }
 
@@ -867,6 +910,7 @@ mod tests {
             target: Some("cargo test".into()),
             exit_code: Some(1),
             raw_json: None,
+            output: None,
         };
         let expanded = expand_template(
             "Tool ${tool_name} ran '${target}' with exit ${exit_code}",
@@ -949,6 +993,34 @@ prepend = "WRAPPED=1"
         } else {
             panic!("expected Rewrite action");
         }
+    }
+
+    #[test]
+    fn redact_action_replaces_output_when_redact_on_path() {
+        // Skipped in environments without the `redact` binary on PATH — this
+        // mirrors run_redact's fail-open behavior rather than failing the test.
+        if Command::new("redact").arg("--help").output().is_err() {
+            return;
+        }
+        let config = HookPipelineConfig {
+            hooks: vec![HookRule {
+                matcher: Some("Bash".into()),
+                ..rule(HookEvent::PostToolUse, HookAction::Redact { level: None })
+            }],
+        };
+        let mut c = ctx(HookEvent::PostToolUse, "cat secret.env");
+        c.output = Some("OPENAI_API_KEY=sk-abc123".into());
+        let r = run_pipeline(&config, &c);
+        assert!(r.replace_output.is_some());
+    }
+
+    #[test]
+    fn redact_action_noop_without_output() {
+        let config = HookPipelineConfig {
+            hooks: vec![rule(HookEvent::PostToolUse, HookAction::Redact { level: None })],
+        };
+        let r = run_pipeline(&config, &ctx(HookEvent::PostToolUse, "ls"));
+        assert!(r.replace_output.is_none());
     }
 
     #[test]

@@ -37,7 +37,20 @@ impl VarExpander for NoopExpander {
 /// - Tokens beginning with `http://` or `https://` are skipped entirely.
 /// - References inside single-quoted tokens are not expanded (the token starts with `'`).
 pub fn expand_vars(command: &str) -> String {
+    if is_nu_c_invocation(command) {
+        return command.to_string();
+    }
     expand_inline(command)
+}
+
+/// True if `command` is a `nu -c '...'` / `nu -c "..."` invocation.
+///
+/// `$` inside such a payload is Nushell syntax (`$env.VAR`, closure params like
+/// `$f`), not a POSIX-style env reference — expanding it here corrupts the
+/// script rather than resolving anything.
+fn is_nu_c_invocation(command: &str) -> bool {
+    let trimmed = command.trim_start();
+    trimmed.starts_with("nu -c ") || trimmed.starts_with("nu -c'") || trimmed.starts_with("nu -c\"")
 }
 
 /// Number of bytes in the `$env.` prefix (`$`, `e`, `n`, `v`, `.`).
@@ -131,9 +144,24 @@ fn expand_tilde(bytes: &[u8], i: usize, len: usize, _s: &str) -> (String, usize)
     }
 }
 
-/// Expand a `$`-prefixed variable reference at position `i`.
+/// Handle a `$`-prefixed reference at position `i`. Always leaves it as-is.
+///
+/// `$VAR`/`${VAR}`/`$env.VAR` resolution was disabled: this pipeline always
+/// dispatches through Nushell (the `no-bash-use-nu` rule wraps every non-trivial
+/// command in `nu -c "..."`), and Nushell resolves `$env.VAR` and `$name`
+/// references itself at run time. Pre-resolving them against the *hook process's*
+/// environment here ran ahead of that, silently truncating or replacing
+/// legitimate Nushell syntax (closure params like `$f`, `$env.X` lookups) with
+/// unrelated (and sometimes sensitive, e.g. unresolved `op://` secret refs) text.
 /// Returns `(replacement_text, bytes_consumed)`.
+#[allow(unused_variables)]
 fn expand_dollar(s: &str, bytes: &[u8], i: usize, len: usize) -> (String, usize) {
+    ("$".to_string(), 1)
+}
+
+/// Retained for potential future opt-in use; no longer called by [`expand_dollar`].
+#[allow(dead_code)]
+fn expand_dollar_enabled(s: &str, bytes: &[u8], i: usize, len: usize) -> (String, usize) {
     // `$$` — leave as-is.
     if i + 1 < len && bytes[i + 1] == b'$' {
         return ("$$".to_string(), 2);
@@ -235,29 +263,30 @@ mod tests {
 
     // qual:allow(test_quality) reason: "SUT called through with_env! macro — invisible to rustqual"
     #[test]
-    fn expand_vars_dollar_varname() {
+    fn expand_vars_dollar_varname_left_as_is() {
+        // Dollar-variable resolution is disabled — see expand_dollar's doc comment.
         let result = with_env!(("_CRS_TEST_FOO", "/test/foo") => {
             expand_vars("echo $_CRS_TEST_FOO")
         });
-        assert_eq!(result, "echo /test/foo");
+        assert_eq!(result, "echo $_CRS_TEST_FOO");
     }
 
     // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
-    fn expand_vars_dollar_brace_varname() {
+    fn expand_vars_dollar_brace_varname_left_as_is() {
         let result = with_env!(("_CRS_TEST_BAR", "/test/bar") => {
             expand_vars("op run --env-file=${_CRS_TEST_BAR}/.secrets")
         });
-        assert_eq!(result, "op run --env-file=/test/bar/.secrets");
+        assert_eq!(result, "op run --env-file=${_CRS_TEST_BAR}/.secrets");
     }
 
     // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
-    fn expand_vars_nu_env_style() {
+    fn expand_vars_nu_env_style_left_as_is() {
         let result = with_env!(("_CRS_TEST_HOME", "/nu/home") => {
             expand_vars("op run --env-file=$env._CRS_TEST_HOME/.secrets")
         });
-        assert_eq!(result, "op run --env-file=/nu/home/.secrets");
+        assert_eq!(result, "op run --env-file=$env._CRS_TEST_HOME/.secrets");
     }
 
     // qual:allow(test_quality) reason: "SUT called through with_env! macro"
@@ -320,6 +349,15 @@ mod tests {
     }
 
     #[test]
+    fn does_not_expand_inside_nu_c_invocation() {
+        let _guard = ENV_MUTEX.lock().unwrap();
+        unsafe { std::env::set_var("GITHUB_TOKEN", "op://Personal/xyz/token") };
+        let cmd = r#"nu -c "$env.GITHUB_TOKEN? | describe""#;
+        assert_eq!(expand_vars(cmd), cmd);
+        unsafe { std::env::remove_var("GITHUB_TOKEN") };
+    }
+
+    #[test]
     fn passthrough_plain_command() {
         assert_eq!(
             expand_vars("cargo build --release"),
@@ -329,10 +367,10 @@ mod tests {
 
     // qual:allow(test_quality) reason: "SUT called through with_env! macro"
     #[test]
-    fn expand_vars_multiple_in_one_command() {
+    fn expand_vars_multiple_in_one_command_left_as_is() {
         let result = with_env!(("_CRS_TEST_A", "aaa"), ("_CRS_TEST_B", "bbb") => {
             expand_vars("echo $_CRS_TEST_A $_CRS_TEST_B")
         });
-        assert_eq!(result, "echo aaa bbb");
+        assert_eq!(result, "echo $_CRS_TEST_A $_CRS_TEST_B");
     }
 }

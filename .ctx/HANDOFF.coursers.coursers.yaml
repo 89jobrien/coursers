@@ -1,31 +1,53 @@
 project: coursers
 id: coursers
-updated: 2026-08-17
+updated: 2026-08-18
 items:
 - id: gm3
   doob_uuid: null
   name: godmode-pipeline--coursers-rule-lifecycle--job-472
   priority: P2
-  status: open
+  status: done
   title: 'godmode pipeline: coursers rule lifecycle (JOB-472)'
-  description: Task gm3 in progress
+  description: Landed in the separate ~/dev/godmode repo (skills/crs-hook-testing/SKILL.md),
+    not in this repo. First attempt failed (background agent checkpoint/resume
+    crash); retried successfully with worktree isolation.
   files: []
-  completed: null
+  completed: '2026-08-17'
   extra: []
 - id: uncommitted-work
   doob_uuid: null
   name: uncommitted-work
   priority: P1
   status: open
-  title: Uncommitted changes (1 file)
+  title: Uncommitted changes (4 files)
   description: |-
     Working tree has uncommitted changes:
-    .ctx/HANDOFF.coursers.coursers.yaml
+    crates/core/src/hook/pipeline.rs (HookAction::Redact feature, this session)
+    crates/coursers/src/crs_commands.rs (HookAction::Redact wiring, this session)
+    crates/core/src/parse/expand.rs (pre-existing drift, not from this session, unverified)
+    crates/core/tests/conformance_var_expander.rs (pre-existing drift, not from this session, unverified)
   files:
-  - .ctx/HANDOFF.coursers.coursers.yaml
+  - crates/core/src/hook/pipeline.rs
+  - crates/coursers/src/crs_commands.rs
+  - crates/core/src/parse/expand.rs
+  - crates/core/tests/conformance_var_expander.rs
   completed: null
   extra: []
 log:
+- date: '20260818.000000'
+  summary: |-
+    Added HookAction::Redact to the generic plugin pipeline (crates/core/src/hook/pipeline.rs):
+    pipes PostToolUse tool output through the `redact` (obfsck) binary and replaces it via
+    protocol::filter_result_response, closing a gap where op item get --format json had leaked
+    a 1Password concealed field in plaintext into a live session. New HookContext.output field,
+    new PipelineResult.replace_output field. 2 new unit tests, all 20 pipeline tests passing,
+    cargo build --workspace and clippy --workspace clean. cargo install --path crates/coursers
+    run, crs/coursers reinstalled. Verified live end-to-end via crs hook post-tool-use against
+    a fake GitHub token, confirmed in crs log. New rule guardian/redact-tool-output added to
+    ~/.config/crs/plugins.d/godmode.toml (matcher Bash|Read|Grep, outside this repo).
+    NOT YET COMMITTED — only targeted tests run (-p coursers-core --lib hook::pipeline), not
+    the full workspace suite or coursers-e2e; full pre-push gate not yet run.
+  commits: []
 - date: 'null'
   summary: Tackled GitHub issues
   commits: []
