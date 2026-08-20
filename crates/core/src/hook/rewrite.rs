@@ -1,5 +1,37 @@
 use serde::Deserialize;
 
+use crate::error::CourserError;
+
+/// Port: abstracts how the rewrite configuration is loaded.
+pub trait RewriteLoader {
+    fn load(&self) -> Result<RewriteConfig, CourserError>;
+}
+
+/// Loads [`RewriteConfig`] from the active filters file (same TOML as
+/// `FiltersConfig`, but parsed for the `[[rewrites]]` tables only).
+pub struct FsRewriteLoader;
+
+impl RewriteLoader for FsRewriteLoader {
+    fn load(&self) -> Result<RewriteConfig, CourserError> {
+        let Some(content) = crate::hook::filters::merged_content() else {
+            return Ok(RewriteConfig::default());
+        };
+        toml::from_str(&content).map_err(CourserError::Toml)
+    }
+}
+
+/// In-memory rewrite loader for tests. Returns the config it was constructed with.
+#[cfg(any(test, feature = "testing"))]
+#[derive(Clone)]
+pub struct InMemoryRewriteLoader(pub RewriteConfig);
+
+#[cfg(any(test, feature = "testing"))]
+impl RewriteLoader for InMemoryRewriteLoader {
+    fn load(&self) -> Result<RewriteConfig, CourserError> {
+        Ok(self.0.clone())
+    }
+}
+
 /// A rewrite rule: if `pattern` matches the command, replace with `replace`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RewriteRule {
