@@ -23,3 +23,8 @@ fuzz/corpus/
 .litho/
 .taskit-cache/
 .xtask-cache/
+!.ctx/opavs/
+.ctx/opavs/phase
+!.ctx/opavs/tasks.yaml
+!.ctx/opavs/memory-bank/
+!.ctx/opavs/memory-bank/*.md
