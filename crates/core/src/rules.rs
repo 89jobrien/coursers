@@ -179,7 +179,24 @@ pub fn matched_rule_id(command: &str, rules: &[Rule]) -> Option<String> {
 /// When a rule has `target_commands`, the deny message is enriched with the
 /// specific pipe stage that triggered the block.
 pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
+    let (rule_id, msg, _span) = check_with_span(command, rules)?;
+    Some((rule_id, msg))
+}
+
+/// Same as [`check`], but also returns the byte range in `command` of the
+/// offending pattern match, when the winning rule's regex matched directly
+/// against the raw command (as opposed to firing via `target_commands` gating
+/// alone). Callers that render a `RuleViolation` diagnostic use this range for
+/// a `#[label]` span; [`check`] discards it for callers that only need the
+/// message.
+pub fn check_with_span(
+    command: &str,
+    rules: &[Rule],
+) -> Option<(String, String, Option<std::ops::Range<usize>>)> {
     let rule = find_matching_rule(command, rules)?;
+    let span = build_regex(rule)
+        .and_then(|re| re.find(command))
+        .map(|m| m.range());
     let base_msg = rule
         .message
         .clone()
@@ -189,7 +206,7 @@ pub fn check(command: &str, rules: &[Rule]) -> Option<(String, String)> {
     } else {
         base_msg
     };
-    Some((rule.id.clone(), msg))
+    Some((rule.id.clone(), msg, span))
 }
 
 /// Pipeline-aware variant of `check`. Splits `command` on sequential operators

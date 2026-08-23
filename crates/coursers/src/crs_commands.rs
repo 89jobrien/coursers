@@ -1239,7 +1239,10 @@ pub fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
     }
 
     let config = load_rules().unwrap_or_else(|e| {
-        eprintln!("[crs] warning: failed to load rules: {e}");
+        eprintln!(
+            "[crs] warning: failed to load rules:\n{:?}",
+            miette::Report::new(e)
+        );
         coursers_core::rules::RulesConfig {
             rules: vec![],
             failure_learning: coursers_core::rules::FailureLearning::default(),
@@ -1320,6 +1323,18 @@ pub fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
                     println!("{}", line.trim_end());
                 }
             }
+            println!();
+            println!("       rendered diagnostic preview:");
+            let span = re.find(&command).map(|m| m.range());
+            let msg = rule
+                .message
+                .clone()
+                .unwrap_or_else(|| format!("Blocked by rule '{}'.", rule.id));
+            let rendered =
+                coursers_core::diagnostics::RuleViolation::new(&command, &msg, span).render();
+            for line in rendered.lines() {
+                println!("       {line}");
+            }
             // List exceptions that did NOT match (so user knows what would save them)
             if !rule.exceptions.is_empty() {
                 println!("       would allow if any of:");
@@ -1363,7 +1378,10 @@ pub fn cmd_discover(
     }
     .load()
     .unwrap_or_else(|e| {
-        eprintln!("[crs] warning: failed to load rules: {e}");
+        eprintln!(
+            "[crs] warning: failed to load rules:\n{:?}",
+            miette::Report::new(e)
+        );
         coursers_core::rules::RulesConfig {
             rules: vec![],
             failure_learning: coursers_core::rules::FailureLearning::default(),
@@ -1809,7 +1827,10 @@ pub fn cmd_suggest(
     }
     .load()
     .unwrap_or_else(|e| {
-        eprintln!("[crs] warning: failed to load rules: {e}");
+        eprintln!(
+            "[crs] warning: failed to load rules:\n{:?}",
+            miette::Report::new(e)
+        );
         coursers_core::rules::RulesConfig {
             rules: vec![],
             failure_learning: coursers_core::rules::FailureLearning::default(),

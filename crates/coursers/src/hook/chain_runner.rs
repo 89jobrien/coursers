@@ -105,7 +105,12 @@ pub fn run_pre(profile_cfg: &ProfileConfig) {
     match outcome {
         PreHookOutcome::Allow => {}
         PreHookOutcome::Deny(msg) => {
-            emit_deny(profile_cfg.protocol, &msg);
+            // No byte-range span available here — HookChain doesn't thread one
+            // through from the underlying rule match, unlike the legacy
+            // pre.rs path (see matched_span there).
+            let rendered =
+                coursers_core::diagnostics::RuleViolation::new(command, &msg, None).render();
+            emit_deny(profile_cfg.protocol, &rendered);
         }
         PreHookOutcome::Rewrite { command, reason } => {
             emit_rewrite(&command, &reason);

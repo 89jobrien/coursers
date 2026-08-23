@@ -34,7 +34,10 @@ pub fn hook_stores() -> (
 
     let loader = FsRulesLoader;
     let config = loader.load().unwrap_or_else(|e| {
-        eprintln!("[coursers] warning: failed to load rules: {e}");
+        eprintln!(
+            "[coursers] warning: failed to load rules:\n{:?}",
+            miette::Report::new(e)
+        );
         coursers_core::rules::RulesConfig {
             rules: vec![],
             failure_learning: coursers_core::rules::FailureLearning::default(),
@@ -80,12 +83,16 @@ pub fn read_stdin() -> Option<HookPayload> {
     match serde_json::from_str(&buf) {
         Ok(payload) => Some(payload),
         Err(e) => {
-            eprintln!("[coursers] warning: failed to parse stdin as hook payload: {e}");
+            let report = miette::Report::new(coursers_core::error::CourserError::Json(e));
+            eprintln!("[coursers] warning: failed to parse stdin as hook payload:\n{report:?}");
             None
         }
     }
 }
 
+// Deliberately plain: this is the internal-error path (serialization itself
+// failed), not a normal deny, so it must not depend on miette rendering
+// succeeding.
 /// Serialize a [`PreResponse`] to JSON, falling back to a hardcoded deny payload if
 /// serialization fails. This function never panics.
 #[allow(dead_code)]
@@ -102,6 +109,11 @@ pub fn deny(reason: &str) {
 }
 
 /// Protocol-aware deny: exit code differs between Claude (2) and Codex (0).
+///
+/// `reason` is used verbatim — callers that want a rendered
+/// [`coursers_core::diagnostics::RuleViolation`] (course-correct-rules.json
+/// denies) must render it themselves before calling this. godmode.toml
+/// destructive-command denies pass a plain string straight through.
 pub fn deny_with_protocol(proto: coursers_core::config::HookProtocol, reason: &str) {
     use std::io::Write;
     let (json, exit_code) = coursers_core::hook::protocol::deny_response(proto, reason);

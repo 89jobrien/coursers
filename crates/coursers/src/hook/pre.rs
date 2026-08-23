@@ -11,6 +11,29 @@ pub(crate) fn should_enrich(rule_id: &str) -> bool {
     rule_id == "no-ls-use-glob"
 }
 
+/// Best-effort byte range of the pattern match that caused `command` to be
+/// blocked, for the `RuleViolation` diagnostic's `#[label]` span. Mirrors
+/// [`rules::check_pipeline`]'s segment-then-whole-command fallback so the
+/// span lines up with whichever match `check_pipeline` actually used.
+fn matched_span(
+    command: &str,
+    rules: &[coursers_core::rules::Rule],
+) -> Option<std::ops::Range<usize>> {
+    let segment_hit = coursers_core::pipeline::sequential_segments(command)
+        .into_iter()
+        .find_map(|seg| {
+            let (_, _, span) = rules::check_with_span(seg, rules)?;
+            // `seg` borrows from `command`; recover its offset via pointer
+            // arithmetic so the span is relative to the full command string.
+            let offset = seg.as_ptr() as usize - command.as_ptr() as usize;
+            span.map(|r| (r.start + offset)..(r.end + offset))
+        });
+    segment_hit.or_else(|| {
+        let (_, _, span) = rules::check_with_span(command, rules)?;
+        span
+    })
+}
+
 /// Extract the target path from an `ls` command.
 /// Takes the last non-flag token after `ls`; falls back to `.` for bare `ls`.
 pub(crate) fn extract_ls_path(command: &str) -> &str {
@@ -205,7 +228,10 @@ pub fn run_with_proto<L: RulesLoader, S: StateStore>(
             vec![rule_id.clone()],
             full_msg.clone(),
         );
-        deny_with_protocol(protocol, &full_msg);
+        let span = matched_span(command, &config.rules);
+        let rendered =
+            coursers_core::diagnostics::RuleViolation::new(command, &full_msg, span).render();
+        deny_with_protocol(protocol, &rendered);
     }
 
     // 2. Learned failures

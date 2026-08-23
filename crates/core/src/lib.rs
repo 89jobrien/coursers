@@ -6,6 +6,7 @@ pub use error::CourserError;
 pub mod analyze;
 pub mod config;
 pub mod date;
+pub mod diagnostics;
 pub mod hook;
 pub mod jsonl_source;
 pub mod loader;

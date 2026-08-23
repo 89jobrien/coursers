@@ -26,6 +26,7 @@ clap_complete_nushell = "4"
 coursers-types = { workspace = true }
 coursers-core = { workspace = true }
 dirs = { workspace = true }
+miette = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

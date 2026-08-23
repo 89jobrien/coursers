@@ -2,54 +2,55 @@
 ///
 /// All external error types are wrapped here so callers never need to depend on
 /// `serde_json`, `toml`, `redb`, or `regex` just to match on an error variant.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error, miette::Diagnostic)]
 pub enum CourserError {
     /// Wraps [`std::io::Error`].
+    #[error("I/O error: {0}")]
+    #[diagnostic(
+        code(coursers::io),
+        help("check that the path exists and is readable/writable")
+    )]
     Io(std::io::Error),
     /// Wraps [`serde_json::Error`].
+    #[error("JSON error: {0}")]
+    #[diagnostic(code(coursers::json), help("check the JSON file for syntax errors"))]
     Json(serde_json::Error),
     /// Wraps [`toml::de::Error`].
+    #[error("TOML error: {0}")]
+    #[diagnostic(code(coursers::toml), help("check the TOML file for syntax errors"))]
     Toml(toml::de::Error),
     /// Wraps [`redb::DatabaseError`].
+    #[error("database error: {0}")]
+    #[diagnostic(
+        code(coursers::database),
+        help("the redb database file may be corrupt or locked by another process")
+    )]
     Database(redb::DatabaseError),
     /// Wraps [`redb::CommitError`].
+    #[error("database commit error: {0}")]
+    #[diagnostic(code(coursers::database_commit), help("retry the operation"))]
     DatabaseCommit(redb::CommitError),
     /// Wraps [`redb::StorageError`].
+    #[error("database storage error: {0}")]
+    #[diagnostic(
+        code(coursers::database_storage),
+        help("check available disk space and file permissions")
+    )]
     DatabaseStorage(redb::StorageError),
     /// Wraps [`redb::TableError`].
+    #[error("database table error: {0}")]
+    #[diagnostic(
+        code(coursers::database_table),
+        help("the expected table may be missing from the database")
+    )]
     DatabaseTable(redb::TableError),
     /// Wraps [`regex::Error`].
+    #[error("regex error: {0}")]
+    #[diagnostic(
+        code(coursers::regex),
+        help("check the rule's pattern for invalid regex syntax")
+    )]
     Regex(regex::Error),
-}
-
-impl std::fmt::Display for CourserError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CourserError::Io(e) => write!(f, "I/O error: {e}"),
-            CourserError::Json(e) => write!(f, "JSON error: {e}"),
-            CourserError::Toml(e) => write!(f, "TOML error: {e}"),
-            CourserError::Database(e) => write!(f, "database error: {e}"),
-            CourserError::DatabaseCommit(e) => write!(f, "database commit error: {e}"),
-            CourserError::DatabaseStorage(e) => write!(f, "database storage error: {e}"),
-            CourserError::DatabaseTable(e) => write!(f, "database table error: {e}"),
-            CourserError::Regex(e) => write!(f, "regex error: {e}"),
-        }
-    }
-}
-
-impl std::error::Error for CourserError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match self {
-            CourserError::Io(e) => Some(e),
-            CourserError::Json(e) => Some(e),
-            CourserError::Toml(e) => Some(e),
-            CourserError::Database(e) => Some(e),
-            CourserError::DatabaseCommit(e) => Some(e),
-            CourserError::DatabaseStorage(e) => Some(e),
-            CourserError::DatabaseTable(e) => Some(e),
-            CourserError::Regex(e) => Some(e),
-        }
-    }
 }
 
 impl From<std::io::Error> for CourserError {

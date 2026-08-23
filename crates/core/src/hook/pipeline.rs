@@ -1017,7 +1017,10 @@ prepend = "WRAPPED=1"
     #[test]
     fn redact_action_noop_without_output() {
         let config = HookPipelineConfig {
-            hooks: vec![rule(HookEvent::PostToolUse, HookAction::Redact { level: None })],
+            hooks: vec![rule(
+                HookEvent::PostToolUse,
+                HookAction::Redact { level: None },
+            )],
         };
         let r = run_pipeline(&config, &ctx(HookEvent::PostToolUse, "ls"));
         assert!(r.replace_output.is_none());
