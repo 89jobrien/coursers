@@ -1331,7 +1331,7 @@ pub fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
                 .clone()
                 .unwrap_or_else(|| format!("Blocked by rule '{}'.", rule.id));
             let rendered =
-                coursers_core::diagnostics::RuleViolation::new(&command, &msg, span).render();
+                coursers_core::diagnostics::RuleViolation::new(&command, &msg, span).render_fancy();
             for line in rendered.lines() {
                 println!("       {line}");
             }

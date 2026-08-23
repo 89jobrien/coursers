@@ -10,7 +10,7 @@ cargo build
 cargo build --release
 
 # Install binaries locally — one crate produces both the `coursers` and `crs` bins
-cargo install --path crates/coursers
+just install   # or: cargo install --path crates/coursers
 
 # Test
 cargo test
@@ -176,9 +176,10 @@ not re-run to verify the output path during the last doc pass — treat as
   an already-running shell's `PATH` has the old version's dir baked in).
 - After editing `crates/core` or `crates/coursers`, `cargo build`/`cargo nextest run`
   do NOT update the globally-installed `~/.cargo/bin/crs` and `coursers` binaries.
-  Run `cargo install --path crates/coursers` before trusting live `crs`/`coursers`
-  behavior against the new code — this cost two separate debugging detours on
-  2026-08-15/16 (rewrite-engine cascade fix, hook-log fix) before the pattern was
+  Run `just install` (or `cargo install --path crates/coursers`) before trusting
+  live `crs`/`coursers` behavior against the new code — this cost two separate
+  debugging detours on 2026-08-15/16 (rewrite-engine cascade fix, hook-log fix)
+  and a third on 2026-08-23 (miette diagnostic rendering) before the pattern was
   recognized.
 - When a rule seems to behave differently through the real hook chain than
   expected, compare `crs probe` (matches the raw whole command string, no

@@ -28,11 +28,25 @@ impl RuleViolation {
         }
     }
 
-    /// Render this diagnostic to a plain string (colorless — safe for
-    /// embedding in a deny-reason payload that isn't a live terminal).
+    /// Render this diagnostic to a plain string (colorless, ASCII-only — safe
+    /// for embedding in a deny-reason payload that isn't a live terminal,
+    /// e.g. JSON sent back over the Claude Code hook protocol).
     pub fn render(&self) -> String {
         let mut out = String::new();
         let handler = miette::GraphicalReportHandler::new_themed(miette::GraphicalTheme::none());
+        handler
+            .render_report(&mut out, self)
+            .unwrap_or_else(|_| out.push_str(&self.message));
+        out
+    }
+
+    /// Render with miette's default graphical handler — unicode box-drawing
+    /// and ANSI color when the output stream supports it. Use this for
+    /// terminal-facing previews (`crs probe`); use [`Self::render`] for
+    /// anything embedded in a non-terminal payload.
+    pub fn render_fancy(&self) -> String {
+        let mut out = String::new();
+        let handler = miette::GraphicalReportHandler::new();
         handler
             .render_report(&mut out, self)
             .unwrap_or_else(|_| out.push_str(&self.message));

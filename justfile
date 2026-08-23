@@ -25,3 +25,7 @@ check:
 # Smoke test (requires installed or release-built binaries)
 smoke:
     nu scripts/smoke.nu
+
+# Install coursers/crs to ~/.cargo/bin (cargo build/test do NOT do this — see CLAUDE.md)
+install:
+    cargo install --path crates/coursers
