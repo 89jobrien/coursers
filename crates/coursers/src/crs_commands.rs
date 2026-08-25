@@ -2179,6 +2179,10 @@ pub fn cmd_nu_check(files: &[String], hooks: bool, nu_libs: bool) {
     }
 
     if paths.is_empty() {
+        if hooks || nu_libs {
+            println!("ok (0 files)");
+            return;
+        }
         eprintln!("crs nu-check: no files specified. Use --hooks, --nu-libs, or pass file paths.");
         std::process::exit(1);
     }
