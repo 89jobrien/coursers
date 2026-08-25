@@ -36,5 +36,10 @@ jobs:
         with:
           tool: cargo-llvm-cov,cargo-deny,cargo-machete
 
+      - name: Install Nushell
+        uses: taiki-e/install-action@v2
+        with:
+          tool: nu
+
       - name: Run CI pipeline
         run: cargo xtask ci --fail-fast
