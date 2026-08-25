@@ -31,5 +31,10 @@ jobs:
       - name: Install taskit
         run: cargo install taskit || cargo install --path .
 
+      - name: Install required taskit tools
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-deny,cargo-machete
+
       - name: Run CI pipeline
         run: cargo xtask ci --fail-fast
