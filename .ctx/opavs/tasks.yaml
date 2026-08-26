@@ -1,1 +1,10 @@
-tasks: []
+tasks:
+- id: coursers-skill-author
+  description: ''
+  status: done
+  depends_on: []
+- id: coursers-skill-sync
+  description: ''
+  status: done
+  depends_on:
+  - coursers-skill-author

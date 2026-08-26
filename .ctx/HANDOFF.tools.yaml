@@ -1,120 +1,216 @@
-generated: 2026-08-15
+generated: 2026-08-23
 since_days: 30
-sessions_scanned: 6
-total_commands: 536
+sessions_scanned: 182
+total_commands: 14022
 top_supported:
-  - command: cd /Users/joe/dev/coursers;
-    count: 50
-    rule: no-bash-use-nu
-    est_savings_tokens: 10582
-  - command: cd /Users/joe/dev/godmode
-    count: 12
-    rule: no-bash-use-nu
-    est_savings_tokens: 2963
-  - command: cat
-    count: 4
-    rule: no-cat-use-read
-    est_savings_tokens: 5413
-  - command: rm
-    count: 2
-    rule: no-bash-use-nu
-    est_savings_tokens: 761
-  - command: cat /Users/joe/dev/coursers/Cargo.toml
-    count: 1
-    rule: no-cat-use-read
-    est_savings_tokens: 414
-  - command: ls
-    count: 1
-    rule: no-bash-use-nu
-    est_savings_tokens: 160
-  - command: find /Users/joe/dev/godmode
-    count: 1
-    rule: no-find-use-glob
-    est_savings_tokens: 102
-  - command: tail
-    count: 1
-    rule: no-head-tail-use-read
-    est_savings_tokens: 432
-  - command: git branch
-    count: 1
-    rule: no-bash-use-nu
-    est_savings_tokens: 205
-  - command: git status;
-    count: 1
-    rule: no-bash-use-nu
-    est_savings_tokens: 270
-  - command: cat /tmp/audit_outdated.log;
-    count: 1
-    rule: no-bash-use-nu
-    est_savings_tokens: 549
   - command: grep
-    count: 1
+    count: 623
+    rule: no-grep-use-tool
+    est_savings_tokens: 96255
+  - command: cd /Users/joe/dev/minibox
+    count: 284
+    rule: no-cd-use-absolute-paths
+    est_savings_tokens: 85657
+  - command: sed
+    count: 188
+    rule: no-sed-n-use-read
+    est_savings_tokens: 89371
+  - command: ls
+    count: 185
+    rule: no-ls-use-glob
+    est_savings_tokens: 38633
+  - command: item get
+    count: 121
     rule: no-bash-use-nu
-    est_savings_tokens: 92
+    est_savings_tokens: 29375
+  - command: cd /Users/joe/dev/notfiles
+    count: 117
+    rule: no-bash-use-nu
+    est_savings_tokens: 44489
+  - command: cd /Users/joe/dev/personal-mcp
+    count: 103
+    rule: no-bash-use-nu
+    est_savings_tokens: 26922
+  - command: cd /Users/joe/dev/tracers
+    count: 94
+    rule: no-cd-use-absolute-paths
+    est_savings_tokens: 28681
+  - command: cat
+    count: 90
+    rule: no-bash-use-nu
+    est_savings_tokens: 55959
+  - command: cd /Users/joe/dev/taskit
+    count: 89
+    rule: no-bash-use-nu
+    est_savings_tokens: 28957
+  - command: cd /Users/joe/dev/kan
+    count: 89
+    rule: no-bash-use-nu
+    est_savings_tokens: 20204
+  - command: cd ~/dev/godmode
+    count: 86
+    rule: no-bash-use-nu
+    est_savings_tokens: 24362
+  - command: cd /Users/joe/dev/godmode
+    count: 86
+    rule: no-bash-use-nu
+    est_savings_tokens: 23286
+  - command: git
+    count: 75
+    rule: no-bash-use-nu
+    est_savings_tokens: 19051
+  - command: tail
+    count: 72
+    rule: no-head-tail-use-read
+    est_savings_tokens: 37033
+  - command: cd ~/dev/ragrs
+    count: 71
+    rule: no-bash-use-nu
+    est_savings_tokens: 9873
+  - command: python3
+    count: 64
+    rule: no-bash-use-nu
+    est_savings_tokens: 12923
+  - command: git add
+    count: 58
+    rule: no-bash-use-nu
+    est_savings_tokens: 13070
+  - command: godmode task
+    count: 58
+    rule: no-bash-use-nu
+    est_savings_tokens: 4846
+  - command: git status
+    count: 54
+    rule: no-bash-use-nu
+    est_savings_tokens: 10236
+  - command: git branch
+    count: 53
+    rule: no-bash-use-nu
+    est_savings_tokens: 5518
   - command: cargo fmt
-    count: 1
+    count: 53
     rule: no-bash-use-nu
-    est_savings_tokens: 132
-  - command: echo "---
-    count: 1
+    est_savings_tokens: 8776
+  - command: cd /Users/joe/dev/personal-mcp;
+    count: 53
     rule: no-bash-use-nu
-    est_savings_tokens: 1070
-  - command: find /Users/joe/dev/coursers
-    count: 1
-    rule: no-find-use-glob
-    est_savings_tokens: 95
-  - command: for c
-    count: 1
+    est_savings_tokens: 9675
+  - command: cd /Users/joe/dev/coursers;
+    count: 51
     rule: no-bash-use-nu
-    est_savings_tokens: 59
-  - command: diff /Users/joe/dev/coursers/xtask/src/main.rs
-    count: 1
+    est_savings_tokens: 10673
+  - command: rg
+    count: 51
+    rule: no-grep-use-tool
+    est_savings_tokens: 9323
+  - command: cd /Users/joe/dev/pick-rs
+    count: 46
     rule: no-bash-use-nu
-    est_savings_tokens: 63
-  - command: cargo deny
-    count: 1
+    est_savings_tokens: 5190
+  - command: cd /Users/joe/dev/doob
+    count: 42
     rule: no-bash-use-nu
-    est_savings_tokens: 525
+    est_savings_tokens: 10063
+  - command: echo "===
+    count: 42
+    rule: no-bash-use-nu
+    est_savings_tokens: 23518
+  - command: cd /Users/joe/dotfiles
+    count: 38
+    rule: no-cd-use-absolute-paths
+    est_savings_tokens: 32998
+  - command: cd /Users/joe/.notfiles/dotfiles-tools/.dotfiles-tools
+    count: 37
+    rule: no-cd-use-absolute-paths
+    est_savings_tokens: 24887
 top_unhandled:
   - base_command: nu
-    count: 412
-    example: "nu -c 'if (\".ctx/HANDOFF.md\" | path exists) { open .ctx/HANDOFF.md } else { \"no ..."
+    count: 5751
+    example: "nu -c 'do { rg -n \"\\\"check\\\"|Command::new\\\\(\\\"crux\\\"\\\\)\" crates/crux-agentic/src..."
   - base_command: grep
-    count: 12
-    example: "grep -n \"fn event_str_table\" -A1 /Users/joe/dev/coursers/crates/coursers/src/crs..."
+    count: 445
+    example: "grep -n \"fn new\" -A 25 ~/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/cr..."
   - base_command: git
-    count: 11
-    example: "git diff"
+    count: 147
+    example: "git -C /Users/joe/dev/taskit diff crates/taskit-engine/src/lib.rs crates/taskit-..."
+  - base_command: cargo check
+    count: 127
+    example: "cargo check --workspace 2>&1 | tail -50"
+  - base_command: cargo nextest
+    count: 117
+    example: "cargo nextest run 2>&1 | tail -40"
+  - base_command: cargo clippy
+    count: 102
+    example: "cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tail -40"
+  - base_command: git add
+    count: 87
+    example: "git add CLAUDE.md && git commit -m \"$(cat <<'EOF'\ndocs: add missing export-def-m..."
+  - base_command: doob todo
+    count: 77
+    example: "doob todo list -p taskit --json 2>&1 | head -100"
+  - base_command: mkdir
+    count: 71
+    example: "mkdir -p /Users/joe/dev/crux/.ctx/godmode/memory-bank"
   - base_command: cargo test
-    count: 6
-    example: "cargo test --workspace 2>&1 | grep -E \"FAILED|test result|error\\[\" "
-  - base_command: cargo deny
-    count: 2
-    example: "cargo deny check advisories 2>&1 | tail -30"
-  - base_command: nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/session-summary.nu
-    count: 2
-    example: "nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/session..."
-  - base_command: nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/trace-stats.nu
-    count: 2
-    example: "nu /Users/joe/dev/godmode/skills/observability-as-infrastructure/helpers/trace-s..."
-  - base_command: cargo-deny
-    count: 1
-    example: "/Users/joe/.local/share/mise/installs/cargo-cargo-deny/0.20.2/bin/cargo-deny --v..."
-  - base_command: ls
-    count: 1
-    example: "/bin/ls -la docs/ .cargo/ .litho/ .githooks/ xtask/ .xtask-cache/ 2>&1 | head -8..."
-  - base_command: nu ~/dev/godmode/skills/code-review/helpers/run-review.nu
-    count: 1
-    example: "nu ~/dev/godmode/skills/code-review/helpers/run-review.nu 2>&1 | tail -n 60"
+    count: 68
+    example: "cargo test --workspace --lib 2>&1 | tail -60"
+  - base_command: git diff
+    count: 65
+    example: "git diff .claude/settings.local.json"
+  - base_command: git status
+    count: 63
+    example: "git status --short"
+  - base_command: godmode task
+    count: 59
+    example: "godmode task next 2>&1 | head -60"
   - base_command: git branch
-    count: 1
-    example: "git branch --show-current"
+    count: 58
+    example: "git branch --show-current\ngit log --oneline -5\ncargo check --workspace 2>&1 | ta..."
+  - base_command: git commit
+    count: 56
+    example: "git commit -m \"$(cat <<'EOF'\ndocs(taskit): add grounded feature-idea docs from i..."
+  - base_command: cargo fmt
+    count: 47
+    example: "cargo fmt --all -- --check 2>&1 | head -40"
+  - base_command: git show
+    count: 44
+    example: "git show 0583e14 -- crates/taskit-engine/src/todo_sync.rs | head -400"
+  - base_command: rm
+    count: 35
+    example: "rm /Users/joe/dev/89jobrien.github.io/.claude/skills/run-89jobrien-github-io/ver..."
+  - base_command: cargo xtask
+    count: 34
+    example: "cargo xtask verify 2>&1 | tail -20"
+  - base_command: git push
+    count: 32
+    example: "git push 2>&1"
+  - base_command: godmode handoff
+    count: 32
+    example: "godmode handoff 2>&1 | tail -60"
   - base_command: git log
-    count: 1
-    example: "git log --oneline --all --grep=\"JOB-47\" | head -30"
-  - base_command: grep '"name"'
-    count: 1
-    example: "grep '\"name\"' /Users/joe/.claude/projects/-Users-joe-dev-coursers/9512eb1a-2b1a-..."
-  - base_command: git checkout
-    count: 1
-    example: "git checkout -b refactor/dedupe-event-str-tables"
+    count: 29
+    example: "git log f7bc940..HEAD --oneline --no-merges | grep -v \"^.......... flow:\""
+  - base_command: sudo
+    count: 29
+    example: "SUDO_ASKPASS=/Users/joe/.local/bin/askpass-gui.sh sudo -A pkill -f \"target/relea..."
+  - base_command: taskit flow
+    count: 26
+    example: "taskit flow --help 2>&1\necho \"---\"\ntaskit flow auto --help 2>&1"
+  - base_command: gh api
+    count: 26
+    example: "gh api repos/89jobrien/pick-rs 2>&1 | head -20"
+  - base_command: wc
+    count: 25
+    example: "wc -l /private/tmp/claude-501/-Users-joe-dev-nu-libs/85bd940a-400c-470b-a0f1-0f8..."
+  - base_command: cargo run
+    count: 24
+    example: "cargo run --bin kayaku-sim -- --guideline baseline --dry-run 2>&1 | grep -A3 \"^=..."
+  - base_command: cargo build
+    count: 24
+    example: "cargo build --all-targets 2>&1 | tail -30"
+  - base_command: python3
+    count: 22
+    example: "python3 -c \"\nimport json\nwith open('/Users/joe/.claude.json') as f:\n    d = json..."
+  - base_command: crs log
+    count: 20
+    example: "crs log --limit 5"

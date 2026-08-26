@@ -3,6 +3,7 @@ id: coursers
 updated: 2026-08-23
 items:
 - id: hc-d
+  doob_uuid: null
   name: hook-composition--wire-chain-into-coursers-binaries--job-475
   priority: P2
   status: in-progress
@@ -12,11 +13,17 @@ items:
     Merged hc-d (21cc1ab) which integrates HookChain path opt-in via COURSERS_HOOK_CHAIN=1.
     Related phases hc-a (traits), hc-b (concrete structs), hc-c (AppConfig) have landed.
     Next: Complete wiring, run full pre-push gate, confirm end-to-end hook execution.
+  files: []
+  completed: null
   extra:
   - date: 2026-08-23
     type: status
+    field: null
+    value: null
+    reviewed: null
     note: hc-d merge landed on main. Minor pipeline.rs formatting change uncommitted (test function arg wrapping).
 - id: uncommitted-work
+  doob_uuid: null
   name: uncommitted-work
   priority: P1
   status: open
@@ -30,6 +37,8 @@ items:
   files:
   - .ctx/HANDOFF.coursers.coursers.yaml
   - crates/core/src/hook/pipeline.rs
+  completed: null
+  extra: []
 log:
 - date: '20260823.000000'
   summary: |-
@@ -37,19 +46,10 @@ log:
     Wired COURSERS_HOOK_CHAIN into crs/coursers binaries. Minor formatting fix in
     pipeline.rs test function (line wrapping). 8 commits ahead of origin/main, not yet pushed.
     Ahead by 8 commits since last origin/main at a7adcba. Working tree dirty with 2 files.
+  commits: []
 - date: '20260822.032118'
   summary: done=12 running=0 pending=2 blocked=1
-  commits:
-  - 21cc1ab44999b2293fe68c92107ec65ac1d84b3d
-  - d07febfe67e84c6b044c5feb847564c4fffea6a2
-  - 5168aa8b6bc950e378081af7e85dcce3a58a711b
-  - 9c3314870e23744af32a794d8187d833aa3bdeb9
-  - 7a65a166abf49075b86830fc61e30d6af29abbe2
-  - 319b410b9fd67da0b27d19d4806c95dc507bb3ab
-  - 38d0b0c3f81fff3d01fee6956db2a178adf578ac
-  - ce916684f9fba6944d0b650dd394e9c7ac9b49c2
-  - a7adcbaf2a5d7e1c9e453e6c3398b81f3ba819b5
-  - 00ade1c231e3c9e18e4f53c2823bfb95b074fa38
+  commits: []
 - date: 2026-08-16
   summary: |-
     Task-aware rule overrides via godmode running-task title context (bc3dbe7).
@@ -59,3 +59,4 @@ log:
     Updated CLAUDE.md with agent-improvement-loop gotchas (ad505fe).
     Enhanced hook execution log to record course-correct blocks (latest).
     Tests: 332 passing. Clippy clean. Cargo check passing.
+  commits: []
