@@ -34,7 +34,7 @@ miette = { version = "7", features = ["fancy"] }
 # Pinned to a specific rev (not a local path) so `cargo outdated --workspace` and other
 # tooling that copies the manifest to a tmp dir can resolve it. Bump `rev` to pick up
 # prefixe changes; see https://github.com/89jobrien/prefixe. (2026-08-03)
-prefixe = { git = "https://github.com/89jobrien/prefixe.git", rev = "91ce4d8f97e2748d07b3d870c28946b28881adc4" }
+prefixe = { version = "0.5.0", git = "https://github.com/89jobrien/prefixe.git", rev = "f9602bcd7d3ed0a29280b26d06c42e2f33682b99" }
 redb = "4.1"
 regex = "1"
 # nu-parser/nu-protocol removed: nu-engine 0.111-0.113 has a compilation bug
