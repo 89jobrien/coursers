@@ -2,6 +2,7 @@ pub mod crs_commands;
 pub mod hook;
 pub mod nu_check;
 pub mod obfsck;
+pub mod opencode;
 pub mod rtk;
 
 use clap::{Parser, Subcommand};
@@ -301,13 +302,15 @@ pub fn run(cli: Cli) {
         } => crs_commands::cmd_history(limit, rule.as_deref(), &format),
         Command::Export { out } => crs_commands::cmd_export(out.as_deref()),
         Command::Hook { target, event } => crs_commands::cmd_hook(&target, &event),
-        Command::ValidateHooks { ref target } => {
-            if target == "codex" {
-                crs_commands::cmd_validate_codex_hooks();
-            } else {
-                crs_commands::cmd_validate_hooks();
+        Command::ValidateHooks { ref target } => match target.as_str() {
+            "claude" => crs_commands::cmd_validate_hooks(),
+            "codex" => crs_commands::cmd_validate_codex_hooks(),
+            "opencode" => opencode::cmd_validate_hooks(),
+            other => {
+                eprintln!("crs validate-hooks: unknown target '{other}'");
+                std::process::exit(1);
             }
-        }
+        },
         Command::Log {
             limit,
             event,

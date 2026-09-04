@@ -71,6 +71,12 @@ For Codex, the top-level registry also points at `crs hook --target codex <event
 Those entries dispatch to the existing `$HOME/.codex/hooks/*.crux` backends, which
 still compose `coursers pre/post` and `crs rewrite/filter` internally for Bash flows.
 
+For OpenCode, copy or symlink exactly `integrations/opencode/coursers.ts` and
+`integrations/opencode/opencode-plugin.d.ts` into project-local `.opencode/plugins/` or global
+`$HOME/.config/opencode/plugins/`. Do not copy the integration test file. Run
+`crs validate-hooks --target opencode` to verify both files and the required binaries. See
+[docs/opencode.md](docs/opencode.md) for event mappings and troubleshooting.
+
 ---
 
 ## Configuration

@@ -545,7 +545,7 @@ pub fn cmd_validate_codex_hooks() {
     }
 }
 
-fn parse_hook_event(event_str: &str) -> Option<coursers_core::hook_pipeline::HookEvent> {
+pub(crate) fn parse_hook_event(event_str: &str) -> Option<coursers_core::hook_pipeline::HookEvent> {
     use coursers_core::hook_pipeline::HookEvent;
 
     match event_str {
@@ -753,6 +753,19 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
     // Parse stdin JSON (may be empty for lifecycle events like SessionStart).
     let mut buf = String::new();
     let _ = io::stdin().read_to_string(&mut buf);
+
+    if hook_target == "opencode" {
+        match crate::opencode::run_hook(event, &buf)
+            .and_then(|response| crate::opencode::write_hook_response(&response))
+        {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("crs hook: OpenCode adapter failed: {error:?}");
+                std::process::exit(1);
+            }
+        }
+    }
+
     let json: Option<Value> = serde_json::from_str(&buf).ok();
 
     let tool_name = json
