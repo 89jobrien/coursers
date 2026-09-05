@@ -155,6 +155,8 @@ pub fn query(db: &Database, q: &LogQuery) -> Vec<LogEntry> {
         {
             continue;
         }
+        // TODO(log-before-filter): Skip entries newer than `before` instead of breaking;
+        // the remaining descending entries are older and may satisfy the query.
         if let Some(before) = q.before
             && ts >= before
         {

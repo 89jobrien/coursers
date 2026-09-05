@@ -662,6 +662,8 @@ fn codex_backend_filename(
     }
 }
 
+// TODO(bounded-process-runner): Centralize child-process execution with timeouts and bounded output;
+// concurrently drain piped streams so a stalled or noisy backend cannot hang hook processing.
 fn run_codex_backend(
     event: coursers_core::hook_pipeline::HookEvent,
     tool_name: Option<&str>,

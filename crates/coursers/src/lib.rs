@@ -239,7 +239,7 @@ pub fn run(cli: Cli) {
             state,
         } => {
             // TODO(profile-aware-cli): pass the resolved profile into filter, rewrite, and stats (#61)
-            // handlers instead of accepting profile flags and discarding their configuration.
+            // handlers, or remove flags that currently accept and discard configuration.
             let _profile_cfg = build_profile(profile, rules, state);
             crs_commands::cmd_filter();
         }

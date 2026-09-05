@@ -94,6 +94,8 @@ impl<R: RulesLoader, S: StateStore> PreHook for RuleBlockHook<R, S> {
             .into_iter()
             .chain(std::iter::once(command))
         {
+            // TODO(task-override-rule-scan): Scan all matching rules after an override;
+            // suppressing the first match must not bypass a later blocking rule.
             if let Some(rule) = config.rules.iter().find(|r| {
                 r.enabled && crate::rules::matched_rule_id(seg, std::slice::from_ref(r)).is_some()
             }) {

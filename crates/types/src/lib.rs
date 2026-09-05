@@ -1,3 +1,5 @@
+// TODO(workspace-test-gaps): Add serialization tests for coursers-types, legacy/chain parity
+// coverage, concurrent state-write tests, and a CI gate that compiles the fuzz workspace.
 pub mod capture;
 pub mod config;
 pub mod filters;

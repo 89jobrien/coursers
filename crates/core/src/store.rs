@@ -29,6 +29,8 @@ impl FsStateStore {
     }
 
     /// Atomically save state to a file path via tmp+rename.
+    // TODO(concurrent-state-updates): Add a locked update API spanning load, mutation, and save;
+    // use unique same-directory temporary files so concurrent hooks cannot lose state.
     fn save_to(path: &Path, state: &State) -> Result<(), CourserError> {
         let tmp = path.with_extension("json.tmp");
         let json = serde_json::to_string_pretty(state).map_err(CourserError::Json)?;
