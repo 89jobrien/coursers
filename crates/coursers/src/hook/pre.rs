@@ -128,10 +128,13 @@ fn record_correction(
     coursers_core::hook::log::record(&db, &entry);
 }
 
-// TODO(hook-ordering-semantics): document whether Claude Code short-circuits on
-// the first deny response from a hook chain or runs all hooks in the chain.
-// If short-circuit: the failure-learning check below (step 2) is skipped when a
-// rule fires (step 1). If not: both can produce output. Clarify in CLAUDE.md.
+// Claude Code runs matching command hooks independently; a deny from this
+// process does not short-circuit sibling hooks configured in settings.json.
+// Ordering within `coursers pre` is deterministic, however: predefined rules run
+// before learned failures, and `deny_with_protocol` exits immediately. Therefore
+// a predefined-rule deny skips the learned-failure check below and this process
+// emits exactly one response. The in-process HookChain preserves first-terminal-
+// outcome semantics for its own ordered pre-hooks.
 //
 // TODO(no-sed-n-use-read): enable the `no-sed-n-use-read` block rule once the
 // Read tool's offset/limit feature is stable. Currently deferred because the
