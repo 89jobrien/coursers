@@ -64,10 +64,13 @@ tool_usage:
 ## Script Interface
 
 ```
-scripts/enrich-handoff.nu [--since N]   # default N=1
+scripts/enrich-handoff.nu [--since N] [--input PATH] [--root PATH] [--generated-date DATE]
 ```
 
 - `--since N` — scan last N days (default 1, covers current session)
+- `--input PATH` — read saved RTK JSON instead of running RTK (for deterministic testing)
+- `--root PATH` — write into a supplied repository root instead of running `handoff-detect`
+- `--generated-date DATE` — override the generated date for deterministic fixtures
 - The script writes to `.ctx/` relative to the repo root (resolved via `handoff-detect --root`)
 - If `rtk` is not on PATH: exit non-zero, write nothing
 - If `.ctx/` does not exist: create it

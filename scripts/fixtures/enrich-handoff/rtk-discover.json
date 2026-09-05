@@ -1,0 +1,27 @@
+{
+  "sessions_scanned": 7,
+  "total_commands": 42,
+  "supported": [
+    {
+      "command": "cargo test",
+      "count": 15,
+      "rtk_equivalent": "rtk cargo test",
+      "estimated_savings_tokens": 800,
+      "estimated_savings_pct": 35.5
+    },
+    {
+      "command": "cargo build",
+      "count": 5,
+      "rtk_equivalent": "rtk cargo build",
+      "estimated_savings_tokens": 200,
+      "estimated_savings_pct": 20
+    }
+  ],
+  "unsupported": [
+    {
+      "base_command": "op account",
+      "count": 3,
+      "example": "op account list\nignored second line"
+    }
+  ]
+}

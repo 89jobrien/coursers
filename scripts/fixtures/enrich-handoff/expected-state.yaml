@@ -1,0 +1,8 @@
+generated: "2026-09-04"
+phase: "VERIFY"
+tool_usage:
+  sessions_scanned: 7
+  total_commands: 42
+  top_command: "cargo test (15)"
+  est_savings_tokens: 1000
+  unhandled_top: "op account (3)"

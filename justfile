@@ -26,6 +26,10 @@ check:
 smoke:
     nu scripts/smoke.nu
 
+# Test handoff enrichment from saved RTK JSON (RTK not required)
+test-enrichment:
+    nu scripts/test-enrich-handoff.nu
+
 # Install coursers/crs to ~/.cargo/bin (cargo build/test do NOT do this — see CLAUDE.md)
 install:
     cargo install --path crates/coursers
