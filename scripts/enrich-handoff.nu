@@ -1,6 +1,7 @@
 #!/usr/bin/env nu
-# enrich-handoff.nu — write .ctx/HANDOFF.tools.yaml and update .ctx/HANDOFF.state.yaml
-# Usage: nu scripts/enrich-handoff.nu [--since <int>]
+# Canonical handoff enrichment implementation.
+# Writes .ctx/HANDOFF.tools.yaml and updates .ctx/HANDOFF.state.yaml.
+# Usage: nu scripts/enrich-handoff.nu [--since <int>] [--input <json>] [--root <path>] [--generated-date <date>]
 
 # yaml_quote: return a JSON-quoted string safe for embedding in YAML scalar positions.
 # e.g. yaml_quote "hello \"world\"" => "\"hello \\\"world\\\"\""
@@ -8,40 +9,49 @@ def yaml_quote [s: string]: nothing -> string {
     $s | to json
 }
 
-def main [--since: int = 1] {
-    # Verify rtk is on PATH — first? returns null on empty list rather than crashing
-    let rtk_path = (which rtk | get path | first?)
-    if $rtk_path == null {
-        print --stderr "enrich-handoff: rtk not found on PATH, aborting"
-        exit 1
+def main [
+    --since: int = 1
+    --input: path
+    --root: path
+    --generated-date: string
+] {
+    let repo_root = if $root != null {
+        $root
+    } else {
+        let root_result = (do { handoff-detect --root } | complete)
+        if $root_result.exit_code != 0 {
+            print --stderr "enrich-handoff: handoff-detect --root failed, aborting"
+            exit 1
+        }
+        $root_result.stdout | str trim
     }
-
-    # Resolve repo root via handoff-detect
-    let root_result = (do { handoff-detect --root } | complete)
-    if $root_result.exit_code != 0 {
-        print --stderr "enrich-handoff: handoff-detect --root failed, aborting"
-        exit 1
-    }
-    let root = ($root_result.stdout | str trim)
-    let ctx = ($root | path join ".ctx")
-
-    # Create .ctx/ if absent
+    let ctx = ($repo_root | path join ".ctx")
     mkdir $ctx
 
-    # Run rtk discover
-    let discover_result = (do { rtk discover --format json --since $since } | complete)
-    if $discover_result.exit_code != 0 {
-        print --stderr "enrich-handoff: rtk discover failed, aborting"
-        exit 1
-    }
-    let data = ($discover_result.stdout | from json)
+    let data = if $input != null {
+        open $input
+    } else {
+        let rtk_path = (which rtk | get path | first?)
+        if $rtk_path == null {
+            print --stderr "enrich-handoff: rtk not found on PATH, aborting"
+            exit 1
+        }
 
-    write_tools_yaml $ctx $data $since
+        let discover_result = (do { rtk discover --format json --since $since } | complete)
+        if $discover_result.exit_code != 0 {
+            print --stderr "enrich-handoff: rtk discover failed, aborting"
+            exit 1
+        }
+        $discover_result.stdout | from json
+    }
+    let date = ($generated_date | default (date now | format date "%Y-%m-%d"))
+
+    write_tools_yaml $ctx $data $since $date
     merge_state_yaml $ctx $data
 }
 
-def write_tools_yaml [ctx: string, data: record, since: int] {
-    let today = (date now | format date "%Y-%m-%d")
+def write_tools_yaml [ctx: string, data: record, since: int, generated_date: string] {
+    let today = $generated_date
 
     let top_supported = (
         $data.supported?

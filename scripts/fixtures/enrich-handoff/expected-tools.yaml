@@ -1,0 +1,19 @@
+generated: "2026-09-05"
+since_days: 7
+sessions_scanned: 7
+total_commands: 42
+top_supported:
+  - command: "cargo test"
+    count: 15
+    rtk_equivalent: "rtk cargo test"
+    est_savings_tokens: 800
+    est_savings_pct: 35.5
+  - command: "cargo build"
+    count: 5
+    rtk_equivalent: "rtk cargo build"
+    est_savings_tokens: 200
+    est_savings_pct: 20
+top_unhandled:
+  - base_command: "op account"
+    count: 3
+    example: "op account list"

@@ -1,7 +1,7 @@
 # Design: Handoff Tool Usage Enrichment
 
 **Date:** 2026-04-06
-**Status:** Approved
+**Status:** Approved; amended 2026-09-05 to use one canonical implementation
 
 ## Problem
 
@@ -12,21 +12,19 @@ covered by rules.
 
 ## Solution
 
-A script pair (`scripts/enrich-handoff.nu` + `scripts/enrich-handoff.sh`) that runs at end of
-session, pulls RTK session data via `rtk discover --format json`, and writes two outputs:
+The canonical `scripts/enrich-handoff.nu` script runs at end of session, pulls RTK session data via `rtk discover --format json`, and writes two outputs. The deprecated `scripts/enrich-handoff.sh` path remains as a compatibility wrapper that delegates to Nushell:
 
 1. `.ctx/HANDOFF.tools.yaml` — full detail for `/hand:on` orientation and `/hand:over` diagrams
 2. A `tool_usage` stats block merged into `.ctx/HANDOFF.state.yaml`
 
-Both scripts write identical output schemas. The caller dispatches `nu` if available, falls back
-to `sh`. `rtk` absent → exit 0 silently (non-blocking).
+All transformation logic lives in the Nushell script. Callers invoke it directly. `rtk` absent causes a non-zero exit without writing output.
 
 ## Data Flow
 
 ```
 rtk discover --format json --since <N>
         ↓
-scripts/enrich-handoff.{nu,sh}
+scripts/enrich-handoff.nu
         ├─→ .ctx/HANDOFF.tools.yaml        (full detail)
         └─→ .ctx/HANDOFF.state.yaml        (tool_usage stats block merged in)
 ```
@@ -66,13 +64,15 @@ tool_usage:
 ## Script Interface
 
 ```
-scripts/enrich-handoff.nu [--since N]   # default N=1
-scripts/enrich-handoff.sh [--since N]
+scripts/enrich-handoff.nu [--since N] [--input PATH] [--root PATH] [--generated-date DATE]
 ```
 
 - `--since N` — scan last N days (default 1, covers current session)
-- Both scripts write to `.ctx/` relative to the repo root (resolved via `handoff-detect --root`)
-- If `rtk` not on PATH: exit 0, write nothing
+- `--input PATH` — read saved RTK JSON instead of running RTK (for deterministic testing)
+- `--root PATH` — write into a supplied repository root instead of running `handoff-detect`
+- `--generated-date DATE` — override the generated date for deterministic fixtures
+- The script writes to `.ctx/` relative to the repo root (resolved via `handoff-detect --root`)
+- If `rtk` is not on PATH: exit non-zero, write nothing
 - If `.ctx/` does not exist: create it
 
 ## Integration with `hand` Skills
@@ -82,7 +82,7 @@ scripts/enrich-handoff.sh [--since N]
 After writing `.ctx/HANDOFF.state.yaml`, runs:
 
 ```sh
-nu scripts/enrich-handoff.nu 2>/dev/null || sh scripts/enrich-handoff.sh 2>/dev/null
+nu scripts/enrich-handoff.nu 2>/dev/null || true
 ```
 
 ### `hand:on`
@@ -109,7 +109,7 @@ containing:
 | File | Change |
 |------|--------|
 | `scripts/enrich-handoff.nu` | New — primary script |
-| `scripts/enrich-handoff.sh` | New — POSIX fallback |
+| `scripts/enrich-handoff.sh` | Deprecated compatibility wrapper delegating to the canonical Nushell script |
 | `hand` plugin: `handoff` skill | Call enrich script after state write |
 | `hand` plugin: `handon` skill | Surface `tool_usage` summary on wake |
 | `hand` plugin: `handover` skill | Add Tool Usage section + Mermaid chart |
