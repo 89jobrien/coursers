@@ -199,3 +199,19 @@ fn in_memory_store_satisfies_contract() {
     let store = InMemoryCaptureStore::new();
     assert_mark_accepted_contract(&store);
 }
+
+#[test]
+fn fs_store_operations_return_directory_creation_errors() {
+    let dir = TempDir::new().expect("tempdir");
+    let parent = dir.path().join("not-a-directory");
+    std::fs::write(&parent, b"file").expect("create parent blocker");
+    let store = SuggestionStore::new(parent.join("suggestions.jsonl"));
+
+    let result = CaptureStore::record(&store, make_record("grep a .", "rg a .", "sess-A"));
+
+    assert!(result.is_err(), "record failure must be returned");
+
+    let result = CaptureStore::mark_accepted(&store, "sess-A", "rg a .", 0);
+
+    assert!(result.is_err(), "acceptance failure must be returned");
+}
