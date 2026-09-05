@@ -37,6 +37,8 @@ use coursers_core::hook::chain::{HookContext, PostHookOutcome, PreHookOutcome, T
 /// Returns `true` when `COURSERS_HOOK_CHAIN=1` is set in the environment.
 ///
 /// This is the single source of truth for the opt-in check used in `lib.rs`.
+// TODO(unify-hook-paths): close the documented parity gaps, converge legacy and chain execution (#57)
+// on one context/outcome pipeline, and remove the runtime implementation switch.
 pub fn chain_enabled() -> bool {
     std::env::var("COURSERS_HOOK_CHAIN").as_deref() == Ok("1")
 }

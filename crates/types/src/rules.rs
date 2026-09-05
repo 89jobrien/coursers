@@ -1,6 +1,8 @@
 use serde::Deserialize;
 
 /// A rule that blocks a shell command matching a pattern.
+// TODO(canonical-domain-contracts): make coursers-types the canonical home for rules and ports, (#63)
+// then remove the divergent compatibility definitions retained in coursers-core.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Rule {
     pub id: String,

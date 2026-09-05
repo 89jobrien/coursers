@@ -238,11 +238,13 @@ pub fn run(cli: Cli) {
             rules,
             state,
         } => {
-            let _profile_cfg = crs_commands::resolve_profile(profile, rules, state);
+            // TODO(profile-aware-cli): pass the resolved profile into filter, rewrite, and stats (#61)
+            // handlers instead of accepting profile flags and discarding their configuration.
+            let _profile_cfg = build_profile(profile, rules, state);
             crs_commands::cmd_filter();
         }
         Command::Rewrite { profile, rules } => {
-            let _profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let _profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_rewrite();
         }
         Command::Discover {
@@ -255,7 +257,7 @@ pub fn run(cli: Cli) {
             generate_filters,
             min_count,
         } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_discover(
                 &profile_cfg,
                 all,
@@ -267,15 +269,15 @@ pub fn run(cli: Cli) {
             );
         }
         Command::Validate { profile, rules } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_validate(&profile_cfg);
         }
         Command::Probe { profile, rules } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_probe(&profile_cfg);
         }
         Command::Stats { profile } => {
-            let _profile_cfg = crs_commands::resolve_profile(profile, None, None);
+            let _profile_cfg = build_profile(profile, None, None);
             crs_commands::cmd_stats();
         }
         Command::Insights {
@@ -292,7 +294,7 @@ pub fn run(cli: Cli) {
             limit,
             format,
         } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_suggest(&profile_cfg, all, since, limit, &format);
         }
         Command::History {

@@ -151,7 +151,7 @@ fn build_regex(rule: &Rule) -> Option<Regex> {
 /// Returns the first rule that matches `command` (enabled, target gate, regex, no exception).
 /// Shared by `matched_rule_id` and `check` to avoid duplicating iteration logic.
 ///
-/// TODO(comment-line-fps): `no-ls-use-glob` and `no-cat-use-read` produce false
+/// TODO(comment-line-fps): `no-ls-use-glob` and `no-cat-use-read` produce false (#53)
 /// positives on comment lines — e.g. `# use cat to see X` or doc strings mentioning
 /// `ls`. Add an exception pattern for `#.*\b(ls|cat)\b` or gate those rules on
 /// `target_commands` so they only fire when `ls`/`cat` is argv[0].

@@ -18,6 +18,8 @@ pub mod rules;
 pub mod rx_prefix;
 pub mod state;
 pub mod store;
+// TODO(core-package-conformance-tests): ensure package-scoped core test commands run every (#52)
+// conformance and property suite without relying on workspace feature unification.
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
 

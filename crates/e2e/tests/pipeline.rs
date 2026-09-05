@@ -7,6 +7,8 @@ use tempfile::{NamedTempFile, TempDir};
 // Harness helpers
 // ---------------------------------------------------------------------------
 
+// TODO(shared-e2e-harness): consolidate the duplicated subprocess helpers and always select an (#62)
+// explicitly built binary instead of silently preferring a potentially stale release artifact.
 fn workspace_bin(name: &str) -> PathBuf {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workspace = manifest.parent().unwrap().parent().unwrap();

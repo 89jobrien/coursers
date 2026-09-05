@@ -211,6 +211,11 @@ pub struct SuggestionStore {
     pub path: PathBuf,
 }
 
+enum WriteMode {
+    Append,
+    Replace,
+}
+
 impl SuggestionStore {
     /// Return the default JSONL path under `$XDG_CONFIG_HOME/coursers/suggestions.jsonl`.
     pub fn default_path() -> PathBuf {
@@ -264,6 +269,19 @@ impl SuggestionStore {
             .ok()
     }
 
+    fn open_writer(&self, mode: WriteMode) -> Option<std::fs::File> {
+        if let Some(parent) = self.path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let mut options = std::fs::OpenOptions::new();
+        options.create(true);
+        match mode {
+            WriteMode::Append => options.append(true),
+            WriteMode::Replace => options.write(true).truncate(true),
+        };
+        options.open(&self.path).ok()
+    }
+
     // qual:allow(iosp) reason: "I/O boundary — file locking + append"
     fn do_record(&self, record: SuggestionRecord) {
         let Some(file) = self.lock_file() else { return };
@@ -291,14 +309,7 @@ impl SuggestionStore {
 
     // qual:allow(iosp) reason: "I/O boundary — file creation + write"
     fn append(&self, record: &SuggestionRecord) {
-        if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-        else {
+        let Some(mut file) = self.open_writer(WriteMode::Append) else {
             return;
         };
         if let Ok(line) = serde_json::to_string(record) {
@@ -307,15 +318,7 @@ impl SuggestionStore {
     }
 
     fn write_all(&self, records: &[SuggestionRecord]) {
-        if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(&self.path)
-        else {
+        let Some(mut file) = self.open_writer(WriteMode::Replace) else {
             return;
         };
         for r in records {
@@ -327,6 +330,8 @@ impl SuggestionStore {
 }
 
 impl CaptureStore for SuggestionStore {
+    // TODO(capture-store-errors): propagate directory, lock, serialization, and write failures (#47)
+    // instead of reporting successful persistence after an operation was discarded.
     fn record(&self, record: SuggestionRecord) -> Result<(), CourserError> {
         self.do_record(record);
         Ok(())

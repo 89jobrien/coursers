@@ -128,16 +128,16 @@ fn record_correction(
     coursers_core::hook::log::record(&db, &entry);
 }
 
-// TODO(hook-ordering-semantics): document whether Claude Code short-circuits on
+// TODO(hook-ordering-semantics): document whether Claude Code short-circuits on (#58)
 // the first deny response from a hook chain or runs all hooks in the chain.
 // If short-circuit: the failure-learning check below (step 2) is skipped when a
 // rule fires (step 1). If not: both can produce output. Clarify in CLAUDE.md.
 //
-// TODO(no-sed-n-use-read): enable the `no-sed-n-use-read` block rule once the
+// TODO(no-sed-n-use-read): enable the `no-sed-n-use-read` block rule once the (#59)
 // Read tool's offset/limit feature is stable. Currently deferred because the
 // alternative (Read with offset) is not yet ergonomic enough to enforce.
 //
-// TODO(coursers-11): coursers-11 (cross-tool block) depends on obfsck-11 and
+// TODO(coursers-11): coursers-11 (cross-tool block) depends on obfsck-11 and (#60)
 // mcpipe-21 in external repos. No local fallback is documented. When those issues
 // are resolved, wire the cross-tool detection here.
 /// Core pre-hook logic, injectable for testing.

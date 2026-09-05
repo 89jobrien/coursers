@@ -112,7 +112,7 @@ impl StateStore for &InMemoryStateStore {
 mod tests {
     use super::*;
 
-    // TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses
+    // TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses (#54)
     // serialization locks (ENV_LOCK) rather than RAII isolation. Refactor to use
     // `temp_env::with_var` for cleaner, panic-safe env isolation in all test files.
 
