@@ -227,109 +227,124 @@ impl SuggestionStore {
         Self { path }
     }
 
-    /// Load all records from the JSONL file. Silently skips malformed lines.
+    /// Load all records from the JSONL file. Silently skips malformed lines and
+    /// returns an empty collection when the file cannot be read.
     pub fn load(&self) -> Vec<SuggestionRecord> {
-        let Ok(file) = std::fs::File::open(&self.path) else {
-            return Vec::new();
+        self.load_records().unwrap_or_default()
+    }
+
+    fn load_records(&self) -> Result<Vec<SuggestionRecord>, CourserError> {
+        let file = match std::fs::File::open(&self.path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => return Err(CourserError::Io(error)),
         };
+
         std::io::BufReader::new(file)
             .lines()
-            .map_while(Result::ok)
-            .filter(|l| !l.trim().is_empty())
-            .filter_map(|l| serde_json::from_str(&l).ok())
-            .collect()
+            .try_fold(Vec::new(), |mut records, line| {
+                let line = line.map_err(CourserError::Io)?;
+                if !line.trim().is_empty()
+                    && let Ok(record) = serde_json::from_str(&line)
+                {
+                    records.push(record);
+                }
+                Ok(records)
+            })
     }
 
     /// Record a block event. If the (original, suggestion) pair is new, append.
     /// If it already exists, increment count (and upgrade accepted if applicable).
     pub fn record(&self, record: SuggestionRecord) {
-        self.do_record(record);
+        let _ = self.do_record(record);
     }
 
     /// Mark a pending (unaccepted) record as accepted, matched by session_id +
     /// suggestion text. Updates in-place.
     pub fn mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
-        self.do_mark_accepted(session_id, command, exit_code);
+        let _ = self.do_mark_accepted(session_id, command, exit_code);
     }
 
-    fn lock_file(&self) -> Option<std::fs::File> {
+    fn lock_file(&self) -> Result<std::fs::File, CourserError> {
         if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent).map_err(CourserError::Io)?;
         }
         std::fs::OpenOptions::new()
             .create(true)
             .truncate(false)
             .write(true)
             .open(&self.path)
-            .ok()
+            .map_err(CourserError::Io)
     }
 
     // qual:allow(iosp) reason: "I/O boundary — file locking + append"
-    fn do_record(&self, record: SuggestionRecord) {
-        let Some(file) = self.lock_file() else { return };
+    fn do_record(&self, record: SuggestionRecord) -> Result<(), CourserError> {
+        let file = self.lock_file()?;
         let mut lock = FdRwLock::new(file);
-        let Ok(_guard) = lock.write() else { return };
+        let _guard = lock.write().map_err(CourserError::Io)?;
 
-        let mut records = self.load();
+        let mut records = self.load_records()?;
         if merge_duplicate(&mut records, &record) {
-            self.write_all(&records);
+            self.write_all(&records)
         } else {
-            self.append(&record);
+            self.append(&record)
         }
     }
 
-    fn do_mark_accepted(&self, session_id: &str, command: &str, exit_code: i64) {
-        let Some(file) = self.lock_file() else { return };
+    fn do_mark_accepted(
+        &self,
+        session_id: &str,
+        command: &str,
+        exit_code: i64,
+    ) -> Result<(), CourserError> {
+        let file = self.lock_file()?;
         let mut lock = FdRwLock::new(file);
-        let Ok(_guard) = lock.write() else { return };
+        let _guard = lock.write().map_err(CourserError::Io)?;
 
-        let mut records = self.load();
+        let mut records = self.load_records()?;
         if apply_accepted(&mut records, session_id, command, exit_code) {
-            self.write_all(&records);
+            self.write_all(&records)?;
         }
+        Ok(())
     }
 
     // qual:allow(iosp) reason: "I/O boundary — file creation + write"
-    fn append(&self, record: &SuggestionRecord) {
+    fn append(&self, record: &SuggestionRecord) -> Result<(), CourserError> {
+        let line = serde_json::to_string(record).map_err(CourserError::Json)?;
         if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent).map_err(CourserError::Io)?;
         }
-        let Ok(mut file) = std::fs::OpenOptions::new()
+        let mut file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
             .open(&self.path)
-        else {
-            return;
-        };
-        if let Ok(line) = serde_json::to_string(record) {
-            let _ = writeln!(file, "{}", line);
-        }
+            .map_err(CourserError::Io)?;
+        writeln!(file, "{}", line).map_err(CourserError::Io)
     }
 
-    fn write_all(&self, records: &[SuggestionRecord]) {
-        if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+    fn write_all(&self, records: &[SuggestionRecord]) -> Result<(), CourserError> {
+        let mut contents = Vec::new();
+        for record in records {
+            serde_json::to_writer(&mut contents, record).map_err(CourserError::Json)?;
+            contents.push(10);
         }
-        let Ok(mut file) = std::fs::OpenOptions::new()
+
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent).map_err(CourserError::Io)?;
+        }
+        let mut file = std::fs::OpenOptions::new()
             .create(true)
             .write(true)
             .truncate(true)
             .open(&self.path)
-        else {
-            return;
-        };
-        for r in records {
-            if let Ok(line) = serde_json::to_string(r) {
-                let _ = writeln!(file, "{}", line);
-            }
-        }
+            .map_err(CourserError::Io)?;
+        file.write_all(&contents).map_err(CourserError::Io)
     }
 }
 
 impl CaptureStore for SuggestionStore {
     fn record(&self, record: SuggestionRecord) -> Result<(), CourserError> {
-        self.do_record(record);
-        Ok(())
+        self.do_record(record)
     }
 
     fn mark_accepted(
@@ -338,8 +353,7 @@ impl CaptureStore for SuggestionStore {
         command: &str,
         exit_code: i64,
     ) -> Result<(), CourserError> {
-        self.do_mark_accepted(session_id, command, exit_code);
-        Ok(())
+        self.do_mark_accepted(session_id, command, exit_code)
     }
 }
 
