@@ -26,6 +26,32 @@ fn blocked_command_exits_nonzero() {
 }
 
 #[test]
+fn predefined_rule_deny_short_circuits_learned_failure_check() {
+    let tmp = TempDir::new().unwrap();
+    let state = tmp.path().join("state.json");
+    let rules = fixture("rules_basic.json");
+
+    for _ in 0..3 {
+        let out = run_post(&fixture("payload_post_fail.json"), &rules, &state);
+        assert!(out.status.success(), "failed to seed failure state");
+    }
+
+    let out = run_pre(&fixture("payload_bash_grep.json"), &rules, &state);
+    assert_eq!(out.status.code(), Some(2));
+
+    let response: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("pre hook must emit exactly one JSON response");
+    let reason = response["hookSpecificOutput"]["permissionDecisionReason"]
+        .as_str()
+        .expect("deny response must include a reason");
+    assert!(reason.contains("Grep tool"), "unexpected reason: {reason}");
+    assert!(
+        !reason.contains("exact command has failed"),
+        "learned-failure deny must not replace the earlier rule deny: {reason}"
+    );
+}
+
+#[test]
 fn allowed_command_exits_zero() {
     let tmp = TempDir::new().unwrap();
     let state = tmp.path().join("state.json");

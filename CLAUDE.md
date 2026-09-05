@@ -138,6 +138,19 @@ never mock the file system directly.
 }
 ```
 
+### Hook ordering and short-circuit behavior
+
+Claude Code runs all matching command hooks independently; a deny does not stop sibling hooks
+from running, and array order must not be used as inter-process sequencing. In the configuration
+above, `crs rewrite` may therefore run even when `coursers pre` denies the tool call.
+
+Within one `coursers pre` process, checks are ordered: predefined rules run before learned
+failures. Emitting a deny terminates that process immediately, so a predefined-rule match skips
+the learned-failure check and emits exactly one deny response. The opt-in in-process `HookChain`
+uses the same first-terminal-outcome rule for pre-hooks: the first deny or rewrite wins, while its
+observers still receive the resolved outcome. A denied tool call never executes, so there is no
+corresponding `PostToolUse` event for `coursers post` to learn from.
+
 ## Hook wiring verification
 
 The standard hook chain is documented above and mirrored in
