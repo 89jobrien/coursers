@@ -1,5 +1,6 @@
 #!/usr/bin/env nu
-# enrich-handoff.nu — write .ctx/HANDOFF.tools.yaml and update .ctx/HANDOFF.state.yaml
+# Canonical handoff enrichment implementation.
+# Writes .ctx/HANDOFF.tools.yaml and updates .ctx/HANDOFF.state.yaml.
 # Usage: nu scripts/enrich-handoff.nu [--since <int>]
 
 # yaml_quote: return a JSON-quoted string safe for embedding in YAML scalar positions.

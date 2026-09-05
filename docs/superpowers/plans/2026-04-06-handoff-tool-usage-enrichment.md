@@ -5,6 +5,8 @@ note: Tasks 1-2 (scripts) landed. Tasks 3-6 targeted the hand plugin which no lo
 
 # Handoff Tool Usage Enrichment Implementation Plan
 
+> Historical implementation plan. The shell and jq transformations were retired by #66; `scripts/enrich-handoff.nu` is canonical and `scripts/enrich-handoff.sh` is only a deprecated compatibility wrapper.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development
 > (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use
 > checkbox (`- [ ]`) syntax for tracking.
