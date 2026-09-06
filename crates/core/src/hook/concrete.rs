@@ -9,7 +9,7 @@
 //!
 //! | Struct              | Trait        | Delegates to                              |
 //! |---------------------|--------------|-------------------------------------------|
-//! | [`RuleBlockHook`]   | [`PreHook`]  | `rules::check_pipeline`, `state::check_learned` |
+//! | [`RuleBlockHook`]   | [`PreHook`]  | task-aware pipeline rules, learned failures     |
 //! | [`RewriteHook`]     | [`PreHook`]  | `rewrite::apply`                          |
 //! | [`FilterHook`]      | [`PostHook`] | `filter_logic::run_filter`                |
 //! | [`FailureObserver`] | [`Observer`] | `state::record_failure`                   |
@@ -25,7 +25,7 @@ use crate::hook::filters::FiltersLoader;
 use crate::hook::rewrite::{RewriteLoader, apply as rewrite_apply};
 use crate::loader::RulesLoader;
 use crate::parse::expand::NoopExpander;
-use crate::rules::{check_pipeline, task_overrides_rule};
+use crate::rules::check_pipeline_with_task_overrides;
 use crate::state::{check_learned, record_failure};
 use crate::store::StateStore;
 use crate::types::filters::FilterResult;
@@ -88,32 +88,10 @@ impl<R: RulesLoader, S: StateStore> PreHook for RuleBlockHook<R, S> {
         let config = self.rules_loader.load()?;
 
         // --- Rule-block check ---
-        // Walk the pipeline segments; deny on the first matching rule that is
-        // not suppressed by a running godmode task.
-        for seg in crate::parse::pipeline::sequential_segments(command)
-            .into_iter()
-            .chain(std::iter::once(command))
+        if let Some((_, msg)) =
+            check_pipeline_with_task_overrides(command, &config.rules, &self.running_titles)
         {
-            // TODO(task-override-rule-scan): Scan all matching rules after an override;
-            // suppressing the first match must not bypass a later blocking rule.
-            if let Some(rule) = config.rules.iter().find(|r| {
-                r.enabled && crate::rules::matched_rule_id(seg, std::slice::from_ref(r)).is_some()
-            }) {
-                if task_overrides_rule(rule, &self.running_titles) {
-                    continue;
-                }
-                let (_, msg) = check_pipeline(seg, &config.rules)
-                    .or_else(|| check_pipeline(command, &config.rules))
-                    .unwrap_or_else(|| {
-                        (
-                            rule.id.clone(),
-                            rule.message
-                                .clone()
-                                .unwrap_or_else(|| format!("Blocked by rule '{}'.", rule.id)),
-                        )
-                    });
-                return Ok(PreHookOutcome::Deny(msg));
-            }
+            return Ok(PreHookOutcome::Deny(msg));
         }
 
         // --- Failure-learning check ---
@@ -339,6 +317,27 @@ mod tests {
 
         let outcome = hook.run(&bash_ctx("grep foo .")).unwrap();
         assert!(matches!(outcome, PreHookOutcome::Deny(_)));
+    }
+
+    #[test]
+    fn rule_block_hook_scans_past_task_overridden_match() {
+        let mut overridden = rule_blocking("overridden-grep", r"\bgrep\b");
+        overridden.task_override = Some("migrate*".to_string());
+        let config = RulesConfig {
+            rules: vec![overridden, rule_blocking("always-block-grep", r"\bgrep\b")],
+            ..empty_rules()
+        };
+        let hook = RuleBlockHook::new(InMemoryRulesLoader(config), InMemoryStateStore::new())
+            .with_running_titles(vec!["[task] migrate grep usage".to_string()]);
+
+        let outcome = hook.run(&bash_ctx("grep foo .")).unwrap();
+
+        assert_eq!(
+            outcome,
+            PreHookOutcome::Deny(
+                "Use the dedicated tool instead of always-block-grep.".to_string()
+            )
+        );
     }
 
     #[test]

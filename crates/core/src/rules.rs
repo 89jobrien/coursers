@@ -226,6 +226,28 @@ pub fn check_pipeline(command: &str, rules: &[Rule]) -> Option<(String, String)>
         .or_else(|| check(command, rules))
 }
 
+/// Pipeline-aware rule check that ignores only rules overridden by running tasks.
+///
+/// An overridden match does not allow the command immediately: scanning continues so
+/// a later matching rule can still deny it.
+pub fn check_pipeline_with_task_overrides(
+    command: &str,
+    rules: &[Rule],
+    running_titles: &[String],
+) -> Option<(String, String)> {
+    let check_rules = |candidate| {
+        rules
+            .iter()
+            .filter(|rule| !task_overrides_rule(rule, running_titles))
+            .find_map(|rule| check(candidate, std::slice::from_ref(rule)))
+    };
+
+    crate::pipeline::sequential_segments(command)
+        .into_iter()
+        .find_map(check_rules)
+        .or_else(|| check_rules(command))
+}
+
 /// Pipeline-aware variant of `matched_rule_id`. Same whole-command fallback
 /// as [`check_pipeline`].
 pub fn matched_rule_id_pipeline(command: &str, rules: &[Rule]) -> Option<String> {
@@ -930,5 +952,39 @@ mod tests {
             &rule,
             &["[t1] migrate grep usage".to_string()]
         ));
+    }
+
+    #[test]
+    fn pipeline_task_override_scans_later_matching_rule() {
+        let overridden = rule_with_override(r"\bgrep\b", "migrate*");
+        let blocking = make_rule("always-block-grep", r"\bgrep\b");
+
+        let outcome = check_pipeline_with_task_overrides(
+            "grep foo .",
+            &[overridden, blocking],
+            &["[t1] migrate grep usage".to_string()],
+        );
+
+        assert_eq!(
+            outcome.map(|(id, _)| id),
+            Some("always-block-grep".to_string())
+        );
+    }
+
+    #[test]
+    fn pipeline_task_override_scans_later_whole_command_rule() {
+        let overridden = rule_with_override(";", "migrate*");
+        let blocking = make_rule("always-block-sequential", ";");
+
+        let outcome = check_pipeline_with_task_overrides(
+            "echo first; echo second",
+            &[overridden, blocking],
+            &["[t1] migrate shell commands".to_string()],
+        );
+
+        assert_eq!(
+            outcome.map(|(id, _)| id),
+            Some("always-block-sequential".to_string())
+        );
     }
 }

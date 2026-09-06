@@ -18,18 +18,21 @@ pub(crate) fn should_enrich(rule_id: &str) -> bool {
 fn matched_span(
     command: &str,
     rules: &[coursers_core::rules::Rule],
+    rule_id: &str,
 ) -> Option<std::ops::Range<usize>> {
+    let rule = rules.iter().find(|rule| rule.id == rule_id)?;
+    let selected_rule = std::slice::from_ref(rule);
     let segment_hit = coursers_core::pipeline::sequential_segments(command)
         .into_iter()
         .find_map(|seg| {
-            let (_, _, span) = rules::check_with_span(seg, rules)?;
+            let (_, _, span) = rules::check_with_span(seg, selected_rule)?;
             // `seg` borrows from `command`; recover its offset via pointer
             // arithmetic so the span is relative to the full command string.
             let offset = seg.as_ptr() as usize - command.as_ptr() as usize;
             span.map(|r| (r.start + offset)..(r.end + offset))
         });
     segment_hit.or_else(|| {
-        let (_, _, span) = rules::check_with_span(command, rules)?;
+        let (_, _, span) = rules::check_with_span(command, selected_rule)?;
         span
     })
 }
@@ -186,15 +189,11 @@ pub fn run_with_proto<L: RulesLoader, S: StateStore>(
 
     // 1. Predefined rules — a matching `task_override` glob against a running
     // godmode task title suppresses the block for that task's duration.
-    let matched_rule = rules::check_pipeline(command, &config.rules).filter(|(rule_id, _)| {
-        !config
-            .rules
-            .iter()
-            .find(|r| &r.id == rule_id)
-            .is_some_and(|r| {
-                rules::task_overrides_rule(r, &coursers_core::config::running_task_titles())
-            })
-    });
+    let matched_rule = rules::check_pipeline_with_task_overrides(
+        command,
+        &config.rules,
+        &coursers_core::config::running_task_titles(),
+    );
     if let Some((rule_id, msg)) = matched_rule {
         coursers_core::stats::record_block(&coursers_core::stats::stats_path(), &rule_id);
 
@@ -228,7 +227,7 @@ pub fn run_with_proto<L: RulesLoader, S: StateStore>(
             vec![rule_id.clone()],
             full_msg.clone(),
         );
-        let span = matched_span(command, &config.rules);
+        let span = matched_span(command, &config.rules, &rule_id);
         let rendered =
             coursers_core::diagnostics::RuleViolation::new(command, &full_msg, span).render();
         deny_with_protocol(protocol, &rendered);
@@ -386,6 +385,19 @@ mod tests {
     fn should_enrich_false_for_other_rules() {
         assert!(!should_enrich("no-find-use-glob"));
         assert!(!should_enrich(""));
+    }
+
+    #[test]
+    fn matched_span_uses_selected_rule_after_override_scan() {
+        let mut first = config_with_rule("grep").rules.remove(0);
+        first.id = "overridden-grep".to_string();
+        let mut second = config_with_rule("foo").rules.remove(0);
+        second.id = "blocking-foo".to_string();
+
+        assert_eq!(
+            matched_span("grep foo", &[first, second], "blocking-foo"),
+            Some(5..8)
+        );
     }
 
     #[test]
