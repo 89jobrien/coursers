@@ -8,3 +8,42 @@ tasks:
   status: done
   depends_on:
   - coursers-skill-author
+- id: oc1
+  description: ''
+  status: done
+  depends_on: []
+- id: oc2
+  description: ''
+  status: done
+  depends_on:
+  - oc1
+- id: oc3
+  description: ''
+  status: done
+  depends_on:
+  - oc2
+- id: oc4
+  description: ''
+  status: done
+  depends_on:
+  - oc3
+- id: oc5
+  description: ''
+  status: done
+  depends_on:
+  - oc4
+- id: oc6
+  description: ''
+  status: done
+  depends_on:
+  - oc5
+- id: oc7
+  description: ''
+  status: done
+  depends_on:
+  - oc6
+- id: oc8
+  description: ''
+  status: done
+  depends_on:
+  - oc7

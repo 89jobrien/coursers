@@ -154,7 +154,7 @@ pub fn discover(
         entry.count += 1;
         // Use real output length when available: bytes / 4 ≈ tokens.
         // Never fabricate a number — if output_bytes is absent, leave est_tokens at 0.
-        // TODO(token-estimation): the bytes/4 heuristic is undocumented and fragile
+        // TODO(token-estimation): the bytes/4 heuristic is undocumented and fragile (#48)
         // for non-ASCII content (multi-byte Unicode inflates the estimate). Consider
         // exposing BYTES_PER_TOKEN in user config or using a proper tokenizer.
         if let Some(bytes) = rec.output_bytes {

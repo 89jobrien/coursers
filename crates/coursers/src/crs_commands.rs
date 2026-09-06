@@ -1,13 +1,13 @@
 // Commands migrated from the crs binary.
 // qual:allow(srp) reason: "CLI subcommand implementations â inherently large"
+// TODO(split-crs-commands): replace this god-module with command-specific modules that return (#55)
+// typed results and keep protocol I/O and presentation at the CLI boundary.
 
-use coursers_core::config::ConfigBuilder;
 use coursers_core::hook::filter_logic::{FilterPayload, FilterResult, run_filter};
 use coursers_core::rewrite::RewriteConfig;
 use serde::Deserialize;
 use serde_json::Value;
 use std::io::{self, Read, Write};
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 /// Minimal PostToolUse hook payload (crs-specific; coursers hook module has its own).
@@ -21,24 +21,6 @@ struct HookPayload {
 #[derive(Debug, Deserialize)]
 struct ToolInput {
     command: Option<String>,
-}
-
-pub fn resolve_profile(
-    profile: Option<String>,
-    rules: Option<PathBuf>,
-    state: Option<PathBuf>,
-) -> coursers_core::config::ProfileConfig {
-    let mut b = ConfigBuilder::new();
-    if let Some(p) = profile {
-        b = b.profile(p);
-    }
-    if let Some(r) = rules {
-        b = b.rules(r);
-    }
-    if let Some(s) = state {
-        b = b.state(s);
-    }
-    b.build()
 }
 
 /// Run the crs rewrite hook logic. Returns Some(rewritten) or None.
@@ -545,7 +527,7 @@ pub fn cmd_validate_codex_hooks() {
     }
 }
 
-fn parse_hook_event(event_str: &str) -> Option<coursers_core::hook_pipeline::HookEvent> {
+pub(crate) fn parse_hook_event(event_str: &str) -> Option<coursers_core::hook_pipeline::HookEvent> {
     use coursers_core::hook_pipeline::HookEvent;
 
     match event_str {
@@ -680,6 +662,8 @@ fn codex_backend_filename(
     }
 }
 
+// TODO(bounded-process-runner): Centralize child-process execution with timeouts and bounded output;
+// concurrently drain piped streams so a stalled or noisy backend cannot hang hook processing.
 fn run_codex_backend(
     event: coursers_core::hook_pipeline::HookEvent,
     tool_name: Option<&str>,
@@ -753,6 +737,19 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
     // Parse stdin JSON (may be empty for lifecycle events like SessionStart).
     let mut buf = String::new();
     let _ = io::stdin().read_to_string(&mut buf);
+
+    if hook_target == "opencode" {
+        match crate::opencode::run_hook(event, &buf)
+            .and_then(|response| crate::opencode::write_hook_response(&response))
+        {
+            Ok(()) => return,
+            Err(error) => {
+                eprintln!("crs hook: OpenCode adapter failed: {error:?}");
+                std::process::exit(1);
+            }
+        }
+    }
+
     let json: Option<Value> = serde_json::from_str(&buf).ok();
 
     let tool_name = json
@@ -941,6 +938,8 @@ pub fn cmd_log(
 
         let outcome_str = match &entry.outcome {
             coursers_core::hook::log::Outcome::Pass => "PASS".to_string(),
+            // TODO(unicode-safe-truncation): centralize display truncation around UTF-8 character (#56)
+            // boundaries so valid user-controlled text cannot panic command rendering.
             coursers_core::hook::log::Outcome::Deny { message } => {
                 format!("DENY: {}", &message[..message.len().min(60)])
             }

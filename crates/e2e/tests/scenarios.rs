@@ -139,6 +139,8 @@ fn run_scenario(path: &Path) {
         ("COURSERS_STATE", &state_str),
     ];
 
+    // TODO(strict-e2e-assertions): Assert exact exit codes and deserialize complete protocol JSON;
+    // substring and generic nonzero checks can let crashes or malformed responses pass.
     // Phase: post_failures — record failures before testing pre-block
     if let Some(ref pf) = sf.post_failures {
         for _ in 0..pf.count {

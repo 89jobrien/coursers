@@ -7,6 +7,8 @@ use tempfile::{NamedTempFile, TempDir};
 // Harness helpers
 // ---------------------------------------------------------------------------
 
+// TODO(shared-e2e-harness): consolidate subprocess helpers, select an explicitly built binary (#62),
+// and run the correctly named `coursers-e2e` package instead of accepting stale artifacts.
 fn workspace_bin(name: &str) -> PathBuf {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
     let workspace = manifest.parent().unwrap().parent().unwrap();

@@ -29,6 +29,8 @@ impl FsStateStore {
     }
 
     /// Atomically save state to a file path via tmp+rename.
+    // TODO(concurrent-state-updates): Add a locked update API spanning load, mutation, and save;
+    // use unique same-directory temporary files so concurrent hooks cannot lose state.
     fn save_to(path: &Path, state: &State) -> Result<(), CourserError> {
         let tmp = path.with_extension("json.tmp");
         let json = serde_json::to_string_pretty(state).map_err(CourserError::Json)?;
@@ -112,7 +114,7 @@ impl StateStore for &InMemoryStateStore {
 mod tests {
     use super::*;
 
-    // TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses
+    // TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses (#54)
     // serialization locks (ENV_LOCK) rather than RAII isolation. Refactor to use
     // `temp_env::with_var` for cleaner, panic-safe env isolation in all test files.
 

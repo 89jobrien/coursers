@@ -2,6 +2,7 @@ pub mod crs_commands;
 pub mod hook;
 pub mod nu_check;
 pub mod obfsck;
+pub mod opencode;
 pub mod rtk;
 
 use clap::{Parser, Subcommand};
@@ -237,11 +238,13 @@ pub fn run(cli: Cli) {
             rules,
             state,
         } => {
-            let _profile_cfg = crs_commands::resolve_profile(profile, rules, state);
+            // TODO(profile-aware-cli): pass the resolved profile into filter, rewrite, and stats (#61)
+            // handlers, or remove flags that currently accept and discard configuration.
+            let _profile_cfg = build_profile(profile, rules, state);
             crs_commands::cmd_filter();
         }
         Command::Rewrite { profile, rules } => {
-            let _profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let _profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_rewrite();
         }
         Command::Discover {
@@ -254,7 +257,7 @@ pub fn run(cli: Cli) {
             generate_filters,
             min_count,
         } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_discover(
                 &profile_cfg,
                 all,
@@ -266,15 +269,15 @@ pub fn run(cli: Cli) {
             );
         }
         Command::Validate { profile, rules } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_validate(&profile_cfg);
         }
         Command::Probe { profile, rules } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_probe(&profile_cfg);
         }
         Command::Stats { profile } => {
-            let _profile_cfg = crs_commands::resolve_profile(profile, None, None);
+            let _profile_cfg = build_profile(profile, None, None);
             crs_commands::cmd_stats();
         }
         Command::Insights {
@@ -291,7 +294,7 @@ pub fn run(cli: Cli) {
             limit,
             format,
         } => {
-            let profile_cfg = crs_commands::resolve_profile(profile, rules, None);
+            let profile_cfg = build_profile(profile, rules, None);
             crs_commands::cmd_suggest(&profile_cfg, all, since, limit, &format);
         }
         Command::History {
@@ -301,13 +304,15 @@ pub fn run(cli: Cli) {
         } => crs_commands::cmd_history(limit, rule.as_deref(), &format),
         Command::Export { out } => crs_commands::cmd_export(out.as_deref()),
         Command::Hook { target, event } => crs_commands::cmd_hook(&target, &event),
-        Command::ValidateHooks { ref target } => {
-            if target == "codex" {
-                crs_commands::cmd_validate_codex_hooks();
-            } else {
-                crs_commands::cmd_validate_hooks();
+        Command::ValidateHooks { ref target } => match target.as_str() {
+            "claude" => crs_commands::cmd_validate_hooks(),
+            "codex" => crs_commands::cmd_validate_codex_hooks(),
+            "opencode" => opencode::cmd_validate_hooks(),
+            other => {
+                eprintln!("crs validate-hooks: unknown target '{other}'");
+                std::process::exit(1);
             }
-        }
+        },
         Command::Log {
             limit,
             event,

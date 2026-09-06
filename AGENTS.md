@@ -1,190 +1,159 @@
 # AGENTS.md
 
-This repo uses the opavs (Orient-Plan-Act-Verify-Ship) phase discipline.
+Guidance for coding agents working in this Rust workspace. Prefer repository evidence over stale
+memory, preserve unrelated user changes, and keep edits scoped to the requested task.
 
-- Task graph: `.ctx/opavs/tasks.yaml` (managed via `opavs tasks`)
-- Memory bank: `.ctx/opavs/memory-bank/` (`active-context.md`, `progress.md`)
-- Current phase: `.ctx/opavs/phase` (managed via `opavs phase`, not committed)
+## Workflow Discipline
 
-## Commands
+This repository uses OPAVS (Orient, Plan, Act, Verify, Ship).
+
+- Check the phase with `opavs phase get`; change it with `opavs phase set <PHASE>`.
+- Manage `.ctx/opavs/tasks.yaml` through `opavs tasks`, not by hand.
+- Read `.ctx/opavs/memory-bank/active-context.md` and `progress.md` when resuming work.
+- ORIENT and PLAN are read-only; edit only in ACT, test in VERIFY, commit/push only in SHIP.
+- `.ctx/opavs/phase` is local and intentionally uncommitted.
+- Run `git status --short --branch` before editing; never discard changes you did not create.
+
+## Workspace Ownership
+
+The workspace uses Rust 2024, resolver 3, and a minimum Rust version of 1.89.
+
+- `crates/types` (`coursers-types`): domain data and stable port traits.
+- `crates/core` (`coursers-core`): rules, parsing, state, filters, rewrites, analysis, and hooks.
+- `crates/coursers` (`coursers`): CLI dispatch, concrete adapters, protocol I/O, and both binaries.
+- `crates/e2e` (`coursers-e2e`): realistic cross-command and hook-chain scenarios.
+- `crates/xtask` (`xtask`): taskit-backed workspace quality gates.
+- Put external I/O behind traits and inject fakes or tempdir-backed adapters in tests.
+- Do not mock the filesystem when an existing port (`RulesLoader`, `StateStore`, etc.) fits.
+
+There is no separate `crs` crate. `crates/coursers/Cargo.toml` defines `coursers` from
+`src/main.rs` and `crs` from the thin `src/bin/crs.rs`; both call `coursers::run` and expose the
+same Clap command model. Check the entrypoints before assuming behavior is binary-specific.
+
+## Build and Install
 
 ```sh
-# Build
-cargo build
-cargo build --release
+cargo check --workspace                 # fastest compile validation
+cargo build                             # debug workspace build
+cargo build --release                   # optimized, stripped/LTO build
+just check                              # workspace check + clippy
+just install                            # install coursers and crs to $HOME/.cargo/bin
+```
 
-# Install binaries locally — one crate produces both the `coursers` and `crs` bins
-just install   # or: cargo install --path crates/coursers
+`cargo build` and tests do not refresh installed binaries. After changing `crates/core` or
+`crates/coursers`, run `just install` before testing live `crs`/`coursers` hook behavior.
 
-# Test
-cargo test
-cargo test -p coursers-types  # domain types and port traits only
-cargo test -p coursers-core   # core library only
-cargo test -p coursers        # coursers/crs binaries (both bin targets, one package)
-cargo test -p coursers-e2e    # end-to-end pipeline/scenario tests
+## Formatting and Linting
 
-# Lint
+```sh
+cargo fmt --all                         # apply rustfmt
+cargo fmt --all -- --check              # verify formatting only
 cargo clippy --workspace -- -D warnings
-
-# Smoke test (end-to-end)
-nu scripts/smoke.nu
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
-## Architecture
+Use the broader all-targets/all-features clippy command before shipping. Test-only warnings have
+repeatedly escaped narrower lint runs. CI sets `RUSTFLAGS=-D warnings`.
 
-Five-crate workspace:
+## Tests
 
-```
-crates/
-  types/     # coursers-types — domain types and port traits
-  core/      # coursers-core — shared library (rules, state, filters, rewrite, history)
-  coursers/  # coursers package — TWO bin targets sharing one `src/main.rs`/CLI:
-             #   `coursers` and `crs` are the same binary under two names, full command
-             #   set on both (pre, post, filter, rewrite, discover, validate, probe,
-             #   stats, insights, audit, suggest, history, export, hook, validate-hooks,
-             #   log, heat, replay, nu-check)
-  e2e/       # coursers-e2e — end-to-end pipeline/scenario integration tests
-  xtask/     # taskit-based workspace CI runner (fmt/lint/test/coverage/pre-commit/pre-push/release)
-```
-
-There is no separate `crs` crate — `crs` is a second `[[bin]]` entry in
-`crates/coursers/Cargo.toml`, both pointing at `src/main.rs`. Whichever name you invoke,
-you get the identical CLI surface; the name only matters for which hook-chain command
-convention you're following in `settings.json`.
-
-### coursers-core
-
-All domain logic lives here. Key modules:
-
-- `rules` — loads `~/.config/coursers/course-correct-rules.json` (`COURSERS_RULES` env override);
-  `RulesLoader` trait enables test injection
-- `state` / `store` — rolling failure log; `StateStore` trait enables test injection
-- `filters` — loads `.ctx/crs-filters.toml` (project) or `~/.config/crs/filters.toml` (global);
-  four modes: `passthrough`, `failures-only`, `errors-only`, `truncate`
-- `rewrite` — regex-replace rules from the same TOML file (`[[rewrites]]` sections)
-- `history` — `CommandSource` trait + `discover()` function; scans Claude Code `.jsonl` session
-  files to surface missed savings; uses `output_bytes / 4` for token estimates
-
-### coursers / crs binary (one CLI, two bin names)
-
-Run `coursers --help` or `crs --help` — both print the same 19-subcommand list. The hook
-chain in `settings.json` conventionally calls `coursers` for the pre/post rule gate and
-`crs` for everything else, but this is a naming convention, not an enforced split:
-
-- `pre` — reads `PreToolUse` JSON from stdin; blocks if command matches a rule and no
-  exception overrides; also blocks commands that have hit the failure threshold
-- `post` — reads `PostToolUse` JSON from stdin; records non-zero exits to the
-  failure-learning state file
-- `filter` — PostToolUse hook; compresses/suppresses output per filter rules
-- `rewrite` — PreToolUse hook; rewrites commands (e.g. force `--message-format json`);
-  exit 1 = passthrough unchanged, exit 0 + JSON = rewritten
-- `discover` — scans `~/.claude/projects/**/*.jsonl` for unhandled Bash commands
-- `validate` — rule health check: pattern compiles, known triggers fire, exceptions work,
-  alternative tools (bun, uv) on PATH
-- `probe` — interactive: read command from stdin (raw string or JSON), show per-rule verdict
-- `stats` — cumulative block counts by rule
-- `insights` — session facets enriched with git context
-- `audit` — rx prefix learning state
-- `suggest` — suggest new rules from unhandled commands
-- `history` — recent blocked commands
-- `export` — dump rules + stats + state as portable JSON
-- `hook` — run the generic hook pipeline for a hook event (also routes Codex hooks via
-  `--target codex`, see `crates/coursers/src/crs_commands.rs`)
-- `validate-hooks` — validate hook pipeline config
-- `log` — query the hook execution log
-- `heat` — heatmap of rule firings
-- `replay` — replay a session's Bash commands through the current ruleset
-- `nu-check` — validate nu scripts using `nu --ide-check`
-
-### Hexagonal boundaries
-
-`coursers-core` defines traits (`CommandSource`, `RulesLoader`, `StateStore`). The `coursers`
-crate owns the concrete adapter (`JsonlCommandSource`). Tests inject fakes via the traits —
-never mock the file system directly.
-
-## Configuration files
-
-| File                                           | Used by subcommand(s)                          | Purpose                                                 |
-| ----------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------- |
-| `~/.config/coursers/course-correct-rules.json` | `pre`, `post`, `validate`, `probe`, `discover`  | Block rules + failure-learning config                   |
-| `~/.config/coursers/course-correct-state.json` | `post`                                          | Global fallback failure-learning state                  |
-| `.ctx/course-correct-state.json`               | `post`                                          | Project-local failure-learning state (wins over global) |
-| `.ctx/crs-filters.toml`                        | `filter`, `rewrite`                            | Project-local filter and rewrite rules                  |
-| `~/.config/crs/filters.toml`                   | `filter`, `rewrite`                            | Global fallback filter and rewrite rules                |
-
-## Hook wiring (`~/.claude/settings.json`)
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "coursers pre" },
-          { "type": "command", "command": "crs rewrite" }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "coursers post" },
-          { "type": "command", "command": "crs filter" }
-        ]
-      }
-    ]
-  }
-}
-```
-
-After installing the hook block in your local `~/.claude/settings.json`, run
-`crs validate-hooks` to verify the chain.
-
-## Council Analysis
+Prefer nextest; use `cargo test` only when nextest is unavailable or libtest-specific flags are
+needed.
 
 ```sh
-op run --account=my.1password.com --env-file=/Users/joe/.secrets -- devkit council
-# Run from repo root. No --repo flag. Output: ~/.dev-agents/coursers/ai-logs/
+cargo nextest run --workspace
+cargo nextest run -p coursers-types
+cargo nextest run -p coursers-core
+cargo nextest run -p coursers
+cargo nextest run -p coursers-e2e
+cargo xtask ci --fail-fast              # same top-level pipeline used by CI
+nu scripts/smoke.nu                     # installed/release binary smoke test
+bun test integrations/opencode/coursers.test.ts
 ```
 
-`devkit` is on PATH, but this command requires 1Password secrets injection and was
-not re-run to verify the output path during the last doc pass — treat as
-`[UNVERIFIED]` until confirmed.
+### Run One Test
 
-## Coursers Rules Gotchas
+```sh
+# Name/substring filter within one package
+cargo nextest run -p coursers-core -E 'test(rule_name)'
 
-- `no-find-use-glob` rule matches any command containing `\bfind\s+[./~$"']` —
-  this includes git commit messages with phrases like "find .ctx". Exception added
-  for `git (commit|log|tag|stash)` including `git -C` form.
-- Two godmode trace-log files exist and are easy to confuse: `.ctx/GODMODE.trace.jsonl`
-  (repo root) vs `.ctx/godmode/traces/trace.jsonl` (the one
-  `skills/observability-as-infrastructure/helpers/*.nu` actually read). Check which
-  one before diagnosing "broken" trace tooling.
-- `.ctx/*` is gitignored except explicitly allow-listed files — edits to
-  `.ctx/GODMODE.tasks.yaml` are invisible to `git status` and `godmode handoff`'s
-  uncommitted-file warning. Don't assume a clean handoff report means no local state
-  changed there.
-- `cargo deny check advisories` crashing with "unsupported CVSS version: 4.0" is a
-  `cargo-deny` binary bug (fixed in 0.20.2, broken in 0.18.3), not a `deny.toml`
-  config problem — ignoring the advisory ID doesn't help since the crash happens
-  loading the advisory DB, before ignore-filtering applies. Upgrade the binary
-  (mise-managed: `mise use -g cargo:cargo-deny@latest`, then start a fresh shell —
-  an already-running shell's `PATH` has the old version's dir baked in).
-- After editing `crates/core` or `crates/coursers`, `cargo build`/`cargo nextest run`
-  do NOT update the globally-installed `~/.cargo/bin/crs` and `coursers` binaries.
-  Run `just install` (or `cargo install --path crates/coursers`) before trusting
-  live `crs`/`coursers` behavior against the new code.
-- When a rule seems to behave differently through the real hook chain than
-  expected, compare `crs probe` (matches the raw whole command string, no
-  pipeline segmentation) against `crs pre` fed the identical JSON payload
-  (goes through the real hook path, including `check_pipeline`'s segment-
-  splitting on `;`/`&&`/`||`).
+# One integration-test target, then one exact test in it
+cargo nextest run -p coursers --test hook_opencode_integration \
+  -E 'test(opencode_tool_deny_returns_zero_with_deny_decision)'
 
-## HANDOFF Dependency Fields
+# Libtest alternative; use the fully qualified test path with --exact
+cargo test -p coursers-core 'rules::tests::<test_name>' -- --exact --nocapture
 
-Use structured fields, not free-text notes, for dependency tracking:
+# One complete integration-test target under libtest
+cargo test -p coursers --test hook_opencode_integration
+```
 
-- `blocked_by: [id1, id2]` on the blocked item
-- `unblocks: [id1]` on each blocker
+Start with the narrowest relevant test, then run the owning package, workspace check, broad clippy,
+and affected end-to-end tests. Changes to shared ports or core behavior require downstream tests.
+
+## Rust Style
+
+- Let `rustfmt` decide layout; do not hand-align fields or fight automatic wrapping.
+- Keep modules focused and `main.rs` entrypoints thin; move behavior into library modules.
+- Group imports by origin with blank lines where useful: `std`, external crates, then `crate`/`super`.
+- Prefer explicit imports over glob imports outside test modules; use `Trait as _` for method lookup
+  when the trait name itself is intentionally unused.
+- Use `UpperCamelCase` for types/traits/enums, `snake_case` for modules/functions/variables, and
+  `SCREAMING_SNAKE_CASE` for constants/statics.
+- Name tests after observable behavior, for example `opencode_tool_deny_returns_zero_with_deny_decision`.
+- Prefer `&str`, slices, and borrowed values when ownership is unnecessary; avoid reflexive clones.
+- Model optional values with `Option`, recoverable failures with `Result`, and modes with enums
+  rather than bool flags or magic strings.
+- Derive `Debug` on public types and add `Clone`, `Eq`, `Hash`, `Default`, or Serde traits only when
+  their semantics are meaningful.
+- Keep fields private when invariants matter; expose the smallest API required by callers.
+- Use `pub(crate)` for workspace-internal implementation details and avoid unnecessary `pub` items;
+  `coursers-core` enables `#![warn(unreachable_pub)]`.
+- Document public contracts with `///`; use `//!` for module-level behavior and protocol invariants.
+- Comments should explain non-obvious intent, safety, ordering, or compatibility constraints, not
+  restate the code.
+- Prefer iterator adapters and early returns/`let ... else` over index loops and deep nesting.
+- Do not introduce `unsafe`; if unavoidable, document the invariant with a `// SAFETY:` comment.
+
+## Error Handling
+
+- Propagate recoverable library errors with `Result` and `?`; do not panic on external input.
+- Use `CourserError` (`thiserror` + `miette::Diagnostic`) for reusable core error contracts.
+- Use `miette::Result` at CLI/adapter boundaries when rich diagnostics are appropriate.
+- Include actionable context in errors: path, event, rule, or failed operation.
+- Hook commands generally fail open on malformed optional configuration: warn on stderr and preserve
+  protocol-safe stdout. Preserve this behavior unless the protocol explicitly requires rejection.
+- Never print diagnostics to stdout when stdout carries hook JSON.
+- `unwrap`/`expect` are acceptable in tests for fixture setup and asserted invariants; avoid them in
+  production paths unless impossibility is proven locally and explained.
+- Do not silently discard errors. If best-effort behavior is required, emit a concise stderr warning.
+
+## Testing Conventions
+
+- Put focused unit tests in an adjacent `#[cfg(test)] mod tests` using `use super::*`.
+- Put public behavior and binary protocol tests under `crates/*/tests/`.
+- Use `tempfile` and injected ports to isolate HOME, config, state, and filesystem behavior.
+- Cover success, malformed input, missing configuration, exceptions, and failure-learning thresholds.
+- Assert exit status, stdout JSON shape, and stderr separately for subprocess tests.
+- Keep serialized/protocol shapes backward compatible; use `#[serde(default)]` for additive fields.
+- Add a regression test before fixing a reproduced rule, parser, hook, or rewrite defect.
+- Environment-mutating tests must use the repository's lock pattern to avoid parallel test races.
+
+## Hook and Configuration Safety
+
+- Live block rules: `$HOME/.config/coursers/course-correct-rules.json` (`COURSERS_RULES` override).
+- Failure state: project `.ctx/course-correct-state.json`, then global config fallback.
+- Filters/rewrites: project `.ctx/crs-filters.toml`, then `$HOME/.config/crs/filters.toml`.
+- Generic pipeline rules: `$HOME/.config/crs/plugins.d/*.toml`.
+- Do not change user-global configuration unless explicitly requested.
+- Reproduce hook bugs with the exact JSON payload; compare `crs probe`, `crs pre`, and
+  `crs hook <event>` because their parsing/composition paths can differ.
+- Inspect recent behavior with `crs log --limit N`; run `crs validate-hooks` after wiring changes.
+- Treat plugin actions that execute commands as real side effects, not dry runs.
+- Never expose secrets from payloads, logs, configuration, environment variables, or fixtures.
+
+## Repository Instruction Files
+
+No `.cursorrules`, `.cursor/rules/`, or `.github/copilot-instructions.md` files currently exist.
+If one is added, treat its scoped instructions as additive to this file and resolve conflicts in
+favor of the more specific rule.

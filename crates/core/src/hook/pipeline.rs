@@ -128,6 +128,8 @@ impl HookPipelineConfig {
 /// 1. Project-local `.ctx/crs-hooks.toml` (walk up from CWD)
 /// 2. Global `~/.config/crs/hooks.toml`
 /// 3. Plugin configs from `~/.config/crs/plugins.d/*.toml`
+// TODO(hook-config-trust): require explicit repository trust before project-local rules may (#50)
+// rewrite commands or execute side effects from `.ctx/crs-hooks.toml`.
 pub fn load_config() -> HookPipelineConfig {
     let mut config = HookPipelineConfig::default();
 
@@ -464,6 +466,8 @@ fn git_branch_slug() -> Option<String> {
 }
 
 /// Run a side-effect command. Optionally capture stdout as a system message.
+// TODO(core-io-boundary): move filesystem discovery and subprocess execution into coursers (#51)
+// adapters, leaving the core pipeline responsible only for deterministic rule evaluation.
 fn run_side_effect(
     args: &[String],
     capture: bool,
