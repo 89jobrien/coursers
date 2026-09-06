@@ -42,4 +42,4 @@ jobs:
           tool: nu
 
       - name: Run CI pipeline
-        run: cargo xtask ci --fail-fast
+        run: cargo xtask check ci --fail-fast
