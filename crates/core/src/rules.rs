@@ -220,10 +220,7 @@ pub fn check_with_span(
 /// `^nu\b`) are evaluated against the full command in the fallback, which
 /// is exactly the anchoring those exceptions assume.
 pub fn check_pipeline(command: &str, rules: &[Rule]) -> Option<(String, String)> {
-    crate::pipeline::sequential_segments(command)
-        .into_iter()
-        .find_map(|seg| check(seg, rules))
-        .or_else(|| check(command, rules))
+    check_pipeline_with(command, |candidate| check(candidate, rules))
 }
 
 /// Pipeline-aware rule check that ignores only rules overridden by running tasks.
@@ -242,19 +239,23 @@ pub fn check_pipeline_with_task_overrides(
             .find_map(|rule| check(candidate, std::slice::from_ref(rule)))
     };
 
-    crate::pipeline::sequential_segments(command)
-        .into_iter()
-        .find_map(check_rules)
-        .or_else(|| check_rules(command))
+    check_pipeline_with(command, check_rules)
 }
 
 /// Pipeline-aware variant of `matched_rule_id`. Same whole-command fallback
 /// as [`check_pipeline`].
 pub fn matched_rule_id_pipeline(command: &str, rules: &[Rule]) -> Option<String> {
+    check_pipeline_with(command, |candidate| matched_rule_id(candidate, rules))
+}
+
+fn check_pipeline_with<'a, T>(
+    command: &'a str,
+    mut check: impl FnMut(&'a str) -> Option<T>,
+) -> Option<T> {
     crate::pipeline::sequential_segments(command)
         .into_iter()
-        .find_map(|seg| matched_rule_id(seg, rules))
-        .or_else(|| matched_rule_id(command, rules))
+        .find_map(&mut check)
+        .or_else(|| check(command))
 }
 
 /// Simple glob match supporting a single trailing `*` wildcard. Real godmode
@@ -860,6 +861,22 @@ mod tests {
             let chk = check(&cmd, &rules);
             prop_assert_eq!(id.is_some(), chk.is_some(),
                 "Disagreement on: {}", cmd);
+        }
+
+        #[test]
+        fn prop_pipeline_rule_id_agrees_with_check(
+            left in "[a-zA-Z0-9 ._/-]{1,20}",
+            operator in prop_oneof![Just(" && "), Just(" || "), Just("; ")],
+            right in "[a-zA-Z0-9 ._/-]{1,20}",
+        ) {
+            let command = format!("{left}{operator}{right}");
+            let rules = vec![grep_targeted_rule()];
+
+            prop_assert_eq!(
+                matched_rule_id_pipeline(&command, &rules),
+                check_pipeline(&command, &rules).map(|(id, _)| id),
+                "Disagreement on: {}", command,
+            );
         }
     }
 

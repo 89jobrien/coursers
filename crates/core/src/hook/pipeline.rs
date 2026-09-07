@@ -223,6 +223,7 @@ pub struct PipelineResult {
 }
 
 /// Run all rules matching `ctx.event` against the given context.
+// qual:allow(iosp) reason: "ordered pipeline integration root"
 pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineResult {
     let Some(event) = ctx.event else {
         return PipelineResult::default();
@@ -232,102 +233,95 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
     let target = ctx.target.as_deref().unwrap_or("");
 
     for rule in &config.hooks {
-        if rule.event != event {
+        if !rule_matches(rule, event, ctx, target) {
             continue;
         }
 
-        // Matcher filter (tool_name)
-        if let Some(ref matcher) = rule.matcher {
-            let tool = ctx.tool_name.as_deref().unwrap_or("");
-            if !matches_tool(matcher, tool) {
-                continue;
-            }
-        }
-
-        // Pattern filter
-        if let Some(ref pattern) = rule.pattern {
-            let Ok(re) = regex::Regex::new(pattern) else {
-                continue;
-            };
-            if !re.is_match(target) {
-                continue;
-            }
-        }
-
-        // Unless filter — a regex, matching what validate_config enforces.
-        // A non-compiling unless is treated as non-matching so the rule
-        // still applies (deny-guards must not fail open on a bad exception).
-        if let Some(ref unless) = rule.unless
-            && regex::Regex::new(unless)
-                .map(|re| re.is_match(target))
-                .unwrap_or(false)
-        {
-            continue;
-        }
-
-        // When filter (PostToolUse only)
-        match rule.when {
-            When::OnSuccess => {
-                if ctx.exit_code.unwrap_or(0) != 0 {
-                    continue;
-                }
-            }
-            When::OnFailure => {
-                if ctx.exit_code.unwrap_or(0) == 0 {
-                    continue;
-                }
-            }
-            When::Always => {}
-        }
-
-        // Track matched rule
-        let label = rule
-            .label
-            .clone()
-            .unwrap_or_else(|| format!("rule-{}", result.matched_rules.len()));
-        result.matched_rules.push(label);
-
-        // Execute action
-        match &rule.action {
-            HookAction::Deny { message } => {
-                let expanded = expand_template(message, ctx);
-                result.deny = Some(expanded);
-                // First deny wins — stop processing.
-                return result;
-            }
-            HookAction::Rewrite {
-                inject,
-                prepend,
-                replace,
-            } => {
-                let current = result.rewrite.as_deref().unwrap_or(target).to_string();
-                let rewritten = apply_rewrite(
-                    &current,
-                    inject.as_deref(),
-                    prepend.as_deref(),
-                    rule.pattern.as_deref(),
-                    replace.as_deref(),
-                );
-                if rewritten != current {
-                    result.rewrite = Some(rewritten);
-                }
-            }
-            HookAction::Run { command, capture } => {
-                run_side_effect(command, *capture, ctx, &mut result);
-            }
-            HookAction::Notify { template } => {
-                let expanded = expand_template(template, ctx);
-                result.messages.push(expanded);
-            }
-            HookAction::Redact { level } => {
-                if let Some(ref text) = ctx.output {
-                    result.replace_output = Some(run_redact(text, level.as_deref()));
-                }
-            }
+        record_match(rule, &mut result);
+        if apply_action(rule, ctx, target, &mut result) {
+            return result;
         }
     }
 
     result
+}
+
+fn rule_matches(rule: &HookRule, event: HookEvent, ctx: &HookContext, target: &str) -> bool {
+    rule.event == event
+        && rule
+            .matcher
+            .as_deref()
+            .is_none_or(|matcher| matches_tool(matcher, ctx.tool_name.as_deref().unwrap_or("")))
+        && rule.pattern.as_deref().is_none_or(|pattern| {
+            regex::Regex::new(pattern).is_ok_and(|regex| regex.is_match(target))
+        })
+        && !rule.unless.as_deref().is_some_and(|unless| {
+            regex::Regex::new(unless).is_ok_and(|regex| regex.is_match(target))
+        })
+        && when_matches(rule.when, ctx.exit_code.unwrap_or(0))
+}
+
+fn when_matches(when: When, exit_code: i64) -> bool {
+    match when {
+        When::Always => true,
+        When::OnSuccess => exit_code == 0,
+        When::OnFailure => exit_code != 0,
+    }
+}
+
+fn record_match(rule: &HookRule, result: &mut PipelineResult) {
+    let label = rule
+        .label
+        .clone()
+        .unwrap_or_else(|| format!("rule-{}", result.matched_rules.len()));
+    result.matched_rules.push(label);
+}
+
+// qual:allow(iosp) reason: "closed action dispatcher for the pipeline integration root"
+fn apply_action(
+    rule: &HookRule,
+    ctx: &HookContext,
+    target: &str,
+    result: &mut PipelineResult,
+) -> bool {
+    match &rule.action {
+        HookAction::Deny { message } => {
+            result.deny = Some(expand_template(message, ctx));
+            true
+        }
+        HookAction::Rewrite {
+            inject,
+            prepend,
+            replace,
+        } => {
+            let current = result.rewrite.as_deref().unwrap_or(target).to_string();
+            let rewritten = apply_rewrite(
+                &current,
+                inject.as_deref(),
+                prepend.as_deref(),
+                rule.pattern.as_deref(),
+                replace.as_deref(),
+            );
+            if rewritten != current {
+                result.rewrite = Some(rewritten);
+            }
+            false
+        }
+        HookAction::Run { command, capture } => {
+            run_side_effect(command, *capture, ctx, result);
+            false
+        }
+        HookAction::Notify { template } => {
+            result.messages.push(expand_template(template, ctx));
+            false
+        }
+        HookAction::Redact { level } => {
+            if let Some(ref text) = ctx.output {
+                result.replace_output = Some(run_redact(text, level.as_deref()));
+            }
+            false
+        }
+    }
 }
 
 /// Pipe `text` through the `redact` binary. Fails open (returns `text`
@@ -377,29 +371,29 @@ fn apply_rewrite(
     pattern: Option<&str>,
     replace: Option<&str>,
 ) -> String {
-    let mut result = command.to_string();
+    let replaced = apply_regex_replacement(command, pattern, replace);
+    let prepend = prepend.map(expand_env_vars);
+    let inject = inject.map(expand_env_vars);
+    apply_affixes(replaced, prepend.as_deref(), inject.as_deref())
+}
 
-    // `replace` is a regex replacement template (may use `$1`, `${name}`, ...)
-    // applied via the rule's own `pattern` — which already matched the
-    // pre-transform command — so capture groups line up correctly.
-    if let Some(replace) = replace
-        && let Some(pattern) = pattern
-        && let Ok(re) = regex::Regex::new(pattern)
-    {
-        result = re.replace(&result, replace).into_owned();
-    }
+fn apply_regex_replacement(command: &str, pattern: Option<&str>, replace: Option<&str>) -> String {
+    let Some((pattern, replace)) = pattern.zip(replace) else {
+        return command.to_string();
+    };
+    regex::Regex::new(pattern)
+        .map(|regex| regex.replace(command, replace).into_owned())
+        .unwrap_or_else(|_| command.to_string())
+}
 
+fn apply_affixes(mut command: String, prepend: Option<&str>, inject: Option<&str>) -> String {
     if let Some(prepend) = prepend {
-        let expanded = expand_env_vars(prepend);
-        result = format!("{expanded} {result}");
+        command = format!("{prepend} {command}");
     }
-
     if let Some(inject) = inject {
-        let expanded = expand_env_vars(inject);
-        result = format!("{result} {expanded}");
+        command = format!("{command} {inject}");
     }
-
-    result
+    command
 }
 
 /// Expand `${VAR}` and `$VAR` in a string from the environment.
@@ -441,14 +435,21 @@ fn expand_template(template: &str, ctx: &HookContext) -> String {
 
 /// Get the current git branch as a slug (strip prefix, replace / and _ with -).
 fn git_branch_slug() -> Option<String> {
+    current_git_branch().and_then(|branch| branch_slug(&branch))
+}
+
+fn current_git_branch() -> Option<String> {
     let output = Command::new("git")
         .args(["rev-parse", "--abbrev-ref", "HEAD"])
         .output()
         .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    let branch = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn branch_slug(branch: &str) -> Option<String> {
     if !branch.starts_with("feature/")
         && !branch.starts_with("fix/")
         && !branch.starts_with("chore/")
@@ -459,7 +460,7 @@ fn git_branch_slug() -> Option<String> {
     let slug = branch
         .split_once('/')
         .map(|(_, rest)| rest)
-        .unwrap_or(&branch)
+        .unwrap_or(branch)
         .replace(['/', '_'], "-")
         .to_lowercase();
     Some(slug)

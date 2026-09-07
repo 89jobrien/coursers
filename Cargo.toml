@@ -9,7 +9,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/89jobrien/coursers"
@@ -18,8 +18,8 @@ rust-version = "1.89.0"
 [workspace.dependencies]
 chrono = "0.4"
 clap = { version = "4", features = ["derive"] }
-coursers-types = { path = "crates/types", version = "^0.1.0" }
-coursers-core = { path = "crates/core", version = "^0.1.0" }
+coursers-types = { path = "crates/types", version = "^0.2.0" }
+coursers-core = { path = "crates/core", version = "^0.2.0" }
 # dirs v5.0.1 pulls windows-sys 0.48 while fd-lock v4.0.4 (latest as of 2026-08-03)
 # pulls windows-sys 0.59, producing duplicate windows_* lock entries (cargo deny
 # check bans). Tried bumping to dirs 6.0.0: it upgrades windows-sys but does NOT

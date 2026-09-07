@@ -42,13 +42,13 @@ sort_dependencies = true  # false to preserve existing order
 
 [release]
 tag_prefix = "v"
-tag_format = "{crate}-{prefix}{version}"  # e.g. my-crate-v1.0.0 (with tag_prefix = "v")
+tag_format = "{crate}-{prefix}{version}"
 require_clean = true
 publish_delay = 5  # seconds between publishes
 create_github_release = false
 sign_tags = false
 changelog_path = "CHANGELOG.md"
-changelog_relative_to = "crate"  # crate = per-crate, workspace = single file
+changelog_relative_to = "workspace"
 skip_changelog_for = []
 require_changelog_entries = false
 require_release_notes = true  # fail if target version lacks release notes
