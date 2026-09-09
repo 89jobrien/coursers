@@ -6,10 +6,8 @@
 
 use std::collections::HashMap;
 
-use crate::date::{SECS_PER_DAY, SECS_PER_HOUR};
+use crate::date::{DAYS_PER_WEEK, HOURS_PER_DAY, SECS_PER_DAY, SECS_PER_HOUR};
 
-const HOURS_PER_DAY: u8 = 24;
-const DAYS_PER_WEEK: u8 = 7;
 /// Number of intensity levels for the ASCII grid (` ░▒▓█`).
 const INTENSITY_LEVELS: u64 = 4;
 /// 1970-01-01 was Thursday; offset to make Monday = 0.
@@ -130,6 +128,7 @@ mod kani_proofs {
 #[cfg(test)]
 mod tests {
     use super::{HeatMap, build, day_hour};
+    use crate::date::{SECS_PER_DAY, SECS_PER_HOUR};
 
     #[test]
     fn empty_heatmap_has_no_cells() {
@@ -155,8 +154,8 @@ mod tests {
 
     #[test]
     fn hour_extraction_is_correct() {
-        // 3600 secs = 1 hour past midnight on Thursday
-        let (day, hour) = day_hour(3600);
+        // One hour past midnight on Thursday
+        let (day, hour) = day_hour(SECS_PER_HOUR);
         assert_eq!(day, 3);
         assert_eq!(hour, 1);
     }
@@ -192,7 +191,7 @@ mod tests {
     #[test]
     fn day_wraps_correctly_for_sunday() {
         // 1970-01-04 = Sunday = day index 6
-        let (day, _) = day_hour(3 * 86400);
+        let (day, _) = day_hour(3 * SECS_PER_DAY);
         assert_eq!(day, 6);
     }
 }

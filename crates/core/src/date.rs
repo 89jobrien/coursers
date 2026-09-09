@@ -9,7 +9,9 @@
 
 pub const SECS_PER_MIN: u64 = 60;
 pub const SECS_PER_HOUR: u64 = 60 * SECS_PER_MIN;
-pub const SECS_PER_DAY: u64 = 24 * SECS_PER_HOUR;
+pub const HOURS_PER_DAY: u8 = 24;
+pub const SECS_PER_DAY: u64 = HOURS_PER_DAY as u64 * SECS_PER_HOUR;
+pub const DAYS_PER_WEEK: u8 = 7;
 
 /// Days in a 400-year Gregorian cycle (Rata Die algorithm constant).
 pub const DAYS_PER_400Y: u64 = 146_097;
