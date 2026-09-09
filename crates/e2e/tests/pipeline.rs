@@ -1,51 +1,11 @@
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+mod common;
+
+use std::io::Write as _;
+use std::path::PathBuf;
+use std::process::Output;
+
+use common::run_bin;
 use tempfile::{NamedTempFile, TempDir};
-
-// ---------------------------------------------------------------------------
-// Harness helpers
-// ---------------------------------------------------------------------------
-
-// TODO(shared-e2e-harness): consolidate subprocess helpers, select an explicitly built binary (#62),
-// and run the correctly named `coursers-e2e` package instead of accepting stale artifacts.
-fn workspace_bin(name: &str) -> PathBuf {
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workspace = manifest.parent().unwrap().parent().unwrap();
-    let debug = workspace.join("target/debug").join(name);
-    let release = workspace.join("target/release").join(name);
-    if release.exists() {
-        release
-    } else {
-        assert!(
-            debug.exists(),
-            "binary {name:?} not found — run `cargo build --workspace` first\nchecked: {}",
-            debug.display()
-        );
-        debug
-    }
-}
-
-fn run_bin(bin: &str, sub: &str, payload: &str, envs: &[(&str, &str)]) -> Output {
-    let mut cmd = Command::new(workspace_bin(bin));
-    cmd.arg(sub)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    for (k, v) in envs {
-        cmd.env(k, v);
-    }
-    let mut child = cmd
-        .spawn()
-        .unwrap_or_else(|e| panic!("spawn {bin} {sub}: {e}"));
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(payload.as_bytes())
-        .unwrap();
-    child.wait_with_output().unwrap()
-}
 
 // ---------------------------------------------------------------------------
 // Pipeline struct
@@ -79,7 +39,7 @@ impl Pipeline {
         let payload = format!(r#"{{"tool_name":"Bash","tool_input":{{"command":{command:?}}}}}"#);
         run_bin(
             "coursers",
-            "pre",
+            &["pre"],
             &payload,
             &[
                 ("COURSERS_RULES", self.rules.path().to_str().unwrap()),
@@ -94,7 +54,7 @@ impl Pipeline {
         );
         run_bin(
             "coursers",
-            "post",
+            &["post"],
             &payload,
             &[
                 ("COURSERS_RULES", self.rules.path().to_str().unwrap()),
@@ -109,7 +69,7 @@ impl Pipeline {
         );
         run_bin(
             "crs",
-            "filter",
+            &["filter"],
             &payload,
             &[("CRS_FILTERS", self.filters.path().to_str().unwrap())],
         )
@@ -119,7 +79,7 @@ impl Pipeline {
         let payload = format!(r#"{{"tool_name":"Bash","tool_input":{{"command":{command:?}}}}}"#);
         let out = run_bin(
             "crs",
-            "rewrite",
+            &["rewrite"],
             &payload,
             &[("CRS_FILTERS", self.filters.path().to_str().unwrap())],
         );
@@ -235,21 +195,15 @@ fn crs_hook_pre_tool_use_runs_course_correct_rules() {
     );
     let run = |command: &str| -> Output {
         let payload = format!(r#"{{"tool_name":"Bash","tool_input":{{"command":{command:?}}}}}"#);
-        let mut cmd = Command::new(workspace_bin("crs"));
-        cmd.args(["hook", "pre-tool-use"])
-            .env("COURSERS_RULES", pipe.rules.path())
-            .env("COURSERS_STATE", pipe.state_file())
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        let mut child = cmd.spawn().expect("spawn crs hook pre-tool-use");
-        child
-            .stdin
-            .as_mut()
-            .unwrap()
-            .write_all(payload.as_bytes())
-            .unwrap();
-        child.wait_with_output().unwrap()
+        run_bin(
+            "crs",
+            &["hook", "pre-tool-use"],
+            &payload,
+            &[
+                ("COURSERS_RULES", pipe.rules.path().to_str().unwrap()),
+                ("COURSERS_STATE", pipe.state_file().to_str().unwrap()),
+            ],
+        )
     };
 
     // Sequential operators → course-correct deny (exit 2).
@@ -264,4 +218,31 @@ fn crs_hook_pre_tool_use_runs_course_correct_rules() {
     // The ^nu exception applies to the whole command → allowed.
     let out = run("nu -c ls");
     assert_eq!(out.status.code(), Some(0), "expected allow for nu-wrapped");
+}
+
+#[test]
+fn harness_selects_active_profile_when_release_artifact_exists() {
+    let target = tempfile::tempdir().unwrap();
+    let debug = target.path().join("debug");
+    let release = target.path().join("release");
+    std::fs::create_dir_all(debug.join("deps")).unwrap();
+    std::fs::create_dir_all(&release).unwrap();
+    let binary_name = format!("coursers{}", std::env::consts::EXE_SUFFIX);
+    std::fs::write(debug.join(&binary_name), "debug").unwrap();
+    std::fs::write(release.join(&binary_name), "stale release").unwrap();
+
+    assert_eq!(
+        common::binary_for_test_executable(&debug.join("deps/pipeline-test-id"), "coursers"),
+        debug.join(binary_name)
+    );
+}
+
+#[test]
+fn harness_derives_profile_from_cargo_test_executable() {
+    let executable = std::path::Path::new("target/debug/deps/pipeline-test-id");
+
+    assert_eq!(
+        common::profile_dir_from_test_executable(executable),
+        std::path::Path::new("target/debug")
+    );
 }
