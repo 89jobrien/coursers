@@ -139,10 +139,6 @@ fn record_correction(
 // emits exactly one response. The in-process HookChain preserves first-terminal-
 // outcome semantics for its own ordered pre-hooks.
 //
-// TODO(no-sed-n-use-read): enable the `no-sed-n-use-read` block rule once the (#59)
-// Read tool's offset/limit feature is stable. Currently deferred because the
-// alternative (Read with offset) is not yet ergonomic enough to enforce.
-//
 // TODO(coursers-11): coursers-11 (cross-tool block) depends on obfsck-11 and (#60)
 // mcpipe-21 in external repos. No local fallback is documented. When those issues
 // are resolved, wire the cross-tool detection here.

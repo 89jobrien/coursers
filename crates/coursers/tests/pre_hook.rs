@@ -1,8 +1,29 @@
 #[path = "common.rs"]
 mod common;
 
-use common::{fixture, run_post, run_pre};
-use tempfile::TempDir;
+use common::{fixture, run_hook, run_post, run_pre};
+use tempfile::{NamedTempFile, TempDir};
+
+fn example_rules_with_sed_rule_enabled() -> NamedTempFile {
+    let rules_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../config/course-correct-rules.example.json");
+    let mut rules: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(rules_path).unwrap()).unwrap();
+    {
+        let rule_entries = rules["rules"].as_array_mut().unwrap();
+        for rule in &mut *rule_entries {
+            rule["enabled"] = false.into();
+        }
+        rule_entries
+            .iter_mut()
+            .find(|rule| rule["id"] == "no-sed-n-use-read")
+            .unwrap()["enabled"] = true.into();
+    }
+
+    let file = NamedTempFile::new().unwrap();
+    serde_json::to_writer(file.as_file(), &rules).unwrap();
+    file
+}
 
 #[test]
 fn blocked_command_exits_nonzero() {
@@ -80,6 +101,59 @@ fn non_bash_passthrough() {
         out.status.success(),
         "expected exit 0 for non-Bash tool, got: {:?}",
         out.status
+    );
+}
+
+#[test]
+fn sed_line_range_rule_denies_with_protocol_safe_json() {
+    let tmp = TempDir::new().unwrap();
+    let rules = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../config/course-correct-rules.example.json");
+    let payload = serde_json::json!({
+        "tool_name": "Bash",
+        "tool_input": { "command": "sed -n '10,20p' src/main.rs" }
+    });
+
+    let out = run_hook(
+        "pre",
+        &payload.to_string(),
+        &rules,
+        &tmp.path().join("state.json"),
+    );
+
+    assert_eq!(out.status.code(), Some(2));
+    let response: serde_json::Value =
+        serde_json::from_slice(&out.stdout).expect("deny response must be exactly one JSON value");
+    assert_eq!(response["hookSpecificOutput"]["permissionDecision"], "deny");
+    assert!(
+        response["hookSpecificOutput"]["permissionDecisionReason"]
+            .as_str()
+            .unwrap()
+            .contains("offset=N, limit=N")
+    );
+}
+
+#[test]
+fn sed_line_range_matcher_allows_other_numeric_sed_programs() {
+    let tmp = TempDir::new().unwrap();
+    let rules = example_rules_with_sed_rule_enabled();
+    let payload = serde_json::json!({
+        "tool_name": "Bash",
+        "tool_input": { "command": "sed -n 10s/foo/bar/p src/main.rs" }
+    });
+
+    let out = run_hook(
+        "pre",
+        &payload.to_string(),
+        rules.path(),
+        &tmp.path().join("state.json"),
+    );
+
+    assert!(
+        out.status.success(),
+        "non-range sed program must pass; stdout: {}; stderr: {}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
     );
 }
 

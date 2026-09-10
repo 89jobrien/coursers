@@ -31,10 +31,9 @@
     },
     {
       "id": "no-sed-n-use-read",
-      "enabled": false,
-      "_todo": "stub: block 'sed -n <range>p file' pattern and redirect to Read tool with offset/limit. Enable once Read offset/limit parameter syntax is confirmed stable (currently broken with string-typed params in this environment).",
+      "enabled": true,
       "description": "Use the Read tool instead of sed -n for line-range reads",
-      "pattern": "\\bsed\\s+-n\\s+['\"]?[0-9]",
+      "pattern": "\\bsed\\s+-n\\s+(?:-e\\s+)?['\"]?[0-9]+(?:\\s*,\\s*[0-9]+)?p['\"]?(?:\\s|$)",
       "pattern_flags": "",
       "target_commands": ["sed"],
       "exceptions": [
