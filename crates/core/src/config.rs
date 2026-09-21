@@ -1,3 +1,5 @@
+//! Profile configuration, path resolution, and active godmode-task lookup.
+
 use std::path::PathBuf;
 
 /// Approximate bytes per token (GPT/Claude tokenizer average).
@@ -60,6 +62,8 @@ struct GodmodeStatus {
     running: Vec<String>,
 }
 
+// TODO(hook-latency-benchmarks): Add cold-start and steady-state regression benchmarks
+// for configuration loading, matcher construction, and hook evaluation against the 5ms budget.
 /// Read running godmode task titles from `~/.cache/godmode/status.json`, a
 /// file godmode writes on every status change. Used by the pre-hook to check
 /// `Rule::task_override` glob matches without shelling out.

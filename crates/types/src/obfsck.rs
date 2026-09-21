@@ -1,3 +1,5 @@
+//! Domain results produced by obfsck auditing and filter generation.
+
 /// A pattern hit returned by the obfsck MCP `audit` tool.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuditHit {

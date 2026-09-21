@@ -1,3 +1,5 @@
+//! Command-history records and frequency-grouping helpers.
+
 use crate::config::BYTES_PER_TOKEN;
 
 /// Extracts the command stem (1–2 token prefix) used for frequency grouping.
@@ -53,6 +55,7 @@ pub struct CommandRecord {
 
 /// Port for iterating over historical Bash commands.
 pub trait CommandSource {
+    /// Returns the historical command records supplied by this source.
     fn commands(&self) -> impl Iterator<Item = CommandRecord>;
 }
 

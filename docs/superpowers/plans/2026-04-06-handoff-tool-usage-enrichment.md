@@ -403,7 +403,7 @@ fi
 
 Non-blocking: if `rtk` is absent or the script fails, continue without error.
 
-````
+````text
 
 - [ ] **Step 3: Verify edit looks correct**
 
@@ -445,14 +445,14 @@ a one-line summary before proceeding:
 Tool usage (last session): <total_commands> commands · ~<est_savings_tokens_rounded> tokens
 saveable · top unhandled: <unhandled_top>
 
-```
+```text
 
 Example:
 ```
 
 Tool usage (last session): 414 commands · ~19K tokens saveable · top unhandled: op account (19)
 
-```
+```text
 
 Round `est_savings_tokens` to nearest K when ≥1000 (e.g. 19217 → ~19K).
 
@@ -461,7 +461,7 @@ If `.ctx/HANDOFF.tools.yaml` also exists, add one line:
 
 Full tool usage detail in .ctx/HANDOFF.tools.yaml
 
-```
+```text
 
 Skip silently if `tool_usage` key is absent from state.
 ```
@@ -545,7 +545,7 @@ Rules:
 - Round y-axis max to next multiple of 20 above the highest count
 - If fewer than 2 entries total, emit summary table only (no chart)
 
-````
+````text
 
 - [ ] **Step 4: Verify**
 
@@ -592,7 +592,7 @@ due to timing/float formatting — that's fine).
 Read `.ctx/HANDOFF.state.yaml`, extract the `tool_usage` block by eye, and confirm the
 one-line summary would render as:
 
-```
+```text
 Tool usage (last session): <N> commands · ~<K>K tokens saveable · top unhandled: <cmd> (<n>)
 ```
 

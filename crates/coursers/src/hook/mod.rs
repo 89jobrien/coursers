@@ -1,3 +1,5 @@
+//! CLI hook payloads, protocol responses, and pre/post dispatch.
+
 pub mod chain_runner;
 pub mod post;
 pub mod pre;

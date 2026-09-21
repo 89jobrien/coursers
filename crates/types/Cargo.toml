@@ -10,9 +10,17 @@ repository.workspace = true
 path = "src/lib.rs"
 doctest = false
 
+[features]
+default = []
+core-compat = ["dep:toml"]
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
+toml = { workspace = true, optional = true }
+
+[dev-dependencies]
+toml = { workspace = true }
 
 [lints]
 workspace = true

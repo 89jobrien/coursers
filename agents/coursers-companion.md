@@ -4,7 +4,7 @@ Agent context for working with the `coursers` + `crs` hook pipeline.
 
 ## Full hook chain
 
-```
+```text
 PreToolUse/Bash:
   1. coursers pre   — block commands matching course-correct rules or failure-learning threshold
   2. crs rewrite    — rewrite commands; exit 1 = passthrough

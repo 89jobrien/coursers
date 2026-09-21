@@ -1,66 +1,9 @@
+//! Filter configuration loading, output filtering, and redaction.
+
 use crate::error::CourserError;
-use serde::Deserialize;
 use std::path::PathBuf;
 
-/// How to handle matched tool output.
-#[derive(Debug, Clone, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum FilterMode {
-    #[default]
-    /// Pass output unchanged.
-    Passthrough,
-    /// Suppress output entirely on success (exit 0); pass through on failure.
-    FailuresOnly,
-    /// Only pass lines containing "error" (case-insensitive).
-    ErrorsOnly,
-    /// Truncate to `max_lines` lines.
-    Truncate,
-    /// Keep only lines matching `match_pattern`. On failure, pass full output.
-    MatchLines,
-}
-
-/// A single filter rule matching one or more commands.
-#[derive(Debug, Clone, Deserialize)]
-pub struct FilterRule {
-    /// Regex pattern matched against the full command string.
-    pub pattern: String,
-    pub mode: FilterMode,
-    /// Used with `Truncate` mode: maximum lines to keep.
-    #[serde(default = "default_max_lines")]
-    pub max_lines: usize,
-    /// Used with `MatchLines` mode: regex matched against each output line.
-    /// Lines that match are kept; non-matching lines are dropped.
-    /// If absent or invalid, the output is passed through unchanged.
-    #[serde(default)]
-    pub match_pattern: Option<String>,
-    // TODO(match-lines-flags): add `match_flags: Option<String>` for regex flag control (#49)
-    // (e.g. "i" for case-insensitive). Blocked on deciding whether to expose raw flag
-    // strings or a typed enum. Defer until a concrete use case requires it.
-    // See: https://docs.rs/regex/latest/regex/#grouping-and-flags
-}
-
-fn default_max_lines() -> usize {
-    50
-}
-
-/// Root of crs-filters.toml.
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct FiltersConfig {
-    #[serde(default)]
-    pub filters: Vec<FilterRule>,
-    #[serde(default)]
-    pub tool_swap: crate::tool_swap::ToolSwapConfig,
-}
-
-impl FiltersConfig {
-    /// Load config from a specific path. Returns default (empty) on missing file.
-    pub fn load_from(path: &std::path::Path) -> Self {
-        let Ok(content) = std::fs::read_to_string(path) else {
-            return Self::default();
-        };
-        toml::from_str(&content).unwrap_or_default()
-    }
-}
+pub use coursers_types::filters::{FilterMode, FilterRule, FiltersConfig};
 
 // ---------------------------------------------------------------------------
 // FiltersLoader trait (port)
@@ -68,7 +11,9 @@ impl FiltersConfig {
 
 /// Port: abstracts how filter configuration is loaded.
 pub trait FiltersLoader {
+    /// Loads the effective filter configuration.
     fn load(&self) -> Result<FiltersConfig, CourserError>;
+    /// Returns the source path of the effective filter configuration, if known.
     fn filters_path(&self) -> Option<PathBuf>;
 }
 
@@ -236,6 +181,36 @@ mod tests {
         let mut f = tempfile::NamedTempFile::new().unwrap();
         write!(f, "{content}").unwrap();
         f
+    }
+
+    #[test]
+    fn filter_rewrite_and_tool_swap_contracts_are_canonical_types() {
+        use std::any::TypeId;
+
+        assert_eq!(
+            TypeId::of::<FilterMode>(),
+            TypeId::of::<coursers_types::filters::FilterMode>()
+        );
+        assert_eq!(
+            TypeId::of::<FilterRule>(),
+            TypeId::of::<coursers_types::filters::FilterRule>()
+        );
+        assert_eq!(
+            TypeId::of::<FiltersConfig>(),
+            TypeId::of::<coursers_types::filters::FiltersConfig>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::tool_swap::ToolSwapConfig>(),
+            TypeId::of::<coursers_types::filters::ToolSwapConfig>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::rewrite::RewriteRule>(),
+            TypeId::of::<coursers_types::filters::RewriteRule>()
+        );
+        assert_eq!(
+            TypeId::of::<crate::rewrite::RewriteConfig>(),
+            TypeId::of::<coursers_types::filters::RewriteConfig>()
+        );
     }
 
     #[test]
@@ -461,17 +436,6 @@ pub fn apply_redaction(output: &str, filters: &ObfsckFilters) -> String {
     }
 
     result
-}
-
-#[cfg(kani)]
-mod kani_proofs {
-    /// Proof: default_max_lines is always positive (used as truncation bound).
-    #[kani::proof]
-    #[kani::unwind(1)]
-    fn default_max_lines_positive() {
-        let m = super::default_max_lines();
-        assert!(m > 0, "default max_lines must be positive");
-    }
 }
 
 #[cfg(test)]

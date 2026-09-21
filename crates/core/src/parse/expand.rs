@@ -1,6 +1,9 @@
+//! Quote-aware shell and Nushell environment-variable expansion.
+
 // qual:allow(srp) reason: "single expand_vars concern"
 /// Port: abstracts how shell variable references are resolved in a command string.
 pub trait VarExpander {
+    /// Expands supported variable references in a command string.
     fn expand(&self, command: &str) -> String;
 }
 

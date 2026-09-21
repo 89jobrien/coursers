@@ -1,55 +1,71 @@
 project: coursers
 id: coursers
-updated: 2026-08-23
+updated: 2026-09-12
 items:
 - id: hc-d
-  doob_uuid: null
   name: hook-composition--wire-chain-into-coursers-binaries--job-475
   priority: P2
-  status: in-progress
+  status: blocked
   title: 'hook-composition: wire chain into coursers binaries (JOB-475)'
-  description: |-
-    Phase hc-d: Wire HookChain trait into coursers binaries for dynamic hook composition.
-    Merged hc-d (21cc1ab) which integrates HookChain path opt-in via COURSERS_HOOK_CHAIN=1.
-    Related phases hc-a (traits), hc-b (concrete structs), hc-c (AppConfig) have landed.
-    Next: Complete wiring, run full pre-push gate, confirm end-to-end hook execution.
-  files: []
-  completed: null
+  description: Uncommitted tree contained unrelated Redact-feature + expand.rs drift, not hc-d work; committed separately. hc-d (wire HookChain trait into coursers binaries) not yet started this session.
   extra:
-  - date: 2026-08-23
-    type: status
-    field: null
-    value: null
-    reviewed: null
-    note: hc-d merge landed on main. Minor pipeline.rs formatting change uncommitted (test function arg wrapping).
+  - date: 2026-09-12
+    type: blocker
+    note: Uncommitted tree contained unrelated Redact-feature + expand.rs drift, not hc-d work; committed separately. hc-d (wire HookChain trait into coursers binaries) not yet started this session.
 - id: uncommitted-work
-  doob_uuid: null
   name: uncommitted-work
   priority: P1
   status: open
-  title: Uncommitted changes (2 files, minimal diff)
+  title: Uncommitted changes (3 files)
   description: |-
     Working tree has uncommitted changes:
-    1. .ctx/HANDOFF.coursers.coursers.yaml — HANDOFF update (72 insertions/deletions)
-    2. crates/core/src/hook/pipeline.rs — formatting only (5 insertions/deletions)
-    The pipeline.rs change is in test function args (wrapping for line length).
-    No logic changes; safe to commit.
+    .ctx/HANDOFF.coursers.coursers.yaml
+    .ctx/opavs/tasks.yaml
+    crates/core/src/hook/pipeline.rs
   files:
   - .ctx/HANDOFF.coursers.coursers.yaml
+  - .ctx/opavs/tasks.yaml
   - crates/core/src/hook/pipeline.rs
-  completed: null
-  extra: []
 log:
+- date: '20260912.042529'
+  summary: done=25 running=0 pending=18 blocked=1
+  commits:
+  - b866360037b4d45c4278eb9b57812557a54007ed
+  - 92a5ef0875a3d391b736feb617e9b74d760b316f
+  - e893b2b53f336f9707957ac50cc0eadfdd8df960
+  - 4437299b51acbc813fec2ea972ac9218c0ffe852
+  - 0d915d364db3229ef9dcbdb89d1c80176c8164ae
+  - 07fd0548f729d5163d51033c0c4ac4f5e7445895
+  - 342cb7fc72a330786a1a99a537a5a03460db0ee2
+  - 10e1d7ee3a86488ab44090614ae6c85991bf1440
+  - 582c29cc44b6a97fb238d74d678337c8b816d11a
+  - 7ddce5d3aaa258b6083e415676758e66102eed25
+- date: '20260906.000000'
+  summary: |-
+    Basis: 342cb7f, the most recent commit before this update that changed
+    .ctx/HANDOFF.coursers.coursers.yaml. Six commits followed: 07fd054 prepared initial
+    crates.io publication metadata; 0d915d3 added OpenCode harness support; 4437299
+    refreshed AGENTS.md; e893b2b consolidated helpers and recorded improvements;
+    92a5ef0 documented prioritized improvements; b866360 fixed task-override scanning.
+    HEAD is b866360 on feat/opencode-harness-support, one commit ahead of its tracked
+    remote at 92a5ef0. Workspace version remains 0.1.0. prefixe changed from 0.4.0 at
+    rev 91ce4d8 to 0.5.0 at rev f9602bc; e2e and xtask were marked publish=false.
+    No tests, checks, builds, or linters were run during this HANDOFF update.
+  commits:
+  - 07fd054
+  - 0d915d3
+  - '4437299'
+  - e893b2b
+  - 92a5ef0
+  - b866360
 - date: '20260823.000000'
   summary: |-
     hc-d merged (21cc1ab): opt-in HookChain path via COURSERS_HOOK_CHAIN=1 env var.
     Wired COURSERS_HOOK_CHAIN into crs/coursers binaries. Minor formatting fix in
     pipeline.rs test function (line wrapping). 8 commits ahead of origin/main, not yet pushed.
     Ahead by 8 commits since last origin/main at a7adcba. Working tree dirty with 2 files.
-  commits: []
 - date: '20260822.032118'
   summary: done=12 running=0 pending=2 blocked=1
-  commits: []
 - date: 2026-08-16
   summary: |-
     Task-aware rule overrides via godmode running-task title context (bc3dbe7).
@@ -59,4 +75,3 @@ log:
     Updated CLAUDE.md with agent-improvement-loop gotchas (ad505fe).
     Enhanced hook execution log to record course-correct blocks (latest).
     Tests: 332 passing. Clippy clean. Cargo check passing.
-  commits: []

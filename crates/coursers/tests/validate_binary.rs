@@ -1,3 +1,5 @@
+//! Binary-level tests for ruleset validation.
+
 #[path = "common_bin.rs"]
 mod common_bin;
 

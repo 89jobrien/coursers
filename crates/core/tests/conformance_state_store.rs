@@ -86,6 +86,20 @@ fn assert_state_store_contract(store: &impl StateStore) {
 // ---------------------------------------------------------------------------
 
 #[test]
+fn core_state_contracts_are_canonical_types() {
+    use std::any::TypeId;
+
+    assert_eq!(
+        TypeId::of::<coursers_core::state::FailureEntry>(),
+        TypeId::of::<coursers_types::state::FailureEntry>()
+    );
+    assert_eq!(
+        TypeId::of::<coursers_core::state::State>(),
+        TypeId::of::<coursers_types::state::State>()
+    );
+}
+
+#[test]
 fn fs_state_store_satisfies_contract() {
     let dir = TempDir::new().expect("tempdir");
     let store = FsStateStore {

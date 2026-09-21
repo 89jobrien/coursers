@@ -1,3 +1,5 @@
+//! Integration tests for OpenCode hook protocol handling.
+
 #[path = "common_bin.rs"]
 mod common_bin;
 

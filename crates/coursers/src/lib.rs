@@ -1,6 +1,10 @@
+//! Shared CLI model and dispatch for the `coursers` and `crs` binaries.
+
 pub mod crs_commands;
 pub mod hook;
 pub mod nu_check;
+// TODO(adapter-crate-integration-io): Move concrete obfsck and RTK subprocess clients
+// into coursers-adapters after the generic hook process runner is established.
 pub mod obfsck;
 pub mod opencode;
 pub mod rtk;
@@ -113,6 +117,8 @@ pub enum Command {
         #[arg(long)]
         remove: Option<String>,
     },
+    // TODO(rule-promotion-workflow): Connect suggest, probe, validate, and replay into a
+    // safe candidate review and activation workflow.
     /// Suggest new rules from unhandled commands
     Suggest {
         #[arg(long)]
@@ -142,17 +148,23 @@ pub enum Command {
         #[arg(short, long)]
         out: Option<String>,
     },
+    // TODO(persistent-hook-service): Add a long-running serve mode that keeps resolved
+    // configuration and compiled matchers warm between hook events.
     /// Run the generic hook pipeline for a hook event
     Hook {
         #[arg(long, default_value = "claude")]
         target: String,
         event: String,
     },
+    // TODO(harness-installer-doctor): Add dry-run installation and comprehensive health
+    // checks for Claude, Codex, and OpenCode integration assets.
     /// Validate hook pipeline config
     ValidateHooks {
         #[arg(long, default_value = "claude")]
         target: String,
     },
+    // TODO(log-time-window-cli): Expose the existing after/before query bounds and safe
+    // pagination through the log subcommand.
     /// Query the hook execution log
     Log {
         #[arg(short, long, default_value = "20")]
@@ -189,6 +201,7 @@ pub enum Command {
     },
 }
 
+/// Resolves CLI profile, rules, and state overrides into configuration.
 pub fn build_profile(
     profile: Option<String>,
     rules: Option<PathBuf>,
@@ -207,6 +220,7 @@ pub fn build_profile(
     b.build()
 }
 
+/// Dispatches a parsed CLI command to its implementation.
 pub fn run(cli: Cli) {
     match cli.command {
         Command::Pre {

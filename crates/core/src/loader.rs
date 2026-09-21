@@ -1,8 +1,11 @@
+//! Rules-configuration loading ports and adapters.
+
 use crate::error::CourserError;
 use crate::rules::{RulesConfig, load as fs_load};
 
 /// Port for loading the rules configuration.
 pub trait RulesLoader {
+    /// Loads the effective blocking-rule configuration.
     fn load(&self) -> Result<RulesConfig, CourserError>;
 }
 

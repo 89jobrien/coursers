@@ -39,7 +39,6 @@ and feeds records into the domain. `main.rs` wires them together and formats the
 
 - Modify: `Cargo.toml`
 - Modify: `crates/crs/Cargo.toml`
-
 - [ ] **Step 1: Add walkdir to workspace deps**
 
 In `Cargo.toml`, add to `[workspace.dependencies]`:
@@ -79,7 +78,6 @@ git commit -m "chore: add walkdir workspace dependency for crs discover"
 
 - Create: `crates/core/src/history.rs`
 - Modify: `crates/core/src/lib.rs`
-
 - [ ] **Step 1: Write failing tests for `stem_of()`**
 
 Create `crates/core/src/history.rs` with just the tests:
@@ -211,7 +209,6 @@ git commit -m "feat(core): add stem_of() with tests"
 
 - Modify: `crates/core/src/history.rs`
 - Modify: `crates/core/src/lib.rs`
-
 - [ ] **Step 1: Add domain types and trait to `history.rs`**
 
 Append to `crates/core/src/history.rs` (before the `#[cfg(test)]` block):
@@ -587,7 +584,6 @@ git commit -m "feat(core): implement discover() domain function"
 
 - Create: `crates/crs/src/jsonl_source.rs`
 - Modify: `crates/crs/src/main.rs` (add `mod jsonl_source;`)
-
 - [ ] **Step 1: Write failing integration test**
 
 Create `crates/crs/tests/discover_integration.rs`:
@@ -759,7 +755,6 @@ git commit -m "feat(crs): add JsonlCommandSource adapter"
 
 - Create: `crates/crs/tests/fixtures/discover/session.jsonl`
 - Modify: `crates/crs/tests/discover_integration.rs`
-
 - [ ] **Step 1: Create discover fixture JSONL**
 
 Create `crates/crs/tests/fixtures/discover/session.jsonl` with two assistant records

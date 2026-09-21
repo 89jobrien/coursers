@@ -1,3 +1,5 @@
+//! Shared error and diagnostic types for core operations.
+
 /// Unified error type for `crs-core`.
 ///
 /// All external error types are wrapped here so callers never need to depend on

@@ -23,7 +23,7 @@ to `sh`. `rtk` absent → exit 0 silently (non-blocking).
 
 ## Data Flow
 
-```
+```text
 rtk discover --format json --since <N>
         ↓
 scripts/enrich-handoff.{nu,sh}
@@ -65,7 +65,7 @@ tool_usage:
 
 ## Script Interface
 
-```
+```text
 scripts/enrich-handoff.nu [--since N]   # default N=1
 scripts/enrich-handoff.sh [--since N]
 ```
@@ -90,7 +90,7 @@ nu scripts/enrich-handoff.nu 2>/dev/null || sh scripts/enrich-handoff.sh 2>/dev/
 After reading `.ctx/HANDOFF.state.yaml`, if `tool_usage` is present, surfaces a one-line summary
 before P0 triage:
 
-```
+```text
 Tool usage (last session): 414 commands · ~19K tokens saveable · top unhandled: op account (19)
 ```
 

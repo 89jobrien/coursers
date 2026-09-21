@@ -81,6 +81,7 @@ pub enum PreHookOutcome {
 /// Return `Err` only for unexpected I/O or internal failures; business-logic
 /// decisions (block, allow) belong in the `Ok(PreHookOutcome)` variants.
 pub trait PreHook {
+    /// Evaluates a hook context before tool execution.
     fn run(&self, ctx: &HookContext) -> Result<PreHookOutcome, CourserError>;
 }
 
@@ -114,6 +115,7 @@ pub enum PostHookOutcome {
 ///
 /// Same convention as [`PreHook::run`].
 pub trait PostHook {
+    /// Evaluates a completed tool call and its output.
     fn run(&self, ctx: &HookContext, output: &ToolOutput) -> Result<PostHookOutcome, CourserError>;
 }
 
@@ -127,8 +129,10 @@ pub trait PostHook {
 /// metrics that should never block a tool call. Errors are non-fatal by
 /// convention — the [`HookChain`] logs them but continues.
 pub trait Observer {
+    /// Observes the result of pre-hook evaluation.
     fn on_pre(&self, ctx: &HookContext, outcome: &PreHookOutcome) -> Result<(), CourserError>;
 
+    /// Observes the result of post-hook evaluation.
     fn on_post(
         &self,
         ctx: &HookContext,

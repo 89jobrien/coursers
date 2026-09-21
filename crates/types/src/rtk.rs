@@ -1,3 +1,5 @@
+//! Domain reports and probe results returned by RTK.
+
 /// Report produced by `rtk discover`.
 #[derive(Debug, Default)]
 pub struct RtkDiscoverReport {

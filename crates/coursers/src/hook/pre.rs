@@ -1,3 +1,5 @@
+//! PreToolUse rule checks, learned-failure checks, and deny responses.
+
 use coursers_core::capture::CaptureStore;
 use coursers_core::loader::RulesLoader;
 use coursers_core::store::StateStore;

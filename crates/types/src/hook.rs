@@ -1,3 +1,5 @@
+//! Domain types for hook contexts, outputs, and decisions.
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 

@@ -116,6 +116,7 @@ pub struct RewriteHook<R> {
 }
 
 impl<R: RewriteLoader> RewriteHook<R> {
+    /// Creates a rewrite hook backed by the supplied configuration loader.
     pub fn new(rewrite_loader: R) -> Self {
         Self { rewrite_loader }
     }
@@ -158,6 +159,7 @@ pub struct FilterHook<F> {
 }
 
 impl<F: FiltersLoader> FilterHook<F> {
+    /// Creates an output-filter hook backed by the supplied configuration loader.
     pub fn new(filters_loader: F) -> Self {
         Self { filters_loader }
     }
@@ -200,6 +202,7 @@ pub struct FailureObserver<R, S> {
 }
 
 impl<R: RulesLoader, S: StateStore> FailureObserver<R, S> {
+    /// Creates a failure observer backed by rule and state stores.
     pub fn new(rules_loader: R, state_store: S) -> Self {
         Self {
             rules_loader,

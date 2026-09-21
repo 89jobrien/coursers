@@ -1,11 +1,15 @@
+//! Shared helpers for invoking the `crs` test binary.
+
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
+/// Returns the Cargo-built `crs` test-binary path.
 pub fn crs_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_crs"))
 }
 
+/// Runs a `crs` subcommand with stdin and environment overrides.
 #[allow(dead_code)]
 pub fn run_crs(subcommand: &str, payload: &str, envs: &[(&str, &str)]) -> Output {
     let mut cmd = Command::new(crs_bin());

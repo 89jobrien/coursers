@@ -106,20 +106,31 @@ pub struct RtkProbeResult {
 
 /// Read-only RTK capabilities: discovery, savings analysis, session stats.
 pub trait RtkAnalysis {
+    /// Returns RTK discovery results for the requested lookback period.
     fn discover(&self, since_days: u32) -> Option<RtkDiscoverReport>;
+    /// Returns RTK token-savings totals when available.
     fn gain(&self) -> Option<RtkGainReport>;
+    /// Returns RTK statistics for the current session when available.
     fn session(&self) -> Option<Vec<RtkSessionEntry>>;
+    /// Returns RTK installation and hook verification results.
     fn verify(&self) -> Option<RtkVerifyResult>;
+    /// Returns RTK hook-audit results when available.
     fn hook_audit(&self) -> Option<RtkHookAudit>;
+    /// Returns the installed RTK version when available.
     fn version(&self) -> Option<String>;
 }
 
 /// Intercept/rewrite RTK capabilities: command rewriting, probing, proxy listing.
 pub trait RtkRewrite {
+    /// Returns RTK's rewritten form of a command, if supported.
     fn rewrite(&self, command: &str) -> Option<String>;
+    /// Returns RTK support and rewrite details for a command.
     fn probe(&self, command: &str) -> Option<RtkProbeResult>;
+    /// Reports whether RTK supports the command.
     fn check(&self, command: &str) -> bool;
+    /// Lists the command proxies managed by RTK.
     fn list_proxies(&self) -> Vec<String>;
+    /// Flushes RTK's accumulated state and reports success.
     fn flush(&self) -> bool;
 }
 

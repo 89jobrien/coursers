@@ -1,3 +1,5 @@
+//! Fuzz target for environment-variable expansion.
+
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

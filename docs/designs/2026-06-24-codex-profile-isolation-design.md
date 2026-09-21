@@ -109,7 +109,7 @@ impl RulesLoader for ProfileFsRulesLoader {
 
 Both subcommands gain identical flags:
 
-```
+```text
 coursers pre  [--profile <name>] [--rules <path>] [--state <path>]
 coursers post [--profile <name>] [--rules <path>] [--state <path>]
 ```
@@ -186,7 +186,7 @@ additionally gain `--rules <path>` and/or `--state <path>`:
 
 New directory and files created as part of this work (not auto-generated; hand-maintained):
 
-```
+```text
 ~/.config/coursers/profiles/codex/
   rules.json    — copy of base rules, Codex-specific tuning allowed
   state.json    — starts empty; written by coursers post --profile codex

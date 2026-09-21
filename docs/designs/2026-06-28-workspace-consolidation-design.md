@@ -25,7 +25,7 @@ binary merge with symlink, associated error types on all port traits.
 
 ## Dependencies
 
-```
+```text
 coursers-types       serde, serde_json, std only
     ^       ^
     |       |
@@ -451,7 +451,7 @@ pub trait FileInfo {
 
 The merged `coursers` binary exposes all subcommands:
 
-```
+```text
 coursers pre [--profile P] [--rules R] [--state S]
 coursers post [--profile P] [--rules R] [--state S]
 coursers filter [--profile P] [--rules R] [--state S]

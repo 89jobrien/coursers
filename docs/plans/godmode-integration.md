@@ -151,7 +151,7 @@ steps:
 
 ### Flow
 
-```
+```text
 godmode pipeline start coursers-rules
   -> crs-discover: scans last 30 days, writes candidates
   -> crs-propose-rules: generates rule stubs (pattern, tool, message)
@@ -256,7 +256,7 @@ matching a glob against 0-5 running task titles adds <0.5ms. Acceptable.
 
 ## Dependency graph
 
-```
+```text
 Phase 1 (verify gate)
   |
   v

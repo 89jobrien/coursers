@@ -111,6 +111,7 @@ pub struct HookPipelineConfig {
 }
 
 impl HookPipelineConfig {
+    /// Loads one hook-pipeline configuration file, defaulting on read or parse failure.
     pub fn load_from(path: &std::path::Path) -> Self {
         let Ok(content) = std::fs::read_to_string(path) else {
             return Self::default();
@@ -330,15 +331,14 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
     result
 }
 
-/// Pipe `text` through the `redact` binary. Fails open (returns `text`
-/// unchanged) if `redact` is missing or errors — a hook must never crash
+/// Pipe `text` through `obfsck redact`. Fails open (returns `text`
+/// unchanged) if `obfsck` is missing or errors — a hook must never crash
 /// the tool call it's observing.
 fn run_redact(text: &str, level: Option<&str>) -> String {
     use std::io::Write as _;
     use std::process::Stdio;
 
-    let mut cmd = Command::new("redact");
-    cmd.arg("--level").arg(level.unwrap_or("minimal"));
+    let mut cmd = redact_command(level);
     cmd.stdin(Stdio::piped());
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::null());
@@ -355,6 +355,15 @@ fn run_redact(text: &str, level: Option<&str>) -> String {
         }
         _ => text.to_string(),
     }
+}
+
+fn redact_command(level: Option<&str>) -> Command {
+    let mut command = Command::new("obfsck");
+    command
+        .arg("redact")
+        .arg("--level")
+        .arg(level.unwrap_or("minimal"));
+    command
 }
 
 // ---------------------------------------------------------------------------
@@ -1000,22 +1009,13 @@ prepend = "WRAPPED=1"
     }
 
     #[test]
-    fn redact_action_replaces_output_when_redact_on_path() {
-        // Skipped in environments without the `redact` binary on PATH — this
-        // mirrors run_redact's fail-open behavior rather than failing the test.
-        if Command::new("redact").arg("--help").output().is_err() {
-            return;
-        }
-        let config = HookPipelineConfig {
-            hooks: vec![HookRule {
-                matcher: Some("Bash".into()),
-                ..rule(HookEvent::PostToolUse, HookAction::Redact { level: None })
-            }],
-        };
-        let mut c = ctx(HookEvent::PostToolUse, "cat secret.env");
-        c.output = Some("OPENAI_API_KEY=sk-abc123".into());
-        let r = run_pipeline(&config, &c);
-        assert!(r.replace_output.is_some());
+    fn redact_action_invokes_canonical_obfsck_subcommand() {
+        let command = redact_command(Some("standard"));
+        assert_eq!(command.get_program(), "obfsck");
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            ["redact", "--level", "standard"]
+        );
     }
 
     #[test]

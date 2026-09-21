@@ -1,3 +1,5 @@
+//! Integration tests for command discovery and rule exclusion.
+
 use coursers_core::history::{DiscoverOpts, discover};
 use coursers_core::loader::{FsRulesLoader, RulesLoader};
 use coursers_core::rules::Rule;

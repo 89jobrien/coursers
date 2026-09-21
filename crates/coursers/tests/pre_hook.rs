@@ -1,3 +1,5 @@
+//! Integration tests for PreToolUse rule enforcement.
+
 #[path = "common.rs"]
 mod common;
 

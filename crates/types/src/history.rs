@@ -1,3 +1,5 @@
+//! Domain records for historical shell commands.
+
 use std::path::PathBuf;
 
 /// A single Bash command extracted from a Claude Code session file.

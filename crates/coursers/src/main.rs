@@ -1,3 +1,5 @@
+//! Entry point for the `coursers` binary, including completion generation.
+
 use clap::{CommandFactory, Parser};
 use coursers::Cli;
 
