@@ -16,7 +16,8 @@ use std::path::PathBuf;
 #[derive(Parser)]
 #[command(
     name = "coursers",
-    about = "Claude Code course-correction hook pipeline"
+    about = "Claude Code course-correction hook pipeline",
+    version
 )]
 pub struct Cli {
     #[command(subcommand)]
