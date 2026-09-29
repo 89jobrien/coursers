@@ -475,26 +475,43 @@ fn git_branch_slug() -> Option<String> {
 }
 
 /// Run a side-effect command. Optionally capture stdout as a system message.
-// TODO(core-io-boundary): move filesystem discovery and subprocess execution into coursers (#51)
-// adapters, leaving the core pipeline responsible only for deterministic rule evaluation.
-fn run_side_effect(
-    args: &[String],
-    capture: bool,
-    _ctx: &HookContext,
-    result: &mut PipelineResult,
-) {
+///
+/// The child receives [`HookContext::raw_json`] on stdin, so scripts that parse
+/// `tool_input` from the payload work unchanged. stdout and stderr are always
+/// piped rather than inherited, because the hook's own stdout carries hook JSON
+/// and a child writing to it would corrupt the protocol.
+fn run_side_effect(args: &[String], capture: bool, ctx: &HookContext, result: &mut PipelineResult) {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
     let Some((program, cmd_args)) = args.split_first() else {
         return;
     };
-    let output = Command::new(program).args(cmd_args).output();
-    match output {
-        Ok(out) if capture && out.status.success() => {
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !stdout.is_empty() {
-                result.messages.push(stdout);
-            }
+
+    let mut cmd = Command::new(program);
+    cmd.args(cmd_args);
+    cmd.stdin(if ctx.raw_json.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    let Ok(mut child) = cmd.spawn() else {
+        return;
+    };
+    if let (Some(raw), Some(mut stdin)) = (ctx.raw_json.as_deref(), child.stdin.take()) {
+        let _ = stdin.write_all(raw.as_bytes());
+    }
+
+    let Ok(out) = child.wait_with_output() else {
+        return;
+    };
+    if capture && out.status.success() {
+        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !stdout.is_empty() {
+            result.messages.push(stdout);
         }
-        _ => {} // fire-and-forget
     }
 }
 
@@ -666,6 +683,49 @@ mod tests {
             raw_json: None,
             output: None,
         }
+    }
+
+    fn run_capture(capture: bool, raw_json: Option<&str>) -> PipelineResult {
+        let action = HookAction::Run {
+            command: vec!["cat".into()],
+            capture,
+        };
+        let config = HookPipelineConfig {
+            hooks: vec![rule(HookEvent::PostToolUse, action)],
+        };
+        let mut context = ctx(HookEvent::PostToolUse, "/tmp/x.rs");
+        context.raw_json = raw_json.map(str::to_string);
+        run_pipeline(&config, &context)
+    }
+
+    #[test]
+    fn run_action_forwards_raw_json_to_child_stdin() {
+        // A side-effect script parses tool_input from stdin. With null stdin it
+        // sees an empty stream, fails to parse, and silently no-ops — the hook
+        // still reports PASS, so the failure is invisible without this.
+        let payload = r#"{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.rs"}}"#;
+        let result = run_capture(true, Some(payload));
+        assert_eq!(result.messages.len(), 1);
+        assert!(
+            result.messages[0].contains("/tmp/x.rs"),
+            "child did not receive the payload on stdin: {:?}",
+            result.messages
+        );
+    }
+
+    #[test]
+    fn run_action_capture_false_does_not_emit_output() {
+        let payload = r#"{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.rs"}}"#;
+        let result = run_capture(false, Some(payload));
+        assert!(result.messages.is_empty(), "capture=false must stay silent");
+    }
+
+    #[test]
+    fn run_action_without_raw_json_sends_null_stdin() {
+        // No payload: the child must still run rather than blocking on a read,
+        // and must not manufacture a message from empty output.
+        let result = run_capture(true, None);
+        assert!(result.messages.is_empty());
     }
 
     #[test]
