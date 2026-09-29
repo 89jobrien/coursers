@@ -194,7 +194,7 @@ impl ProfileConfig {
     /// Assemble a [`crate::hook::chain::HookChain`] from this profile's factory adapters.
     ///
     /// Hook composition (in evaluation order):
-    /// - **Pre**: `RuleBlockHook` → `RewriteHook` (first Deny/Rewrite short-circuits)
+    /// - **Pre**: `RewriteHook` → `RuleBlockHook` (rewrites feed policy checks)
     /// - **Post**: `FilterHook` (last Filter outcome wins)
     /// - **Observer**: `FailureObserver` (always runs; non-fatal errors)
     ///
@@ -208,11 +208,11 @@ impl ProfileConfig {
         let titles = running_task_titles();
 
         HookChain::new()
+            .with_pre(RewriteHook::new(self.rewrite_loader()))
             .with_pre(
                 RuleBlockHook::new(self.rules_loader(), self.state_store())
                     .with_running_titles(titles),
             )
-            .with_pre(RewriteHook::new(self.rewrite_loader()))
             .with_post(FilterHook::new(self.filters_loader()))
             .with_observer(FailureObserver::new(
                 self.rules_loader(),
