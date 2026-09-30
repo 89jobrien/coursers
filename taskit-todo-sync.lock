@@ -1,0 +1,225 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "file": "crates/core/src/analyze/capture.rs",
+      "text": "TODO(capture-store-errors): propagate directory, lock, serialization, and write failures (#47)",
+      "issue_number": 67
+    },
+    {
+      "file": "crates/core/src/analyze/history.rs",
+      "text": "TODO(token-estimation): the bytes/4 heuristic is undocumented and fragile (#48)",
+      "issue_number": 68
+    },
+    {
+      "file": "crates/core/src/analyze/mod.rs",
+      "text": "TODO(adapter-crate-analysis-io): Move capture, stats, facet, and session-history",
+      "issue_number": 69
+    },
+    {
+      "file": "crates/core/src/config.rs",
+      "text": "TODO(hook-latency-benchmarks): Add cold-start and steady-state regression benchmarks",
+      "issue_number": 70
+    },
+    {
+      "file": "crates/core/src/date.rs",
+      "text": "TODO: reconsider — these are mathematical constants, not config; literals",
+      "issue_number": 71
+    },
+    {
+      "file": "crates/core/src/hook/log.rs",
+      "text": "TODO(log-before-filter): Skip entries newer than `before` instead of breaking;",
+      "issue_number": 72
+    },
+    {
+      "file": "crates/core/src/hook/pipeline.rs",
+      "text": "TODO(hook-config-trust): require explicit repository trust before project-local rules may (#50)",
+      "issue_number": 73
+    },
+    {
+      "file": "crates/core/src/jsonl_source.rs",
+      "text": "TODO(#41): pick one arrow style (-> vs the unicode arrow used elsewhere)",
+      "issue_number": 74
+    },
+    {
+      "file": "crates/core/src/lib.rs",
+      "text": "TODO(adapters-crate-consolidation): Six separate TODOs in this workspace all",
+      "issue_number": 75
+    },
+    {
+      "file": "crates/core/src/lib.rs",
+      "text": "TODO(adapter-crate-log-io): Move the redb-backed hook log into coursers-adapters",
+      "issue_number": 78
+    },
+    {
+      "file": "crates/core/src/lib.rs",
+      "text": "TODO(adapter-crate-session-io): Move JSONL session discovery and reading into",
+      "issue_number": 79
+    },
+    {
+      "file": "crates/core/src/lib.rs",
+      "text": "TODO(adapter-crate-prefix-io): Move prefixe-backed file stores and path resolution",
+      "issue_number": 80
+    },
+    {
+      "file": "crates/core/src/lib.rs",
+      "text": "TODO(core-package-conformance-tests): ensure package-scoped core test commands run every (#52)",
+      "issue_number": 81
+    },
+    {
+      "file": "crates/core/src/rules.rs",
+      "text": "TODO(comment-line-fps): `no-ls-use-glob` and `no-cat-use-read` produce false (#53)",
+      "issue_number": 82
+    },
+    {
+      "file": "crates/core/src/store.rs",
+      "text": "TODO(concurrent-state-updates): Add a locked update API spanning load, mutation, and save;",
+      "issue_number": 83
+    },
+    {
+      "file": "crates/core/src/store.rs",
+      "text": "TODO(raii-env-guards): env mutation in tests (set_var/remove_var) uses (#54)",
+      "issue_number": 84
+    },
+    {
+      "file": "crates/coursers/src/crs_commands.rs",
+      "text": "TODO(split-crs-commands): replace this god-module with command-specific modules that return (#55)",
+      "issue_number": 85
+    },
+    {
+      "file": "crates/coursers/src/crs_commands.rs",
+      "text": "TODO(#43): load_from per-source + load_config reads each file twice; cache or reuse",
+      "issue_number": 86
+    },
+    {
+      "file": "crates/coursers/src/crs_commands.rs",
+      "text": "TODO(bounded-process-runner): Centralize child-process execution with timeouts and bounded output;",
+      "issue_number": 87
+    },
+    {
+      "file": "crates/coursers/src/crs_commands.rs",
+      "text": "TODO(unicode-safe-truncation): centralize display truncation around UTF-8 character (#56)",
+      "issue_number": 88
+    },
+    {
+      "file": "crates/coursers/src/crs_commands.rs",
+      "text": "TODO(historical-heatmap): Build heatmaps from the complete redb execution log rather",
+      "issue_number": 89
+    },
+    {
+      "file": "crates/coursers/src/hook/chain_runner.rs",
+      "text": "TODO(unify-hook-paths): close the documented parity gaps, converge legacy and chain execution (#57)",
+      "issue_number": 90
+    },
+    {
+      "file": "crates/coursers/src/hook/pre.rs",
+      "text": "TODO(hook-ordering-semantics): document whether Claude Code short-circuits on (#58)",
+      "issue_number": 91
+    },
+    {
+      "file": "crates/coursers/src/hook/pre.rs",
+      "text": "TODO(no-sed-n-use-read): enable the `no-sed-n-use-read` block rule once the (#59)",
+      "issue_number": 92
+    },
+    {
+      "file": "crates/coursers/src/hook/pre.rs",
+      "text": "TODO(coursers-11): coursers-11 (cross-tool block) depends on obfsck-11 and (#60)",
+      "issue_number": 93
+    },
+    {
+      "file": "crates/coursers/src/lib.rs",
+      "text": "TODO(adapter-crate-integration-io): Move concrete obfsck and RTK subprocess clients",
+      "issue_number": 94
+    },
+    {
+      "file": "crates/coursers/src/lib.rs",
+      "text": "TODO(rule-promotion-workflow): Connect suggest, probe, validate, and replay into a",
+      "issue_number": 95
+    },
+    {
+      "file": "crates/coursers/src/lib.rs",
+      "text": "TODO(persistent-hook-service): Add a long-running serve mode that keeps resolved",
+      "issue_number": 96
+    },
+    {
+      "file": "crates/coursers/src/lib.rs",
+      "text": "TODO(harness-installer-doctor): Add dry-run installation and comprehensive health",
+      "issue_number": 97
+    },
+    {
+      "file": "crates/coursers/src/lib.rs",
+      "text": "TODO(log-time-window-cli): Expose the existing after/before query bounds and safe",
+      "issue_number": 98
+    },
+    {
+      "file": "crates/coursers/src/lib.rs",
+      "text": "TODO(profile-aware-cli): pass the resolved profile into filter, rewrite, and stats (#61)",
+      "issue_number": 99
+    },
+    {
+      "file": "crates/coursers/src/main.rs",
+      "text": "TODO(completions-discoverability): `completions` is intercepted before",
+      "issue_number": 100
+    },
+    {
+      "file": "crates/coursers/src/opencode.rs",
+      "text": "TODO(opencode-chain-path-parity): This path builds the `HookChain`",
+      "issue_number": 101
+    },
+    {
+      "file": "crates/e2e/tests/pipeline.rs",
+      "text": "TODO(shared-e2e-harness): consolidate subprocess helpers, select an explicitly built binary (#62),",
+      "issue_number": 103
+    },
+    {
+      "file": "crates/e2e/tests/scenarios.rs",
+      "text": "TODO(strict-e2e-assertions): Assert exact exit codes and deserialize complete protocol JSON;",
+      "issue_number": 104
+    },
+    {
+      "file": "crates/types/src/filters.rs",
+      "text": "TODO(match-lines-flags): add typed regex flag control for match-lines filters (#49).",
+      "issue_number": 105
+    },
+    {
+      "file": "crates/types/src/filters.rs",
+      "text": "TODO(adapter-core-compat): deprecate in favor of coursers_adapters::FsFiltersLoader when",
+      "issue_number": 106
+    },
+    {
+      "file": "crates/types/src/lib.rs",
+      "text": "TODO(workspace-test-gaps): Add serialization tests for coursers-types, legacy/chain parity",
+      "issue_number": 107
+    },
+    {
+      "file": "crates/types/src/lib.rs",
+      "text": "TODO(ci-surface-gaps): Run the OpenCode Bun suite and installed-binary smoke/rule",
+      "issue_number": 108
+    },
+    {
+      "file": "crates/types/src/pipeline.rs",
+      "text": "TODO(pipeline-types-deduplication): This module is an UNUSED duplicate of",
+      "issue_number": 109
+    },
+    {
+      "file": "crates/types/src/pipeline.rs",
+      "text": "TODO(hook-schema-parity): Keep schemas/crs-hooks.schema.json synchronized with every",
+      "issue_number": 111
+    },
+    {
+      "file": "crates/types/src/pipeline.rs",
+      "text": "TODO(harness-neutral-contract): Define shared request, response, and protocol-adapter",
+      "issue_number": 112
+    },
+    {
+      "file": "crates/types/src/ports.rs",
+      "text": "TODO(canonical-ports-migration): Step 1 — re-point the 15 duplicated domain",
+      "issue_number": 113
+    },
+    {
+      "file": "crates/types/src/rules.rs",
+      "text": "TODO(canonical-domain-contracts): migrate the remaining duplicate contracts and ports into",
+      "issue_number": 114
+    }
+  ]
+}
