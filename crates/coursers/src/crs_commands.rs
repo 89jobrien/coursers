@@ -859,8 +859,20 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
         return;
     }
 
+    // Redacted output and system messages are emitted together: a redact rule and a
+    // `Notify` rule can both match the same call, so returning after the redact response
+    // would discard the notifications. On `Bash` the
+    // `guardian/obfsck-redact-tool-output` rule always matches, which previously made
+    // these rules unreachable in practice: nextest/snap-notify, ci/push-watch,
+    // triage/cargo-gate-failed, triage/nextest-failed, triage/fmt-failed.
+    //
+    // Mirrors `opencode.rs::apply_pipeline_to_response`, which extends `messages`
+    // alongside `replacement_output` rather than returning early.
     if let Some(ref redacted) = result.replace_output {
-        let json = coursers_core::hook::protocol::filter_result_response(redacted);
+        let json = coursers_core::hook::protocol::filter_result_with_messages_response(
+            redacted,
+            &result.messages,
+        );
         write_stdout(&json);
         return;
     }
@@ -1436,6 +1448,17 @@ pub fn cmd_discover(
         _ => print_discover_text(&report),
     }
 
+    // TODO(discover-empty-scan-clobbers-report): Skip the write when the scan found
+    // nothing, instead of overwriting a good report with an empty one. Reproduced
+    // 2026-09-30: `crs discover` with the default `--since 30` scans 0 sessions
+    // (no transcript in ~/.claude/projects carries a Bash tool_use newer than the
+    // cutoff) and still rewrites a tracked 216-line .ctx/HANDOFF.tools.yaml down to
+    // 3 lines. Required `git checkout -- .ctx/HANDOFF.tools.yaml` twice to recover.
+    // The guard should be `report.scanned_commands == 0` — an empty scan carries no
+    // information, so preserving the previous report is strictly better than
+    // truncating it. Consider also warning on stderr when the scan is empty for a
+    // reason other than a too-narrow `--since`, since "0 sessions" is currently
+    // indistinguishable from "the history parser found nothing".
     let ctx = std::path::Path::new(".ctx");
     if ctx.is_dir() {
         write_tools_yaml(&report, since, &rtk_map, ctx.join("HANDOFF.tools.yaml"));

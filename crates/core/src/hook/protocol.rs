@@ -71,6 +71,34 @@ pub fn filter_result_response(text: &str) -> String {
     .to_string()
 }
 
+/// Filtered output *and* system messages in one response (PostToolUse).
+///
+/// A redact rule and a `Notify` rule can both match the same tool call. Returning after
+/// the redact response discarded the notifications, which made `Notify` rules
+/// unreachable whenever a redact rule matched (on `Bash` the
+/// `guardian/obfsck-redact-tool-output` rule always matches, so every notify arm on that
+/// event was dead). Emitting both in a single response keeps the redacted output and the
+/// notifications.
+///
+/// `messages` may be empty, in which case this is identical to
+/// [`filter_result_response`].
+pub fn filter_result_with_messages_response(text: &str, messages: &[String]) -> String {
+    let joined = messages.join("\n");
+    if joined.is_empty() {
+        return filter_result_response(text);
+    }
+    json!({
+        "type": "result",
+        "message": text,
+        "decision": "allow",
+        "hookSpecificOutput": {
+            "hookEventName": "PostToolUse",
+            "additionalContext": joined,
+        }
+    })
+    .to_string()
+}
+
 /// Extract output text from tool_response, trying both field names.
 /// Claude sends `output`, Codex sends `stdout`. If both present,
 /// concatenates them (matching Codex hook convention).
@@ -138,6 +166,29 @@ mod tests {
     fn extract_output_neither() {
         let v = json!({"exit_code": 0});
         assert!(extract_output(&v).is_none());
+    }
+
+    #[test]
+    fn filter_with_messages_emits_both_redaction_and_notifications() {
+        let msgs = vec!["cargo check failed".to_string(), "run fmt".to_string()];
+        let json_str = filter_result_with_messages_response("REDACTED", &msgs);
+        let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(v["message"], "REDACTED");
+        assert_eq!(v["decision"], "allow");
+        assert_eq!(
+            v["hookSpecificOutput"]["additionalContext"],
+            "cargo check failed\nrun fmt"
+        );
+    }
+
+    #[test]
+    fn filter_with_no_messages_matches_plain_filter_response() {
+        let json_str = filter_result_with_messages_response("out", &[]);
+        let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+        assert_eq!(
+            v,
+            serde_json::from_str::<serde_json::Value>(&filter_result_response("out")).unwrap()
+        );
     }
 }
 
