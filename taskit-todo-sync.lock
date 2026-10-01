@@ -212,14 +212,24 @@
       "issue_number": 112
     },
     {
-      "file": "crates/types/src/ports.rs",
-      "text": "TODO(canonical-ports-migration): Step 1 — re-point the 15 duplicated domain",
-      "issue_number": 113
-    },
-    {
       "file": "crates/types/src/rules.rs",
       "text": "TODO(canonical-domain-contracts): migrate the remaining duplicate contracts and ports into",
       "issue_number": 114
+    },
+    {
+      "file": "crates/core/src/analyze/insights.rs",
+      "text": "TODO(insights-repo-attribution-always-empty): Only the first line is read, but Claude",
+      "issue_number": 115
+    },
+    {
+      "file": "crates/core/src/hook/pipeline.rs",
+      "text": "TODO(filters-not-applied-in-hook-path): `~/.config/crs/filters.toml` output-shaping",
+      "issue_number": 116
+    },
+    {
+      "file": "crates/coursers/src/crs_commands.rs",
+      "text": "TODO(discover-empty-scan-clobbers-report): Skip the write when the scan found",
+      "issue_number": 117
     }
   ]
 }
