@@ -1,9 +1,12 @@
-use serde::Deserialize;
+//! Command-rewrite configuration and rule evaluation.
 
 use crate::error::CourserError;
 
+pub use coursers_types::filters::{RewriteConfig, RewriteRule};
+
 /// Port: abstracts how the rewrite configuration is loaded.
 pub trait RewriteLoader {
+    /// Loads the effective command-rewrite configuration.
     fn load(&self) -> Result<RewriteConfig, CourserError>;
 }
 
@@ -77,22 +80,6 @@ impl RewriteLoader for InMemoryRewriteLoader {
     fn load(&self) -> Result<RewriteConfig, CourserError> {
         Ok(self.0.clone())
     }
-}
-
-/// A rewrite rule: if `pattern` matches the command, replace with `replace`.
-#[derive(Debug, Clone, Deserialize)]
-pub struct RewriteRule {
-    /// Regex matched against the full command string.
-    pub pattern: String,
-    /// Replacement string (may use regex capture groups: `$1`, `$2`, ...).
-    pub replace: String,
-}
-
-/// Root of the `[rewrites]` section in crs-filters.toml.
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct RewriteConfig {
-    #[serde(default)]
-    pub rewrites: Vec<RewriteRule>,
 }
 
 /// Result of running a command through the rewrite pipeline.

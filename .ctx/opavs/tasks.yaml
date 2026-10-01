@@ -47,3 +47,81 @@ tasks:
   status: done
   depends_on:
   - oc7
+- id: obfsck-global-output-hook
+  description: Route global PostToolUse output redaction through the canonical obfsck redact command.
+  status: done
+  depends_on: []
+- id: cca-01
+  description: Make coursers-types Rule, FailureLearning, RulesConfig, and State canonical while preserving core compatibility.
+  status: done
+  depends_on: []
+- id: cca-02
+  description: Replace duplicate core filter, rewrite, and tool-swap contracts with canonical coursers-types records.
+  status: done
+  depends_on:
+  - cca-01
+- id: cca-03
+  description: Add complete pipeline action parity, runtime notices, and per-rule source provenance to coursers-types.
+  status: todo
+  depends_on:
+  - cca-02
+- id: cca-04
+  description: Add atomic state, rewrite, pipeline, environment, and bounded process port contracts.
+  status: todo
+  depends_on:
+  - cca-03
+- id: cca-05
+  description: Keep existing core trait implementations source-compatible through private canonical-port bridges.
+  status: todo
+  depends_on:
+  - cca-04
+- id: cca-06
+  description: Publish coursers-adapters with source resolution, filesystem loaders, and atomic state persistence.
+  status: todo
+  depends_on:
+  - cca-05
+- id: cca-07
+  description: Implement bounded child execution and requested-variable hook environment loading.
+  status: todo
+  depends_on:
+  - cca-06
+- id: cca-08
+  description: Move pipeline environment and process I/O behind ports with approved fail-closed outcomes.
+  status: todo
+  depends_on:
+  - cca-07
+- id: cca-09
+  description: Return structured notices and enforcement outcomes without core printing diagnostics.
+  status: todo
+  depends_on:
+  - cca-08
+- id: cca-10
+  description: Construct hook adapters in coursers while preserving legacy profile and protocol behavior.
+  status: todo
+  depends_on:
+  - cca-09
+- id: cca-11
+  description: Inject the shared runtime into all harness paths without changing response contracts.
+  status: todo
+  depends_on:
+  - cca-10
+- id: cca-12
+  description: Make coursers own harness serialization while retaining deprecated core wrappers.
+  status: todo
+  depends_on:
+  - cca-11
+- id: cca-13
+  description: Add supported-scenario parity coverage across legacy, chain, Codex, and OpenCode paths.
+  status: todo
+  depends_on:
+  - cca-12
+- id: cca-14
+  description: Deprecate legacy core adapters and re-exports with exact replacement paths.
+  status: todo
+  depends_on:
+  - cca-13
+- id: cca-15
+  description: Document the architecture, public API, secure failure policy, and migration window.
+  status: todo
+  depends_on:
+  - cca-14

@@ -1,28 +1,35 @@
+//! Shared helpers for `coursers` hook integration tests.
+
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
+/// Returns the Cargo-built `coursers` test-binary path.
 pub fn coursers_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_coursers"))
 }
 
+/// Returns the path to a named integration fixture.
 pub fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/integration/fixtures")
         .join(name)
 }
 
+/// Runs the pre-hook command with file-backed test configuration.
 #[allow(dead_code)]
 pub fn run_pre(payload_path: &Path, rules_path: &Path, state_path: &Path) -> Output {
     let payload = std::fs::read_to_string(payload_path).unwrap();
     run_hook("pre", &payload, rules_path, state_path)
 }
 
+/// Runs the post-hook command with file-backed test configuration.
 pub fn run_post(payload_path: &Path, rules_path: &Path, state_path: &Path) -> Output {
     let payload = std::fs::read_to_string(payload_path).unwrap();
     run_hook("post", &payload, rules_path, state_path)
 }
 
+/// Runs a hook subcommand with the supplied payload and test paths.
 pub fn run_hook(subcommand: &str, payload: &str, rules_path: &Path, state_path: &Path) -> Output {
     let mut child = Command::new(coursers_bin())
         .arg(subcommand)

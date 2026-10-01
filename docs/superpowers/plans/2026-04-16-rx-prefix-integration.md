@@ -37,6 +37,7 @@ redaction for learning. A `PrefixStore` trait keeps file I/O out of unit tests.
 **Files:**
 
 - Create: `crates/core/src/rx_prefix.rs`
+
 - Modify: `crates/core/src/lib.rs`
 
 - [ ] **Step 1: Add the module declaration**
@@ -1121,7 +1122,7 @@ tempfile = "3"
 **Spec coverage:**
 
 | Requirement                                                   | Task                                     |
-| ------------------------------------------------------------- | ---------------------------------------- | --------- | --- | ------ |
+| ------------------------------------------------------------- | ---------------------------------------- |
 | Load `~/.config/rx/prefixes.toml`, `CRS_RX_PREFIXES` override | Task 2 (`FilePrefixStore::default_path`) |
 | Split on `&&`, `                                              |                                          | `, `;`, ` | `   | Task 1 |
 | Two-word key lookup before single-word                        | Task 3                                   |

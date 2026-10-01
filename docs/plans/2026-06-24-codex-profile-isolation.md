@@ -242,14 +242,14 @@ impl Default for ConfigBuilder {
 
 #### 3. Verify
 
-```
+```text
 cargo nextest run -p crs-core -- profile_tests   → all green
 cargo clippy -p crs-core -- -D warnings          → zero warnings
 ```
 
 #### 4. Commit
 
-```
+```text
 git branch --show-current   # must NOT be main
 git commit -m "feat(crs-core): add ProfileConfig and ConfigBuilder for profile-aware path resolution"
 ```
@@ -317,14 +317,14 @@ impl RulesLoader for ProfileFsRulesLoader {
 
 #### 3. Verify
 
-```
+```text
 cargo nextest run -p crs-core               → all green
 cargo clippy -p crs-core -- -D warnings    → zero warnings
 ```
 
 #### 4. Commit
 
-```
+```text
 git branch --show-current   # must NOT be main
 git commit -m "feat(crs-core): add ProfileFsRulesLoader for explicit-path rule loading"
 ```
@@ -373,14 +373,14 @@ pub fn hook_context_with_profile(
 
 #### 2. Verify
 
-```
+```text
 cargo build -p coursers                       → clean build
 cargo clippy -p coursers -- -D warnings      → zero warnings
 ```
 
 #### 3. Commit
 
-```
+```text
 git branch --show-current   # must NOT be main
 git commit -m "feat(coursers): add hook_context_with_profile() for profile-aware hook wiring"
 ```
@@ -538,7 +538,7 @@ pub fn run_with_profile(profile_cfg: &crs_core::config::ProfileConfig) {
 
 #### 5. Verify
 
-```
+```text
 cargo build -p coursers                                    → clean
 cargo nextest run -p coursers                              → all green
 cargo clippy -p coursers -- -D warnings                   → zero warnings
@@ -549,7 +549,7 @@ echo '{"tool_name":"Read"}' | coursers pre --profile codex → silent exit 0
 
 #### 6. Commit
 
-```
+```text
 git branch --show-current   # must NOT be main
 git commit -m "feat(coursers): add --profile/--rules/--state flags to pre/post subcommands"
 ```
@@ -673,7 +673,7 @@ The existing no-arg calls remain correct because `resolve_profile(None, None, No
 
 #### 2. Verify
 
-```
+```text
 cargo build -p crs                                       → clean
 cargo nextest run -p crs                                 → all green
 cargo clippy -p crs -- -D warnings                      → zero warnings
@@ -686,7 +686,7 @@ crs validate --profile codex                             → uses profile rules 
 
 #### 3. Commit
 
-```
+```text
 git branch --show-current   # must NOT be main
 git commit -m "feat(crs): add --profile/--rules/--state flags to filter/rewrite/discover/validate/probe/stats/suggest"
 ```
@@ -715,7 +715,7 @@ echo '{"failures":{}}' > ~/.config/coursers/profiles/codex/state.json
 
 #### 2. Verify
 
-```
+```text
 crs validate --profile codex   → rules load and patterns compile
 ```
 
@@ -848,7 +848,7 @@ ls ~/.config/coursers/profiles/codex/
 
 #### 1. Run full suite
 
-```
+```text
 cargo nextest run --workspace        → all green
 cargo clippy --workspace -- -D warnings  → zero warnings
 cargo build --release                → clean release build
@@ -872,7 +872,7 @@ ls -la ~/.config/coursers/profiles/codex/state.json
 
 #### 3. Commit
 
-```
+```text
 git branch --show-current   # must NOT be main
 git commit -m "chore: full workspace green after codex profile isolation"
 ```

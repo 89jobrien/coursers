@@ -1,3 +1,5 @@
+//! Fuzz target for pipeline-stage command extraction.
+
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

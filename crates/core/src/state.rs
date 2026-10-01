@@ -1,30 +1,17 @@
-use serde::{Deserialize, Serialize};
+//! Failure-learning keys, rolling timestamps, and threshold evaluation.
+
 use sha2::{Digest, Sha256};
-use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::rules::FailureLearning;
+
+pub use coursers_types::state::{FailureEntry, State};
 
 /// Max characters to store in the command preview field.
 const PREVIEW_MAX_CHARS: usize = 80;
 
 /// Minimum window in minutes (floor to avoid divide-by-zero in messages).
 const MIN_WINDOW_MINUTES: u64 = 1;
-
-/// A per-command failure record stored in the rolling failure log.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct FailureEntry {
-    pub command_preview: String,
-    pub timestamps: Vec<u64>,
-    pub last_seen: f64,
-}
-
-/// The full failure-learning state persisted to disk.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct State {
-    #[serde(default)]
-    pub failures: HashMap<String, FailureEntry>,
-}
 
 /// Derive a stable SHA-256 key for a command string used as the state map key.
 pub fn command_key(command: &str) -> String {
@@ -57,6 +44,17 @@ pub fn record_failure(mut state: State, command: &str, fl: &FailureLearning) -> 
     entry.command_preview = preview;
 
     prune(state, fl, now)
+}
+
+/// Drop entries and timestamps older than the configured windows.
+///
+/// Pruning used to run only from [`record_failure`], so it happened just when a *new*
+/// failure was recorded. An entry whose command never failed again was never pruned, and
+/// nothing pruned on load — so entries outlived `cleanup_after_seconds` indefinitely.
+/// Callers that load persisted state should run this so the TTL holds for keys that do
+/// not recur. [`record_failure`] still calls it on the write path.
+pub fn prune_stale(state: State, fl: &FailureLearning) -> State {
+    prune(state, fl, now_secs())
 }
 
 fn prune(mut state: State, fl: &FailureLearning, now: u64) -> State {
@@ -185,6 +183,37 @@ mod tests {
         assert_eq!(st.failures.len(), 1);
         let entry = st.failures.values().next().unwrap();
         assert_eq!(entry.timestamps.len(), 1);
+    }
+
+    /// Regression: an entry whose command never recurred must still expire on the read
+    /// path. `prune` used to be reachable only from `record_failure`, so a stale entry
+    /// outlived `cleanup_after_seconds` until its own command failed again.
+    #[test]
+    fn prune_stale_expires_entries_that_never_recur() {
+        let mut st = State::default();
+        // last_seen far in the past: outside cleanup_after_seconds (3600).
+        st.failures.insert(
+            command_key("grep foo ."),
+            FailureEntry {
+                command_preview: "grep foo .".to_string(),
+                timestamps: vec![now_secs() - 100_000],
+                last_seen: (now_secs() - 100_000) as f64,
+            },
+        );
+        assert_eq!(st.failures.len(), 1, "precondition: stale entry present");
+
+        let pruned = super::prune_stale(st, &fl(3, 300));
+        assert!(
+            pruned.failures.is_empty(),
+            "stale entry should be dropped without any new failure being recorded"
+        );
+    }
+
+    #[test]
+    fn prune_stale_keeps_fresh_entries() {
+        let st = record_failure(State::default(), "cargo check", &fl(3, 300));
+        let pruned = super::prune_stale(st, &fl(3, 300));
+        assert_eq!(pruned.failures.len(), 1, "fresh entry must survive pruning");
     }
 
     #[test]

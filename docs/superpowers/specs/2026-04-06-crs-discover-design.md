@@ -11,7 +11,7 @@ commands were intercepted by existing `crs filter` rules, and which were not. Mo
 
 ## CLI
 
-```
+```text
 crs discover [OPTIONS]
 
 Options:
@@ -28,7 +28,7 @@ Current project detection: match session `cwd` against `std::env::current_dir()`
 
 Hexagonal — domain is pure, fs access isolated to an adapter.
 
-```
+```text
 crs-core/src/history.rs          — port + domain logic
   trait CommandSource             — yields (command: String, session_id: String, cwd: String)
   fn discover(src, rules, opts) -> DiscoverReport
@@ -98,7 +98,7 @@ Skips malformed lines silently. Streams line-by-line — no full-file load.
 
 ## Output: text format
 
-```
+```text
 CRS Discover — Savings Opportunities
 ====================================================
 Scanned: N sessions, M Bash commands

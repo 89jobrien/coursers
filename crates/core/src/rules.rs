@@ -1,91 +1,12 @@
+//! Rule configuration loading and shell-command matching.
+
 use regex::Regex;
-use serde::Deserialize;
 use shell_words;
 use std::fs;
 
 use crate::config::rules_path;
 
-/// A rule that blocks a shell command matching a pattern.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Rule {
-    pub id: String,
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    pub pattern: String,
-    #[serde(default)]
-    pub pattern_flags: String,
-    #[serde(default)]
-    pub exceptions: Vec<String>,
-    /// Command names this rule targets (e.g. `["grep", "rg"]`).
-    /// When non-empty, the rule only fires if argv[0] of at least one pipe
-    /// stage matches. When empty, falls back to raw regex matching.
-    #[serde(default)]
-    pub target_commands: Vec<String>,
-    pub message: Option<String>,
-    /// Glob pattern matched against running godmode task titles
-    /// (`~/.cache/godmode/status.json`). When a running task title matches,
-    /// this rule is suppressed for the duration of that task. Supports a
-    /// single trailing `*` wildcard (e.g. `"migrate*"`); no `*` means exact
-    /// match. See [`task_overrides_rule`].
-    #[serde(default)]
-    pub task_override: Option<String>,
-}
-
-/// Configuration for the failure-learning subsystem.
-#[derive(Debug, Clone, Deserialize)]
-pub struct FailureLearning {
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-    #[serde(default = "default_block_threshold")]
-    pub block_threshold: usize,
-    #[serde(default = "default_window")]
-    pub window_seconds: u64,
-    pub state_file: Option<String>,
-    #[serde(default = "default_max_entries")]
-    pub max_tracked_commands: usize,
-    #[serde(default = "default_cleanup")]
-    pub cleanup_after_seconds: u64,
-    pub message_template: Option<String>,
-}
-
-impl Default for FailureLearning {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            block_threshold: default_block_threshold(),
-            window_seconds: default_window(),
-            state_file: None,
-            max_tracked_commands: default_max_entries(),
-            cleanup_after_seconds: default_cleanup(),
-            message_template: None,
-        }
-    }
-}
-
-/// Root configuration loaded from the course-correct-rules JSON file.
-#[derive(Debug, Clone, Default, Deserialize)]
-pub struct RulesConfig {
-    #[serde(default)]
-    pub rules: Vec<Rule>,
-    #[serde(default)]
-    pub failure_learning: FailureLearning,
-}
-
-fn default_true() -> bool {
-    true
-}
-fn default_block_threshold() -> usize {
-    3
-}
-fn default_window() -> u64 {
-    300
-}
-fn default_max_entries() -> usize {
-    200
-}
-fn default_cleanup() -> u64 {
-    3600
-}
+pub use coursers_types::rules::{FailureLearning, Rule, RulesConfig};
 
 /// Load the rules config from disk. Returns an empty config on missing or malformed file.
 ///
@@ -302,7 +223,7 @@ mod kani_proofs {
     #[kani::proof]
     #[kani::unwind(1)]
     fn block_threshold_at_least_one() {
-        let t = default_block_threshold();
+        let t = coursers_types::rules::default_block_threshold();
         assert!(t >= 1, "block_threshold must be at least 1");
     }
 
@@ -310,7 +231,7 @@ mod kani_proofs {
     #[kani::proof]
     #[kani::unwind(1)]
     fn window_positive() {
-        let w = default_window();
+        let w = coursers_types::rules::default_window();
         assert!(w > 0, "window must be positive");
     }
 }

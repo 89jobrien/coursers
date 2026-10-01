@@ -20,7 +20,9 @@ pub struct Stats {
 
 /// Port for loading and saving block statistics.
 pub trait StatsStore {
+    /// Loads the current block statistics.
     fn load(&self) -> Result<Stats, CourserError>;
+    /// Persists the supplied block statistics.
     fn save(&self, stats: &Stats) -> Result<(), CourserError>;
 
     /// Increment the block counter for `rule_id` and persist.
@@ -67,12 +69,14 @@ pub struct InMemoryStatsStore {
 
 #[cfg(any(test, feature = "testing"))]
 impl InMemoryStatsStore {
+    /// Creates an empty in-memory statistics store.
     pub fn new() -> Self {
         Self {
             inner: std::cell::RefCell::new(Stats::default()),
         }
     }
 
+    /// Returns a snapshot of the stored statistics.
     pub fn get_stats(&self) -> Stats {
         self.inner.borrow().clone()
     }

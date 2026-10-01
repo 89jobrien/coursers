@@ -1,3 +1,5 @@
+//! Domain configuration for profiles and rule/state paths.
+
 use std::path::PathBuf;
 
 /// Approximate bytes per token (GPT/Claude tokenizer average).

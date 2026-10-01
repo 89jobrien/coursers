@@ -15,7 +15,7 @@ doctest = false
 testing = []
 
 [dependencies]
-coursers-types = { workspace = true }
+coursers-types = { workspace = true, features = ["core-compat"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 regex = { workspace = true }

@@ -1,7 +1,9 @@
+//! Fuzz target for rule matching and exception handling.
+
 #![no_main]
 
+use coursers_core::rules::{check, check_pipeline, matched_rule_id, Rule};
 use libfuzzer_sys::fuzz_target;
-use coursers_core::rules::{Rule, check, check_pipeline, matched_rule_id};
 
 fn test_rules() -> Vec<Rule> {
     vec![
@@ -53,10 +55,7 @@ fuzz_target!(|data: &[u8]| {
 
         // If check returns a rule_id, matched_rule_id returns the same one.
         if let (Some((rule_id, _)), Some(mid_id)) = (&chk, &mid) {
-            assert_eq!(
-                rule_id, mid_id,
-                "rule_id mismatch on: {s:?}"
-            );
+            assert_eq!(rule_id, mid_id, "rule_id mismatch on: {s:?}");
         }
     }
 });

@@ -137,7 +137,7 @@ Uses `InMemoryRulesLoader` + `InMemoryStateStore`.
 
 ### Structure
 
-```
+```text
 tests/
   integration/
     fixtures/
@@ -194,7 +194,7 @@ path via `.env("COURSERS_RULES", ...)` on `Command`.
 
 **`scripts/smoke.nu`** — manual end-to-end validation against the real binary and live config.
 
-```
+```text
 Usage: nu scripts/smoke.nu
 ```
 

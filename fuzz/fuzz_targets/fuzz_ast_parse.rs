@@ -1,3 +1,5 @@
+//! Fuzz target for shell-command AST parsing.
+
 #![no_main]
 
 use libfuzzer_sys::fuzz_target;

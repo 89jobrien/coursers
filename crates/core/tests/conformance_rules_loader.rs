@@ -30,6 +30,24 @@ fn assert_rules_loader_contract(loader: &impl RulesLoader, expected_rule_count: 
 // ---------------------------------------------------------------------------
 
 #[test]
+fn core_rule_contracts_are_canonical_types() {
+    use std::any::TypeId;
+
+    assert_eq!(
+        TypeId::of::<Rule>(),
+        TypeId::of::<coursers_types::rules::Rule>()
+    );
+    assert_eq!(
+        TypeId::of::<FailureLearning>(),
+        TypeId::of::<coursers_types::rules::FailureLearning>()
+    );
+    assert_eq!(
+        TypeId::of::<RulesConfig>(),
+        TypeId::of::<coursers_types::rules::RulesConfig>()
+    );
+}
+
+#[test]
 fn in_memory_loader_satisfies_contract_empty() {
     let config = RulesConfig {
         rules: vec![],

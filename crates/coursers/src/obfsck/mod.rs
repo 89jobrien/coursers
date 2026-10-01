@@ -1,3 +1,5 @@
+//! Process-backed adapter for the obfsck MCP interface.
+
 pub mod process;
 
 pub use process::ProcessObfsckMcpClient;

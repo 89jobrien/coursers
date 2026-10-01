@@ -1,3 +1,5 @@
+//! PostToolUse processing and failure-learning updates.
+
 use coursers_core::capture::CaptureStore;
 use coursers_core::loader::RulesLoader;
 use coursers_core::state;

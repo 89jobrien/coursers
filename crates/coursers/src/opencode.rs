@@ -1,3 +1,5 @@
+//! OpenCode hook payload translation and integration validation.
+
 use std::io::{self, Write};
 
 use coursers_core::hook::chain::{

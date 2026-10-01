@@ -1,3 +1,5 @@
+//! Parsing and evaluation for PostToolUse output filters.
+
 use crate::filters::{FilterMode, FilterRule, FiltersConfig, find_rule};
 
 /// Parsed PostToolUse hook payload used by the filter subcommand.

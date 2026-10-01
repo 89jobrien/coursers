@@ -30,7 +30,7 @@ wildcard imports, adding expect messages, and refactoring one complex function.
 
 2. Verify:
 
-   ```
+   ```text
    cargo test -p crs-core
    cargo clippy -p crs-core -- -D warnings
    ```
@@ -54,7 +54,7 @@ wildcard imports, adding expect messages, and refactoring one complex function.
 
 3. Verify:
 
-   ```
+   ```text
    cargo test -p crs-core
    cargo clippy -p crs-core -- -D warnings
    ```
@@ -81,7 +81,7 @@ wildcard imports, adding expect messages, and refactoring one complex function.
 
 3. Verify:
 
-   ```
+   ```text
    cargo test -p crs-core
    cargo clippy -p crs-core -- -D warnings
    ```
@@ -102,7 +102,7 @@ wildcard imports, adding expect messages, and refactoring one complex function.
 
 3. Verify:
 
-   ```
+   ```text
    cargo test -p crs-core
    cargo clippy -p crs-core -- -D warnings
    ```
@@ -128,7 +128,7 @@ wildcard imports, adding expect messages, and refactoring one complex function.
 
 3. Verify:
 
-   ```
+   ```text
    cargo test -p crs-core
    cargo clippy -p crs-core -- -D warnings
    ```
@@ -153,7 +153,7 @@ wildcard imports, adding expect messages, and refactoring one complex function.
 
 2. Verify:
 
-   ```
+   ```text
    cargo test -p crs-core
    cargo clippy -p crs-core -- -D warnings
    ```
@@ -190,7 +190,7 @@ concern"`
 
 4. Verify:
 
-   ```
+   ```text
    cargo test
    cargo clippy --workspace -- -D warnings
    ```
@@ -213,7 +213,7 @@ concern"`
 
 3. Verify:
 
-   ```
+   ```text
    cargo test
    cargo clippy --workspace -- -D warnings
    ```
@@ -235,7 +235,7 @@ concern"`
 
 4. Verify:
 
-   ```
+   ```text
    cargo test
    ```
 
@@ -261,7 +261,7 @@ concern"`
 
 4. Verify:
 
-   ```
+   ```text
    cargo test
    ```
 
@@ -310,7 +310,7 @@ concern"`
 
 4. Verify:
 
-   ```
+   ```text
    cargo test -p crs
    cargo clippy -p crs -- -D warnings
    ```

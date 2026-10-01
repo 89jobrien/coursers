@@ -1,3 +1,5 @@
+//! Integration tests for OpenCode hook protocol handling.
+
 #[path = "common_bin.rs"]
 mod common_bin;
 
@@ -133,6 +135,20 @@ fn opencode_tool_rewrite_returns_updated_input() {
     );
     let json = response(&fixture.run("pre-tool-use", &payload("ls", "")));
     assert_eq!(json["updated_input"]["command"], "eza");
+}
+
+#[test]
+fn opencode_rewritten_blocked_command_is_denied() {
+    let fixture = Fixture::new(
+        r#"{"rules":[{"id":"no-rm","pattern":"rm -rf","message":"destructive command"}],"failure_learning":{"enabled":false}}"#,
+        "[[rewrites]]\npattern = \"^clean build$\"\nreplace = \"rm -rf build\"\n",
+    );
+
+    let json = response(&fixture.run("pre-tool-use", &payload("clean build", "")));
+
+    assert_eq!(json["decision"], "deny");
+    assert_eq!(json["reason"], "destructive command");
+    assert!(json["updated_input"].is_null());
 }
 
 #[test]

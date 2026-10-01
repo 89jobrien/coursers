@@ -68,7 +68,7 @@ Extract `coursers-types` leaf crate, rename `crs-core` to
 
 4. Verify:
 
-   ```
+   ```text
    cargo check -p coursers-types  → compiles
    ```
 
@@ -502,7 +502,7 @@ Extract `coursers-types` leaf crate, rename `crs-core` to
 
 1. Verify:
 
-   ```
+   ```text
    cargo check -p coursers-types  → compiles
    ```
 
@@ -587,7 +587,7 @@ and each module that defined a moved type.
 
 6. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    cargo clippy --workspace -- -D warnings  → clean
    ```
@@ -617,7 +617,7 @@ and each module that defined a moved type.
 
 4. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    cargo clippy --workspace -- -D warnings  → clean
    ```
@@ -653,7 +653,7 @@ and each module that defined a moved type.
 
 4. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    cargo clippy --workspace -- -D warnings  → clean
    ```
@@ -683,7 +683,7 @@ and each module that defined a moved type.
 
 5. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    ```
 
@@ -709,7 +709,7 @@ and each module that defined a moved type.
 
 5. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    ```
 
@@ -735,10 +735,9 @@ and each module that defined a moved type.
 6. Remove these modules from `crates/crs/src/lib.rs`.
 7. Delete `crates/crs/src/lib.rs` if now empty (only
    `run_rewrite` should remain; move it inline to `main.rs` if so).
-
 8. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    ```
 
@@ -771,7 +770,7 @@ and each module that defined a moved type.
 
 5. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    cargo clippy --workspace -- -D warnings  → clean
    ```
@@ -810,7 +809,7 @@ and each module that defined a moved type.
 
 4. Verify:
 
-   ```
+   ```text
    cargo build --workspace  → both binaries built
    cargo test --workspace  → all green
    ```
@@ -834,7 +833,7 @@ and each module that defined a moved type.
 
 4. Verify:
 
-   ```
+   ```text
    cargo test --workspace  → all green
    cargo clippy --workspace -- -D warnings  → clean
    ```
@@ -951,7 +950,7 @@ and each module that defined a moved type.
 
 6. Verify:
 
-   ```
+   ```text
    cargo nextest run -p coursers -- deny_exits  → both green
    ```
 
@@ -1045,7 +1044,7 @@ or inline test in `main.rs`
 
 7. Verify:
 
-   ```
+   ```text
    cargo nextest run -p coursers  → all green
    cargo clippy -p coursers -- -D warnings  → clean
    ```
@@ -1171,7 +1170,7 @@ or inline test in `main.rs`
 
 7. Verify:
 
-   ```
+   ```text
    cargo nextest run -p coursers-core  → all green
    cargo clippy -p coursers-core -- -D warnings  → clean
    ```
@@ -1184,7 +1183,7 @@ or inline test in `main.rs`
 
 After all tasks:
 
-```
+```text
 cargo test --workspace            → all green
 cargo clippy --workspace -- -D warnings  → clean
 cargo install --path crates/coursers     → installs both coursers and crs

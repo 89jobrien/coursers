@@ -1,7 +1,11 @@
+//! Safe conversion of shell file commands into structured tool calls.
+
 // qual:allow(srp) reason: "single tool-swap concern with helper fns"
 use crate::ast::parse;
 use crate::config::BYTES_PER_TOKEN;
 use serde_json::{Value, json};
+
+pub use coursers_types::filters::ToolSwapConfig;
 
 /// Default line count for head/tail when no -n flag is given (matches coreutils).
 const DEFAULT_HEAD_TAIL_LINES: usize = 10;
@@ -38,28 +42,6 @@ impl FileInfo for FakeFileInfo {
     }
     fn avg_bytes_per_line(&self, _path: &str) -> Option<usize> {
         self.avg_bpl
-    }
-}
-
-/// Config for tool-swap behaviour, loaded from `[tool_swap]` in crs-filters.toml.
-#[derive(Debug, Clone, serde::Deserialize)]
-#[serde(default)]
-pub struct ToolSwapConfig {
-    /// Token budget for bare `cat <file>`. Default: 4000.
-    pub cat_token_limit: usize,
-    /// Refuse tail→Read swap if N lines requested exceeds this. Default: 500.
-    pub tail_limit_max: usize,
-    /// Refuse find→Glob swap if -maxdepth exceeds this. Default: 10.
-    pub find_depth_max: usize,
-}
-
-impl Default for ToolSwapConfig {
-    fn default() -> Self {
-        Self {
-            cat_token_limit: 4000,
-            tail_limit_max: 500,
-            find_depth_max: 10,
-        }
     }
 }
 

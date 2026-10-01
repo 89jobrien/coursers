@@ -1,3 +1,5 @@
+//! Fail-open client for invoking the `rtk` executable.
+
 /// ProcessRtkClient — shells out to the `rtk` binary.
 ///
 /// All methods fail-open: if rtk is missing, returns None/false/empty.

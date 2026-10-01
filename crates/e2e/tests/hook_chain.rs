@@ -248,6 +248,43 @@ replace = "git status --short"
     );
 }
 
+#[test]
+fn chain_pre_denies_rewritten_command() {
+    let rules = write_rules(
+        r#"{
+            "rules": [{
+                "id": "no-rm",
+                "enabled": true,
+                "pattern": "rm -rf",
+                "pattern_flags": "",
+                "exceptions": [],
+                "target_commands": [],
+                "message": "destructive command"
+            }],
+            "failure_learning": {"enabled": false}
+        }"#,
+    );
+    let filters = write_filters(
+        r#"
+[[rewrites]]
+pattern = "^clean build$"
+replace = "rm -rf build"
+"#,
+    );
+    let payload = pre_payload("clean build");
+    let envs = [
+        ("COURSERS_HOOK_CHAIN", "1"),
+        ("COURSERS_RULES", rules.path().to_str().unwrap()),
+        ("CRS_FILTERS", filters.path().to_str().unwrap()),
+    ];
+
+    let out = run_bin_with_env("coursers", "pre", &payload, &envs);
+
+    assert_eq!(out.status.code(), Some(2));
+    assert_eq!(parse_decision(&out.stdout), "deny");
+    assert!(parse_reason(&out.stdout).contains("destructive command"));
+}
+
 // ---------------------------------------------------------------------------
 // Scenario 3: Filter (via `crs filter` subcommand on chain path)
 //
@@ -352,6 +389,7 @@ fn chain_failure_learning_blocks_at_threshold() {
         }
     }"#;
     let rules = write_rules(rules_content);
+    let filters = write_filters("");
     let tmp = TempDir::new().unwrap();
     let state_path = tmp.path().join("state.json");
 
@@ -364,6 +402,7 @@ fn chain_failure_learning_blocks_at_threshold() {
             ("COURSERS_HOOK_CHAIN", "1"),
             ("COURSERS_RULES", rules.path().to_str().unwrap()),
             ("COURSERS_STATE", state_path.to_str().unwrap()),
+            ("CRS_FILTERS", filters.path().to_str().unwrap()),
         ];
         let out = run_bin_with_env("coursers", "post", &payload, &envs);
         assert_eq!(
@@ -379,6 +418,7 @@ fn chain_failure_learning_blocks_at_threshold() {
         ("COURSERS_HOOK_CHAIN", "1"),
         ("COURSERS_RULES", rules.path().to_str().unwrap()),
         ("COURSERS_STATE", state_path.to_str().unwrap()),
+        ("CRS_FILTERS", filters.path().to_str().unwrap()),
     ];
     let out = run_bin_with_env("coursers", "pre", &payload, &envs);
 

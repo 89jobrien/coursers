@@ -111,6 +111,7 @@ pub struct HookPipelineConfig {
 }
 
 impl HookPipelineConfig {
+    /// Loads one hook-pipeline configuration file, defaulting on read or parse failure.
     pub fn load_from(path: &std::path::Path) -> Self {
         let Ok(content) = std::fs::read_to_string(path) else {
             return Self::default();
@@ -142,6 +143,15 @@ pub fn load_config() -> HookPipelineConfig {
     }
 
     // 2. Plugin configs
+    // TODO(plugins-dir-env-override): this path is only reachable through
+    // `dirs::home_dir()`, unlike the course-correct ruleset which honours
+    // `COURSERS_RULES`. There is no dedicated override, so testing any
+    // plugins.d rule means repointing the whole `HOME` env var. Setting HOME
+    // on a spawned child does work (verified), but it is a blunt instrument:
+    // it redirects every other home-relative lookup too, and there is currently
+    // no automated coverage of any plugins.d rule — including the `notify`
+    // action. Add a `COURSERS_PLUGINS_DIR` override so rules can be tested in
+    // isolation.
     if let Some(home) = dirs::home_dir() {
         let plugins_dir = home.join(".config/crs/plugins.d");
         if plugins_dir.is_dir()
@@ -330,15 +340,14 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
     result
 }
 
-/// Pipe `text` through the `redact` binary. Fails open (returns `text`
-/// unchanged) if `redact` is missing or errors — a hook must never crash
+/// Pipe `text` through `obfsck redact`. Fails open (returns `text`
+/// unchanged) if `obfsck` is missing or errors — a hook must never crash
 /// the tool call it's observing.
 fn run_redact(text: &str, level: Option<&str>) -> String {
     use std::io::Write as _;
     use std::process::Stdio;
 
-    let mut cmd = Command::new("redact");
-    cmd.arg("--level").arg(level.unwrap_or("minimal"));
+    let mut cmd = redact_command(level);
     cmd.stdin(Stdio::piped());
     cmd.stdout(Stdio::piped());
     cmd.stderr(Stdio::null());
@@ -355,6 +364,15 @@ fn run_redact(text: &str, level: Option<&str>) -> String {
         }
         _ => text.to_string(),
     }
+}
+
+fn redact_command(level: Option<&str>) -> Command {
+    let mut command = Command::new("obfsck");
+    command
+        .arg("redact")
+        .arg("--level")
+        .arg(level.unwrap_or("minimal"));
+    command
 }
 
 // ---------------------------------------------------------------------------
@@ -378,6 +396,15 @@ fn apply_rewrite(
     replace: Option<&str>,
 ) -> String {
     let mut result = command.to_string();
+
+    // TODO(rewrite-replace-all): `replace` below uses `Regex::replace`, which
+    // rewrites only the FIRST match, so a command containing the construct twice
+    // is left half-converted. Verified: `cd /nope && ls && echo done` under a
+    // `&&` -> `and` rule became `cd /nope and ls && echo done`. This is the
+    // blocker for any multi-occurrence or chained-operator rewrite, and it also
+    // limits the existing nu-shell `2>/dev/null` -> `| ignore` rule. Add an
+    // opt-in `replace_all` rule field and switch to `Regex::replace_all` here.
+    // Design: docs/designs/2026-09-30-nu-posix-operator-correction-design.md
 
     // `replace` is a regex replacement template (may use `$1`, `${name}`, ...)
     // applied via the rule's own `pattern` — which already matched the
@@ -466,26 +493,43 @@ fn git_branch_slug() -> Option<String> {
 }
 
 /// Run a side-effect command. Optionally capture stdout as a system message.
-// TODO(core-io-boundary): move filesystem discovery and subprocess execution into coursers (#51)
-// adapters, leaving the core pipeline responsible only for deterministic rule evaluation.
-fn run_side_effect(
-    args: &[String],
-    capture: bool,
-    _ctx: &HookContext,
-    result: &mut PipelineResult,
-) {
+///
+/// The child receives [`HookContext::raw_json`] on stdin, so scripts that parse
+/// `tool_input` from the payload work unchanged. stdout and stderr are always
+/// piped rather than inherited, because the hook's own stdout carries hook JSON
+/// and a child writing to it would corrupt the protocol.
+fn run_side_effect(args: &[String], capture: bool, ctx: &HookContext, result: &mut PipelineResult) {
+    use std::io::Write as _;
+    use std::process::Stdio;
+
     let Some((program, cmd_args)) = args.split_first() else {
         return;
     };
-    let output = Command::new(program).args(cmd_args).output();
-    match output {
-        Ok(out) if capture && out.status.success() => {
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if !stdout.is_empty() {
-                result.messages.push(stdout);
-            }
+
+    let mut cmd = Command::new(program);
+    cmd.args(cmd_args);
+    cmd.stdin(if ctx.raw_json.is_some() {
+        Stdio::piped()
+    } else {
+        Stdio::null()
+    });
+    cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    let Ok(mut child) = cmd.spawn() else {
+        return;
+    };
+    if let (Some(raw), Some(mut stdin)) = (ctx.raw_json.as_deref(), child.stdin.take()) {
+        let _ = stdin.write_all(raw.as_bytes());
+    }
+
+    let Ok(out) = child.wait_with_output() else {
+        return;
+    };
+    if capture && out.status.success() {
+        let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        if !stdout.is_empty() {
+            result.messages.push(stdout);
         }
-        _ => {} // fire-and-forget
     }
 }
 
@@ -657,6 +701,49 @@ mod tests {
             raw_json: None,
             output: None,
         }
+    }
+
+    fn run_capture(capture: bool, raw_json: Option<&str>) -> PipelineResult {
+        let action = HookAction::Run {
+            command: vec!["cat".into()],
+            capture,
+        };
+        let config = HookPipelineConfig {
+            hooks: vec![rule(HookEvent::PostToolUse, action)],
+        };
+        let mut context = ctx(HookEvent::PostToolUse, "/tmp/x.rs");
+        context.raw_json = raw_json.map(str::to_string);
+        run_pipeline(&config, &context)
+    }
+
+    #[test]
+    fn run_action_forwards_raw_json_to_child_stdin() {
+        // A side-effect script parses tool_input from stdin. With null stdin it
+        // sees an empty stream, fails to parse, and silently no-ops — the hook
+        // still reports PASS, so the failure is invisible without this.
+        let payload = r#"{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.rs"}}"#;
+        let result = run_capture(true, Some(payload));
+        assert_eq!(result.messages.len(), 1);
+        assert!(
+            result.messages[0].contains("/tmp/x.rs"),
+            "child did not receive the payload on stdin: {:?}",
+            result.messages
+        );
+    }
+
+    #[test]
+    fn run_action_capture_false_does_not_emit_output() {
+        let payload = r#"{"tool_name":"Write","tool_input":{"file_path":"/tmp/x.rs"}}"#;
+        let result = run_capture(false, Some(payload));
+        assert!(result.messages.is_empty(), "capture=false must stay silent");
+    }
+
+    #[test]
+    fn run_action_without_raw_json_sends_null_stdin() {
+        // No payload: the child must still run rather than blocking on a read,
+        // and must not manufacture a message from empty output.
+        let result = run_capture(true, None);
+        assert!(result.messages.is_empty());
     }
 
     #[test]
@@ -1000,22 +1087,13 @@ prepend = "WRAPPED=1"
     }
 
     #[test]
-    fn redact_action_replaces_output_when_redact_on_path() {
-        // Skipped in environments without the `redact` binary on PATH — this
-        // mirrors run_redact's fail-open behavior rather than failing the test.
-        if Command::new("redact").arg("--help").output().is_err() {
-            return;
-        }
-        let config = HookPipelineConfig {
-            hooks: vec![HookRule {
-                matcher: Some("Bash".into()),
-                ..rule(HookEvent::PostToolUse, HookAction::Redact { level: None })
-            }],
-        };
-        let mut c = ctx(HookEvent::PostToolUse, "cat secret.env");
-        c.output = Some("OPENAI_API_KEY=sk-abc123".into());
-        let r = run_pipeline(&config, &c);
-        assert!(r.replace_output.is_some());
+    fn redact_action_invokes_canonical_obfsck_subcommand() {
+        let command = redact_command(Some("standard"));
+        assert_eq!(command.get_program(), "obfsck");
+        assert_eq!(
+            command.get_args().collect::<Vec<_>>(),
+            ["redact", "--level", "standard"]
+        );
     }
 
     #[test]

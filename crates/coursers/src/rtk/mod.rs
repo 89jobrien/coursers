@@ -1,3 +1,5 @@
+//! Process-backed adapter for RTK analysis and rewriting.
+
 pub mod process;
 
 pub use process::ProcessRtkClient;

@@ -1,3 +1,5 @@
+//! Integration tests for PostToolUse failure recording.
+
 #[path = "common.rs"]
 mod common;
 

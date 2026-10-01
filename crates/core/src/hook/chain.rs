@@ -14,8 +14,8 @@
 //!
 //! A [`HookChain`] owns zero or more hooks of each type and drives the
 //! short-circuit evaluation rules:
-//! - `PreHook` chain: first `Deny` or `Rewrite` wins; subsequent hooks are
-//!   skipped once the chain is resolved.
+//! - `PreHook` chain: rewrites update the effective context for subsequent hooks;
+//!   the first `Deny` wins, otherwise the final rewrite is returned.
 //! - `PostHook` chain: all hooks run; last non-`Allow` outcome wins.
 //! - `Observer` chain: all observers always run, in order.
 
@@ -81,6 +81,7 @@ pub enum PreHookOutcome {
 /// Return `Err` only for unexpected I/O or internal failures; business-logic
 /// decisions (block, allow) belong in the `Ok(PreHookOutcome)` variants.
 pub trait PreHook {
+    /// Evaluates a hook context before tool execution.
     fn run(&self, ctx: &HookContext) -> Result<PreHookOutcome, CourserError>;
 }
 
@@ -114,6 +115,7 @@ pub enum PostHookOutcome {
 ///
 /// Same convention as [`PreHook::run`].
 pub trait PostHook {
+    /// Evaluates a completed tool call and its output.
     fn run(&self, ctx: &HookContext, output: &ToolOutput) -> Result<PostHookOutcome, CourserError>;
 }
 
@@ -127,8 +129,10 @@ pub trait PostHook {
 /// metrics that should never block a tool call. Errors are non-fatal by
 /// convention — the [`HookChain`] logs them but continues.
 pub trait Observer {
+    /// Observes the result of pre-hook evaluation.
     fn on_pre(&self, ctx: &HookContext, outcome: &PreHookOutcome) -> Result<(), CourserError>;
 
+    /// Observes the result of post-hook evaluation.
     fn on_post(
         &self,
         ctx: &HookContext,
@@ -145,9 +149,9 @@ pub trait Observer {
 ///
 /// # Pre-chain evaluation
 ///
-/// Hooks run in insertion order.  The chain stops at the first `Deny` or
-/// `Rewrite` result; remaining hooks are skipped.  All observers receive
-/// the resolved outcome.
+/// Hooks run in insertion order. Rewrites update the command seen by later
+/// hooks. The chain stops at the first `Deny`; otherwise the final rewrite is
+/// returned. All observers receive the resolved outcome.
 ///
 /// # Post-chain evaluation
 ///
@@ -199,14 +203,19 @@ impl HookChain {
     /// the outcome is determined.
     pub fn run_pre(&self, ctx: &HookContext) -> Result<PreHookOutcome, CourserError> {
         let mut outcome = PreHookOutcome::Allow;
+        let mut effective_ctx = ctx.clone();
 
         for hook in &self.pre {
-            let result = hook.run(ctx)?;
+            let result = hook.run(&effective_ctx)?;
             match &result {
                 PreHookOutcome::Allow => {}
-                PreHookOutcome::Deny(_) | PreHookOutcome::Rewrite { .. } => {
+                PreHookOutcome::Deny(_) => {
                     outcome = result;
                     break;
+                }
+                PreHookOutcome::Rewrite { command, .. } => {
+                    effective_ctx.raw_input["command"] = Value::String(command.clone());
+                    outcome = result;
                 }
             }
         }
@@ -344,12 +353,38 @@ mod tests {
     }
 
     #[test]
-    fn rewrite_short_circuits_remaining_hooks() {
+    fn rewrite_updates_remaining_hooks_and_is_returned_without_deny() {
         let chain = HookChain::new()
             .with_pre(AlwaysRewrite("nu -c ls"))
-            .with_pre(AlwaysDeny("should not run"));
+            .with_pre(AlwaysAllow);
         let outcome = chain.run_pre(&bash_ctx("ls")).unwrap();
         assert!(matches!(outcome, PreHookOutcome::Rewrite { .. }));
+    }
+
+    struct DenyCommand(&'static str);
+    impl PreHook for DenyCommand {
+        fn run(&self, ctx: &HookContext) -> Result<PreHookOutcome, CourserError> {
+            let command = ctx.raw_input["command"].as_str().unwrap_or_default();
+            if command == self.0 {
+                Ok(PreHookOutcome::Deny("rewritten command blocked".into()))
+            } else {
+                Ok(PreHookOutcome::Allow)
+            }
+        }
+    }
+
+    #[test]
+    fn rewrite_then_deny_uses_rewritten_command() {
+        let chain = HookChain::new()
+            .with_pre(AlwaysRewrite("rm -rf build"))
+            .with_pre(DenyCommand("rm -rf build"));
+
+        let outcome = chain.run_pre(&bash_ctx("clean build")).unwrap();
+
+        assert_eq!(
+            outcome,
+            PreHookOutcome::Deny("rewritten command blocked".into())
+        );
     }
 
     #[test]

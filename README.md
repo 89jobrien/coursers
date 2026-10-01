@@ -194,7 +194,7 @@ commands that match filter/rewrite rules but weren't intercepted.
 
 ## Workspace Structure
 
-```
+```text
 crates/
   core/        # shared library — rules, state, config, filters, rewrite
   coursers/    # `coursers` and `crs` binaries — hooks, rewrite, filter, discover

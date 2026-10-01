@@ -1,3 +1,5 @@
+//! Persistence ports and adapters for failure-learning state.
+
 use std::path::{Path, PathBuf};
 
 use crate::error::CourserError;
@@ -5,7 +7,9 @@ use crate::state::State;
 
 /// Port for loading and saving failure-learning state.
 pub trait StateStore {
+    /// Loads the current failure-learning state.
     fn load(&self) -> Result<State, CourserError>;
+    /// Persists the supplied failure-learning state.
     fn save(&self, state: &State) -> Result<(), CourserError>;
 }
 

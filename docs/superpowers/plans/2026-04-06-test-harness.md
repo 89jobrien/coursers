@@ -29,7 +29,6 @@ tests, Nushell for smoke script.
 - Delete: `hooks/pre-tool-course-correct.nu`
 - Delete: `hooks/post-tool-track-failures.nu`
 - Modify: `Cargo.toml` (workspace root)
-
 - [ ] **Step 1: Stage the already-deleted `src/` files and delete `hooks/`**
 
 ```bash
@@ -79,7 +78,6 @@ git commit -m "chore: remove dead hooks/ and src/, add tempfile workspace dep"
 - Create: `crates/core/src/loader.rs`
 - Modify: `crates/core/src/lib.rs`
 - Modify: `crates/core/Cargo.toml`
-
 - [ ] **Step 1: Add `testing` feature to `crates/core/Cargo.toml`**
 
 ```toml
@@ -176,7 +174,6 @@ git commit -m "feat(core): add RulesLoader trait and FsRulesLoader"
 
 - Create: `crates/core/src/store.rs`
 - Modify: `crates/core/src/lib.rs`
-
 - [ ] **Step 1: Create `crates/core/src/store.rs`**
 
 ```rust
@@ -319,7 +316,6 @@ git commit -m "feat(core): add StateStore trait, FsStateStore, InMemoryStateStor
 - Modify: `crates/coursers/src/hook/post.rs`
 - Modify: `crates/coursers/src/main.rs`
 - Modify: `crates/coursers/Cargo.toml`
-
 - [ ] **Step 1: Add `crs-core` testing feature to `crates/coursers/Cargo.toml`**
 
 ```toml
@@ -1100,7 +1096,6 @@ git commit -m "test(coursers): unit tests for hook::post"
 - Create: `tests/integration/fixtures/payload_post_fail.json`
 - Create: `tests/integration/fixtures/payload_post_ok.json`
 - Create: `tests/integration/fixtures/payload_post_signal.json`
-
 - [ ] **Step 1: Create fixture directory and files**
 
 `tests/integration/fixtures/rules_basic.json`:
@@ -1215,7 +1210,6 @@ git commit -m "test(integration): add fixture JSON files"
 - Create: `tests/integration/post_hook.rs`
 - Create: `tests/integration/common.rs`
 - Modify: `crates/coursers/Cargo.toml`
-
 - [ ] **Step 1: Add integration test config to `crates/coursers/Cargo.toml`**
 
 Append:

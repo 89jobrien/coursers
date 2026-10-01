@@ -20,6 +20,7 @@ pub struct RuleViolation {
 }
 
 impl RuleViolation {
+    /// Creates a rule violation for a command and optional source span.
     pub fn new(command: &str, message: &str, span: Option<std::ops::Range<usize>>) -> Self {
         Self {
             command: command.to_string(),

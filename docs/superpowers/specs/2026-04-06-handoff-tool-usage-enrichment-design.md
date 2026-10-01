@@ -21,7 +21,7 @@ All transformation logic lives in the Nushell script. Callers invoke it directly
 
 ## Data Flow
 
-```
+```text
 rtk discover --format json --since <N>
         ↓
 scripts/enrich-handoff.nu
@@ -90,7 +90,7 @@ nu scripts/enrich-handoff.nu 2>/dev/null || true
 After reading `.ctx/HANDOFF.state.yaml`, if `tool_usage` is present, surfaces a one-line summary
 before P0 triage:
 
-```
+```text
 Tool usage (last session): 414 commands · ~19K tokens saveable · top unhandled: op account (19)
 ```
 

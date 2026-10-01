@@ -1,3 +1,5 @@
+//! Data-driven end-to-end rule and hook scenarios.
+
 use serde::Deserialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};

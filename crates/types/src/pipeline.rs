@@ -1,5 +1,11 @@
+//! Domain configuration and results for generic hook pipelines.
+
 use serde::Deserialize;
 
+// TODO(hook-schema-parity): Keep schemas/crs-hooks.schema.json synchronized with every
+// runtime action, regex semantic, and supported template placeholder.
+// TODO(harness-neutral-contract): Define shared request, response, and protocol-adapter
+// contracts for Claude, Codex, and OpenCode instead of target-specific response paths.
 /// Claude Code hook events.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize)]
 #[serde(rename_all = "kebab-case")]

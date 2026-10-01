@@ -1,3 +1,5 @@
+//! Profile configuration, path resolution, and active godmode-task lookup.
+
 use std::path::PathBuf;
 
 /// Approximate bytes per token (GPT/Claude tokenizer average).
@@ -60,6 +62,8 @@ struct GodmodeStatus {
     running: Vec<String>,
 }
 
+// TODO(hook-latency-benchmarks): Add cold-start and steady-state regression benchmarks
+// for configuration loading, matcher construction, and hook evaluation against the 5ms budget.
 /// Read running godmode task titles from `~/.cache/godmode/status.json`, a
 /// file godmode writes on every status change. Used by the pre-hook to check
 /// `Rule::task_override` glob matches without shelling out.
@@ -190,7 +194,7 @@ impl ProfileConfig {
     /// Assemble a [`crate::hook::chain::HookChain`] from this profile's factory adapters.
     ///
     /// Hook composition (in evaluation order):
-    /// - **Pre**: `RuleBlockHook` → `RewriteHook` (first Deny/Rewrite short-circuits)
+    /// - **Pre**: `RewriteHook` → `RuleBlockHook` (rewrites feed policy checks)
     /// - **Post**: `FilterHook` (last Filter outcome wins)
     /// - **Observer**: `FailureObserver` (always runs; non-fatal errors)
     ///
@@ -204,11 +208,11 @@ impl ProfileConfig {
         let titles = running_task_titles();
 
         HookChain::new()
+            .with_pre(RewriteHook::new(self.rewrite_loader()))
             .with_pre(
                 RuleBlockHook::new(self.rules_loader(), self.state_store())
                     .with_running_titles(titles),
             )
-            .with_pre(RewriteHook::new(self.rewrite_loader()))
             .with_post(FilterHook::new(self.filters_loader()))
             .with_observer(FailureObserver::new(
                 self.rules_loader(),

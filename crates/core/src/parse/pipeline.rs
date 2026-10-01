@@ -1,3 +1,5 @@
+//! Quote-aware extraction of commands and shell pipeline segments.
+
 /// Extract the command names (argv[0]) invoked across all pipe stages of a
 /// shell segment.
 ///

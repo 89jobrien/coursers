@@ -61,6 +61,7 @@ pub struct SuggestionParams {
 
 impl SuggestionRecord {
     // qual:allow(srp) reason: "6 params delegated to SuggestionParams builder"
+    /// Creates a pending suggestion record from its captured command context.
     pub fn new(
         original: impl Into<String>,
         suggestion: impl Into<String>,
@@ -79,6 +80,7 @@ impl SuggestionRecord {
         })
     }
 
+    /// Creates a pending suggestion record with its timestamp and repository metadata.
     pub fn from_params(p: SuggestionParams) -> Self {
         let repo = repo_from_cwd(&p.cwd);
         Self {
@@ -106,6 +108,7 @@ pub struct DedupeKey {
 }
 
 impl DedupeKey {
+    /// Builds a normalized deduplication key from a suggestion record.
     pub fn from_record(r: &SuggestionRecord) -> Self {
         Self {
             original: r.original.trim().to_string(),
@@ -113,6 +116,7 @@ impl DedupeKey {
         }
     }
 
+    /// Builds a normalized deduplication key from command and suggestion text.
     pub fn from_parts(original: &str, suggestion: &str) -> Self {
         Self {
             original: original.trim().to_string(),
@@ -127,7 +131,9 @@ impl DedupeKey {
 
 /// Port for recording and accepting suggestion events.
 pub trait CaptureStore {
+    /// Records a captured suggestion event.
     fn record(&self, record: SuggestionRecord) -> Result<(), CourserError>;
+    /// Marks matching pending suggestions as accepted by a later command.
     fn mark_accepted(
         &self,
         session_id: &str,
@@ -148,12 +154,14 @@ pub struct InMemoryCaptureStore {
 
 #[cfg(any(test, feature = "testing"))]
 impl InMemoryCaptureStore {
+    /// Creates an empty in-memory capture store.
     pub fn new() -> Self {
         Self {
             inner: std::cell::RefCell::new(Vec::new()),
         }
     }
 
+    /// Returns a snapshot of all captured records.
     pub fn records(&self) -> Vec<SuggestionRecord> {
         self.inner.borrow().clone()
     }

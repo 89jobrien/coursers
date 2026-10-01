@@ -33,7 +33,7 @@ cargo run -p xtask -- --help
 
 Five-crate workspace:
 
-```
+```text
 crates/
   types/     # coursers-types — domain types and port traits
   core/      # coursers-core — shared library (rules, state, filters, rewrite, history)

@@ -1,3 +1,5 @@
+//! JSON-RPC stdio client for the `obfsck-mcp` process.
+
 /// ProcessObfsckMcpClient — communicates with `obfsck-mcp` via JSON-RPC stdio.
 ///
 /// Spawns the binary once per call (stateless; acceptable for infrequent use).

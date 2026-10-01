@@ -1,3 +1,5 @@
+//! Binary-level tests for Nushell syntax validation.
+
 #[path = "common_bin.rs"]
 mod common_bin;
 
@@ -12,7 +14,6 @@ fn crs_nu_check(args: &[&str]) -> std::process::Output {
         .expect("failed to spawn crs")
 }
 
-// t7
 #[test]
 fn valid_file_exits_zero() {
     let dir = tempfile::tempdir().unwrap();
@@ -27,7 +28,6 @@ fn valid_file_exits_zero() {
     );
 }
 
-// t8
 #[test]
 fn invalid_file_exits_one() {
     let dir = tempfile::tempdir().unwrap();
@@ -39,7 +39,6 @@ fn invalid_file_exits_one() {
     assert!(!stderr.is_empty(), "expected error output on stderr");
 }
 
-// t9
 #[test]
 fn hooks_flag_scans_hook_dir() {
     // ~/.claude/hooks/nu/ must exist; even if empty the command should exit 0.
@@ -50,7 +49,6 @@ fn hooks_flag_scans_hook_dir() {
     assert!(code == 0 || code == 1, "unexpected exit code: {code}");
 }
 
-// t10
 #[test]
 fn nu_libs_flag_scans_lib_dir() {
     // ~/dev/nu_libs/lib must exist and all mod.nu files we fixed should pass.

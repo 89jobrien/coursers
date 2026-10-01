@@ -1,3 +1,5 @@
+//! Core rules, parsing, hook processing, state, and analysis for Coursers.
+
 #![warn(unreachable_pub)]
 
 pub mod error;
@@ -7,7 +9,11 @@ pub mod analyze;
 pub mod config;
 pub mod date;
 pub mod diagnostics;
+// TODO(adapter-crate-log-io): Move the redb-backed hook log into coursers-adapters
+// after the initial hook execution adapters are stable.
 pub mod hook;
+// TODO(adapter-crate-session-io): Move JSONL session discovery and reading into
+// coursers-adapters while keeping history aggregation in core.
 pub mod jsonl_source;
 pub mod loader;
 pub mod obfsck;
@@ -15,6 +21,8 @@ pub mod parse;
 pub mod replay;
 pub mod rtk;
 pub mod rules;
+// TODO(adapter-crate-prefix-io): Move prefixe-backed file stores and path resolution
+// behind published coursers-adapters constructors.
 pub mod rx_prefix;
 pub mod state;
 pub mod store;

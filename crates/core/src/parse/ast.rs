@@ -1,3 +1,5 @@
+//! Lightweight shell-command parsing into argument vectors.
+
 /// Parsed shell command — argv[0] is the command name, rest are arguments.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShellCmd {

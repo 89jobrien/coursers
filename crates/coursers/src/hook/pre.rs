@@ -1,3 +1,5 @@
+//! PreToolUse rule checks, learned-failure checks, and deny responses.
+
 use coursers_core::capture::CaptureStore;
 use coursers_core::loader::RulesLoader;
 use coursers_core::store::StateStore;
@@ -238,10 +240,19 @@ pub fn run_with_proto<L: RulesLoader, S: StateStore>(
 
     // 2. Learned failures
     if fl.enabled {
-        let st = store.load().unwrap_or_else(|e| {
+        let loaded = store.load().unwrap_or_else(|e| {
             eprintln!("[coursers] warning: failed to load state: {e}");
             coursers_core::state::State::default()
         });
+        // Drop entries past their TTL on the read path too, so commands that never recur
+        // do not linger in state indefinitely (pruning only happened on record).
+        let before = loaded.failures.len();
+        let st = coursers_core::state::prune_stale(loaded, fl);
+        if st.failures.len() != before
+            && let Err(e) = store.save(&st)
+        {
+            eprintln!("[coursers] warning: failed to prune state: {e}");
+        }
         if let Some(msg) = state::check_learned(command, &st, fl) {
             record_correction(
                 &coursers_core::hook::log::db_path(),

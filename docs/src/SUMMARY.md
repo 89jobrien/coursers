@@ -2,11 +2,11 @@
 
 [coursers](./README.md)
 
-# Architecture
+## Architecture
 
 - [Overview](./architecture/overview.md)
 
-# Crates
+## Crates
 
 - [coursers-types](./crates/coursers-types.md)
 - [coursers-core](./crates/coursers-core.md)
@@ -14,7 +14,7 @@
 - [coursers-e2e](./crates/coursers-e2e.md)
 - [xtask](./crates/xtask.md)
 
-# Reference
+## Reference
 
 - [Configuration](./reference/configuration.md)
 - [CI Pipeline](./reference/ci-pipeline.md)

@@ -1,3 +1,5 @@
+//! Reads Claude session JSONL files as command-history records.
+
 use crate::history::{CommandRecord, CommandSource};
 use serde_json::Value;
 use std::collections::HashMap;

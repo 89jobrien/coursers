@@ -1,3 +1,5 @@
+//! Implementations of the shared CLI subcommands.
+
 // Commands migrated from the crs binary.
 // qual:allow(srp) reason: "CLI subcommand implementations â inherently large"
 // TODO(split-crs-commands): replace this god-module with command-specific modules that return (#55)
@@ -266,6 +268,7 @@ pub fn handle_bare_failure(
     Some(format!("Command failed. Retry with: {prefixed}"))
 }
 
+/// Reads a PostToolUse payload and emits any configured output replacement.
 pub fn cmd_filter() {
     let Some(payload) = read_stdin_payload() else {
         return;
@@ -355,6 +358,7 @@ pub fn cmd_filter() {
     }
 }
 
+/// Reads a PreToolUse payload and emits a rewritten command when a rule matches.
 pub fn cmd_rewrite() {
     let Some(payload) = read_stdin_payload() else {
         std::process::exit(1);
@@ -421,6 +425,7 @@ pub fn cmd_rewrite() {
     std::process::exit(1);
 }
 
+/// Validates the configured Claude hook pipeline and reports diagnostics.
 pub fn cmd_validate_hooks() {
     use coursers_core::hook_pipeline::{
         DiagLevel, HookPipelineConfig, config_source_paths, lint_config, load_config,
@@ -470,6 +475,7 @@ pub fn cmd_validate_hooks() {
     }
 }
 
+/// Validates the installed Codex hook configuration and assets.
 pub fn cmd_validate_codex_hooks() {
     let home = dirs::home_dir().unwrap_or_else(|| {
         eprintln!("crs: cannot resolve home directory");
@@ -726,6 +732,7 @@ fn run_codex_backend(
     }
 }
 
+/// Runs the configured hook pipeline for one target and event.
 pub fn cmd_hook(hook_target: &str, event_str: &str) {
     use coursers_core::hook_pipeline::{HookContext, load_config, run_pipeline};
 
@@ -852,8 +859,20 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
         return;
     }
 
+    // Redacted output and system messages are emitted together: a redact rule and a
+    // `Notify` rule can both match the same call, so returning after the redact response
+    // would discard the notifications. On `Bash` the
+    // `guardian/obfsck-redact-tool-output` rule always matches, which previously made
+    // these rules unreachable in practice: nextest/snap-notify, ci/push-watch,
+    // triage/cargo-gate-failed, triage/nextest-failed, triage/fmt-failed.
+    //
+    // Mirrors `opencode.rs::apply_pipeline_to_response`, which extends `messages`
+    // alongside `replacement_output` rather than returning early.
     if let Some(ref redacted) = result.replace_output {
-        let json = coursers_core::hook::protocol::filter_result_response(redacted);
+        let json = coursers_core::hook::protocol::filter_result_with_messages_response(
+            redacted,
+            &result.messages,
+        );
         write_stdout(&json);
         return;
     }
@@ -869,6 +888,7 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
     // No action — silent pass.
 }
 
+/// Queries or prunes the hook execution log and formats the results.
 pub fn cmd_log(
     limit: usize,
     event: Option<&str>,
@@ -990,6 +1010,7 @@ fn event_str_table(event: coursers_core::hook_pipeline::HookEvent) -> (&'static 
     }
 }
 
+/// Returns the canonical Claude spelling of a hook event.
 pub fn event_str_for(event: coursers_core::hook_pipeline::HookEvent) -> &'static str {
     event_str_table(event).0
 }
@@ -998,11 +1019,13 @@ fn event_str_kebab(event: coursers_core::hook_pipeline::HookEvent) -> &'static s
     event_str_table(event).1
 }
 
+/// Emits a PreToolUse response replacing the requested tool and input.
 pub fn emit_tool_swap(tool_name: &str, tool_input: serde_json::Value) {
     let json = coursers_core::hook::protocol::tool_swap_response(tool_name, tool_input);
     write_stdout(&json);
 }
 
+/// Loads rewrite rules from the merged filter configuration.
 pub fn load_rewrite_config() -> coursers_core::rewrite::RewriteConfig {
     let Some(content) = coursers_core::filters::merged_content() else {
         return coursers_core::rewrite::RewriteConfig::default();
@@ -1053,11 +1076,13 @@ pub fn check_probe_match(
     false
 }
 
+/// Emits a hook response that replaces tool output with a message.
 pub fn emit_message(text: &str) {
     let json = coursers_core::hook::protocol::filter_result_response(text);
     write_stdout(&json);
 }
 
+/// Emits a PreToolUse response containing a rewritten Bash command.
 pub fn emit_rewrite(command: &str, applied_rules: &[String]) {
     let reason = if applied_rules.is_empty() {
         format!("crs rewrite: {command}")
@@ -1068,6 +1093,7 @@ pub fn emit_rewrite(command: &str, applied_rules: &[String]) {
     write_stdout(&json);
 }
 
+/// Writes and flushes protocol JSON to stdout.
 pub fn write_stdout(json: &str) {
     let stdout = io::stdout();
     let mut handle = stdout.lock();
@@ -1075,6 +1101,7 @@ pub fn write_stdout(json: &str) {
     handle.flush().ok();
 }
 
+/// Validates blocking rules, exceptions, triggers, and required alternatives.
 pub fn cmd_validate(profile_cfg: &coursers_core::config::ProfileConfig) {
     use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
@@ -1205,6 +1232,7 @@ pub fn cmd_validate(profile_cfg: &coursers_core::config::ProfileConfig) {
     }
 }
 
+/// Evaluates one stdin command against the active ruleset and prints verdicts.
 pub fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
     use coursers_core::loader::{ProfileFsRulesLoader, RulesLoader};
     use regex::Regex;
@@ -1350,6 +1378,7 @@ pub fn cmd_probe(profile_cfg: &coursers_core::config::ProfileConfig) {
     }
 }
 
+/// Scans command history for unhandled commands and optional filter suggestions.
 pub fn cmd_discover(
     profile_cfg: &coursers_core::config::ProfileConfig,
     all: bool,
@@ -1419,6 +1448,17 @@ pub fn cmd_discover(
         _ => print_discover_text(&report),
     }
 
+    // TODO(discover-empty-scan-clobbers-report): Skip the write when the scan found
+    // nothing, instead of overwriting a good report with an empty one. Reproduced
+    // 2026-09-30: `crs discover` with the default `--since 30` scans 0 sessions
+    // (no transcript in ~/.claude/projects carries a Bash tool_use newer than the
+    // cutoff) and still rewrites a tracked 216-line .ctx/HANDOFF.tools.yaml down to
+    // 3 lines. Required `git checkout -- .ctx/HANDOFF.tools.yaml` twice to recover.
+    // The guard should be `report.scanned_commands == 0` — an empty scan carries no
+    // information, so preserving the previous report is strictly better than
+    // truncating it. Consider also warning on stderr when the scan is empty for a
+    // reason other than a too-narrow `--since`, since "0 sessions" is currently
+    // indistinguishable from "the history parser found nothing".
     let ctx = std::path::Path::new(".ctx");
     if ctx.is_dir() {
         write_tools_yaml(&report, since, &rtk_map, ctx.join("HANDOFF.tools.yaml"));
@@ -1660,6 +1700,7 @@ fn format_tokens(n: u64) -> String {
     }
 }
 
+/// Prints cumulative block counts by rule.
 pub fn cmd_stats() {
     use coursers_core::stats::{load, sorted_blocks, stats_path};
 
@@ -1685,6 +1726,7 @@ pub fn cmd_stats() {
     println!("{:<32} {:>8}", "Total", total);
 }
 
+/// Aggregates and renders session insights with optional filters.
 pub fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
     use coursers_core::insights::{aggregate, enrich, load_facets};
 
@@ -1749,6 +1791,7 @@ pub fn cmd_insights(format: &str, since: Option<u32>, repo: Option<&str>) {
     }
 }
 
+/// Audits or removes entries from prefix-learning state.
 pub fn cmd_audit(remove: Option<String>) {
     use coursers_core::rx_prefix::{
         FilePrefixStore, FileProbeStore, PrefixStore as _, ProbeStore as _, audit_state,
@@ -1803,6 +1846,7 @@ pub fn cmd_audit(remove: Option<String>) {
     }
 }
 
+/// Generates candidate rules from unhandled command history.
 pub fn cmd_suggest(
     profile_cfg: &coursers_core::config::ProfileConfig,
     all: bool,
@@ -1876,6 +1920,7 @@ pub fn cmd_suggest(
     }
 }
 
+/// Prints recent blocked-command history with optional rule filtering.
 pub fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
     use coursers_core::loader::{FsRulesLoader, RulesLoader};
     use coursers_core::stats::{load as load_stats, stats_path};
@@ -1964,6 +2009,7 @@ pub fn cmd_history(limit: usize, rule_filter: Option<&str>, format: &str) {
     }
 }
 
+/// Exports rules, statistics, and failure state as portable JSON.
 pub fn cmd_export(out_path: Option<&str>) {
     use coursers_core::loader::{FsRulesLoader, RulesLoader};
     use coursers_core::stats::{load as load_stats, stats_path};
@@ -2017,6 +2063,9 @@ pub fn cmd_export(out_path: Option<&str>) {
     }
 }
 
+// TODO(historical-heatmap): Build heatmaps from the complete redb execution log rather
+// than the single last_seen timestamp retained for each rule.
+/// Renders rule activity as a time-based heatmap.
 pub fn cmd_heat(rule_filter: Option<&str>) {
     use coursers_core::heat::build;
     use coursers_core::stats::{load as load_stats, stats_path};
@@ -2056,6 +2105,7 @@ pub fn cmd_heat(rule_filter: Option<&str>) {
     print!("{}", hm.render());
 }
 
+/// Replays session commands against the active ruleset.
 pub fn cmd_replay(session_path: Option<&str>, format: &str) {
     use coursers_core::loader::{FsRulesLoader, RulesLoader};
     use coursers_core::replay::{format_text, replay};
@@ -2262,6 +2312,7 @@ fn trunc(s: &str, width: usize) -> String {
     }
 }
 
+/// Builds the insights table header and separator.
 pub fn insights_header() -> (String, String) {
     let header = format!(
         "{:<date$}  {:<repo$}  {:<branch$}  {:<outcome$}  {:<help$}  {:>friction$}  summary",
@@ -2282,6 +2333,7 @@ pub fn insights_header() -> (String, String) {
     (header, sep)
 }
 
+/// Formats one enriched session facet as an insights table row.
 pub fn format_insight_row(
     ef: &coursers_core::insights::EnrichedFacet,
     summary_width: usize,
@@ -2347,6 +2399,7 @@ pub fn format_insight_row(
     )
 }
 
+/// Sorts enriched session facets from newest to oldest.
 pub fn sort_enriched_newest_first(enriched: &mut [coursers_core::insights::EnrichedFacet]) {
     enriched.sort_by(|a, b| {
         let ts_a = a.git.as_ref().and_then(|g| g.timestamp.as_deref());

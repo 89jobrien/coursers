@@ -1,3 +1,5 @@
+//! Hook contracts, protocol handling, execution pipelines, and logging.
+
 pub mod chain;
 pub mod concrete;
 pub mod filter_logic;

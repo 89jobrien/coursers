@@ -1,3 +1,5 @@
+//! Domain records and deduplication keys for captured suggestions.
+
 use serde::{Deserialize, Serialize};
 
 /// A suggestion record pairing a blocked command with its alternative.
@@ -35,6 +37,7 @@ pub struct DedupeKey {
 }
 
 impl DedupeKey {
+    /// Builds a normalized deduplication key from a suggestion record.
     pub fn from_record(r: &SuggestionRecord) -> Self {
         Self {
             original: r.original.trim().to_string(),
@@ -42,6 +45,7 @@ impl DedupeKey {
         }
     }
 
+    /// Builds a normalized deduplication key from command and suggestion text.
     pub fn from_parts(original: &str, suggestion: &str) -> Self {
         Self {
             original: original.trim().to_string(),
