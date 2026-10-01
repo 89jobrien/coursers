@@ -220,8 +220,12 @@ fn restrict_to_project_scope(rules: &[HookRule]) -> Vec<HookRule> {
 /// 1. Project-local `.ctx/crs-hooks.toml` (walk up from CWD)
 /// 2. Global `~/.config/crs/hooks.toml`
 /// 3. Plugin configs from `~/.config/crs/plugins.d/*.toml`
-// TODO(hook-config-trust): require explicit repository trust before project-local rules may (#50)
-// rewrite commands or execute side effects from `.ctx/crs-hooks.toml`.
+///
+/// Source 1 is a cloned repository's own file, so its `run` actions pass
+/// through `restrict_to_project_scope` before merging. `Deny`, `Rewrite`,
+/// `Notify`, and `Redact` are unaffected: a repo may block or normalise
+/// commands, it just cannot reach a program the allowlist does not name.
+/// Sources 2 and 3 are the user's own and keep full `run` access.
 pub fn load_config() -> HookPipelineConfig {
     let mut config = HookPipelineConfig::default();
 
