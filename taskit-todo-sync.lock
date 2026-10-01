@@ -230,6 +230,16 @@
       "file": "crates/coursers/src/crs_commands.rs",
       "text": "TODO(discover-empty-scan-clobbers-report): Skip the write when the scan found",
       "issue_number": 117
+    },
+    {
+      "file": "crates/core/src/hook/pipeline.rs",
+      "text": "TODO(plugins-dir-env-override): this path is only reachable through",
+      "issue_number": 118
+    },
+    {
+      "file": "crates/core/src/hook/pipeline.rs",
+      "text": "TODO(rewrite-replace-all): `replace` below uses `Regex::replace`, which",
+      "issue_number": 119
     }
   ]
 }

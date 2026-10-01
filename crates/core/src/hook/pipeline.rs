@@ -143,6 +143,15 @@ pub fn load_config() -> HookPipelineConfig {
     }
 
     // 2. Plugin configs
+    // TODO(plugins-dir-env-override): this path is only reachable through
+    // `dirs::home_dir()`, unlike the course-correct ruleset which honours
+    // `COURSERS_RULES`. There is no dedicated override, so testing any
+    // plugins.d rule means repointing the whole `HOME` env var. Setting HOME
+    // on a spawned child does work (verified), but it is a blunt instrument:
+    // it redirects every other home-relative lookup too, and there is currently
+    // no automated coverage of any plugins.d rule — including the `notify`
+    // action. Add a `COURSERS_PLUGINS_DIR` override so rules can be tested in
+    // isolation.
     if let Some(home) = dirs::home_dir() {
         let plugins_dir = home.join(".config/crs/plugins.d");
         if plugins_dir.is_dir()
@@ -387,6 +396,15 @@ fn apply_rewrite(
     replace: Option<&str>,
 ) -> String {
     let mut result = command.to_string();
+
+    // TODO(rewrite-replace-all): `replace` below uses `Regex::replace`, which
+    // rewrites only the FIRST match, so a command containing the construct twice
+    // is left half-converted. Verified: `cd /nope && ls && echo done` under a
+    // `&&` -> `and` rule became `cd /nope and ls && echo done`. This is the
+    // blocker for any multi-occurrence or chained-operator rewrite, and it also
+    // limits the existing nu-shell `2>/dev/null` -> `| ignore` rule. Add an
+    // opt-in `replace_all` rule field and switch to `Regex::replace_all` here.
+    // Design: docs/designs/2026-09-30-nu-posix-operator-correction-design.md
 
     // `replace` is a regex replacement template (may use `$1`, `${name}`, ...)
     // applied via the rule's own `pattern` — which already matched the
