@@ -78,7 +78,8 @@ fn pre_payload(command: &str) -> String {
 fn rewritten_command(out: &Output) -> Option<String> {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let v: serde_json::Value = serde_json::from_str(stdout.trim()).ok()?;
-    v.get("updatedInput")?
+    v.get("hookSpecificOutput")?
+        .get("updatedInput")?
         .get("command")?
         .as_str()
         .map(str::to_string)
@@ -115,5 +116,61 @@ message = "PROBE_LOADED"
     assert!(
         stdout.contains("PROBE_LOADED"),
         "plugin rule did not load; stdout: {stdout}"
+    );
+}
+
+const DEVNULL_RULE: &str = r#"[[hooks]]
+label = "nu/devnull-to-ignore"
+event = "pre-tool-use"
+matcher = "Bash"
+pattern = "2>/dev/null"
+unless = "^nu\\b"
+action = "rewrite"
+replace = "| ignore"
+"#;
+
+#[test]
+fn devnull_redirect_is_rewritten_to_ignore() {
+    let home = PluginsHome::new();
+    home.write_rule("nu-shell.toml", DEVNULL_RULE);
+    let out = home.run(
+        "pre-tool-use",
+        &pre_payload("rm -rf /tmp/x 2>/dev/null; echo ok"),
+    );
+    assert_eq!(
+        rewritten_command(&out).as_deref(),
+        Some("rm -rf /tmp/x | ignore; echo ok"),
+        "expected 2>/dev/null -> | ignore, got: {out:?}"
+    );
+}
+
+#[test]
+fn valid_nu_operators_are_left_untouched() {
+    // `;` and a bare `|` are VALID in Nushell. The rule must never touch them.
+    let home = PluginsHome::new();
+    home.write_rule("nu-shell.toml", DEVNULL_RULE);
+    for command in ["rm -rf /tmp/x; echo ok", "ls | tail -3"] {
+        let out = home.run("pre-tool-use", &pre_payload(command));
+        assert_eq!(
+            rewritten_command(&out),
+            None,
+            "must not rewrite valid nu syntax: {command}"
+        );
+    }
+}
+
+#[test]
+fn already_wrapped_nu_command_is_exempt() {
+    // `unless = "^nu\\b"` prevents rewriting an already-nu-wrapped command.
+    let home = PluginsHome::new();
+    home.write_rule("nu-shell.toml", DEVNULL_RULE);
+    let out = home.run(
+        "pre-tool-use",
+        &pre_payload("nu -c 'rm -rf /tmp/x 2>/dev/null'"),
+    );
+    assert_eq!(
+        rewritten_command(&out),
+        None,
+        "nu-prefixed command is exempt"
     );
 }
