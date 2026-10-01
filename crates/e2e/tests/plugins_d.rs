@@ -238,3 +238,91 @@ fn residual_rule_is_silent_for_valid_nu_commands() {
         );
     }
 }
+
+/// `no-bash-use-nu` matched a bare `;` via the leading `(;|...)` alternative.
+///
+/// The Bash tool already executes Nushell, where `;` is a valid statement
+/// separator, so that alternative denied every multi-command call — including
+/// ones that were already correct. It also pre-empted the nu/devnull-to-ignore
+/// rewrite, because `coursers pre` runs first and exit(2)s.
+const NO_BASH_USE_NU_RULE: &str = r#"{"rules":[{"id":"no-bash-use-nu","pattern":"(&&|\\|\\||<<|\\$\\(|`|\\$\\{|\\bbash\\b\\s+-c\\b|\\bfor\\b|\\bwhile\\b|\\buntil\\b|\\bif\\b|\\bthen\\b|\\belif\\b|\\belse\\b|\\bfi\\b|\\bcase\\b|\\bdo\\b|\\bdone\\b|\\bfunction\\b)","message":"wrap in nu","exceptions":["^nu\\b"],"exception_policy":"allow_if_any_match"}]}"#;
+
+fn deny_verdict(out: &Output) -> String {
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let v: serde_json::Value =
+        serde_json::from_str(stdout.trim()).unwrap_or(serde_json::Value::Null);
+    v.get("hookSpecificOutput")
+        .and_then(|h| h.get("permissionDecision"))
+        .and_then(|d| d.as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+/// Run the JSON course-correct ruleset through the real `crs hook` path.
+fn run_json_rule(rules: &str, command: &str) -> String {
+    let mut rules_file = tempfile::NamedTempFile::new().unwrap();
+    use std::io::Write as _;
+    rules_file.write_all(rules.as_bytes()).unwrap();
+    let state_dir = tempfile::TempDir::new().unwrap();
+    let payload = pre_payload(command);
+    let mut cmd = Command::new(workspace_bin("crs"));
+    cmd.args(["hook", "pre-tool-use"])
+        .env("COURSERS_RULES", rules_file.path())
+        .env("COURSERS_STATE", state_dir.path().join("state.json"))
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn().expect("spawn crs hook");
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(payload.as_bytes())
+        .unwrap();
+    deny_verdict(&child.wait_with_output().unwrap())
+}
+
+#[test]
+fn semicolon_is_not_denied_in_nu_context() {
+    // `;` is a valid Nushell statement separator. Denying it breaks correct
+    // commands and starves every later PreToolUse rule.
+    for command in ["echo a; echo b", "rm -rf /tmp/x 2>/dev/null; echo ok"] {
+        assert_ne!(
+            run_json_rule(NO_BASH_USE_NU_RULE, command),
+            "deny",
+            "`;` must not be denied: {command}"
+        );
+    }
+}
+
+#[test]
+fn genuinely_posix_only_operators_are_still_denied() {
+    // Dropping `;` must not weaken the rule for anything Nushell actually
+    // rejects. Each of these is a parse error or POSIX-only form.
+    for command in [
+        "cd a && ls",
+        "cd a || ls",
+        "cat <<EOF",
+        "bash -c ls",
+        "for x in a b; do echo x; done",
+        "while true; do echo x; done",
+        "if true; then echo y; fi",
+        "echo `date`",
+        "echo ${HOME}",
+    ] {
+        assert_eq!(
+            run_json_rule(NO_BASH_USE_NU_RULE, command),
+            "deny",
+            "must still be denied: {command}"
+        );
+    }
+}
+
+#[test]
+fn nu_wrapped_command_stays_exempt() {
+    assert_ne!(
+        run_json_rule(NO_BASH_USE_NU_RULE, "nu -c 'cd a && ls'"),
+        "deny",
+        "the ^nu exception must still apply"
+    );
+}
