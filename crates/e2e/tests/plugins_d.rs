@@ -174,3 +174,67 @@ fn already_wrapped_nu_command_is_exempt() {
         "nu-prefixed command is exempt"
     );
 }
+
+const RESIDUAL_RULE: &str = r#"[[hooks]]
+label = "nu/posix-residual-correction"
+event = "post-tool-use"
+matcher = "Bash"
+pattern = "2>&1|2>\\s*/dev/null|&&|\\|\\|"
+unless = "^nu\\b"
+action = "notify"
+template = "Nushell rejected POSIX-only syntax. Use out+err> FILE, or | complete | get stdout stderr."
+"#;
+
+fn post_payload(command: &str) -> String {
+    format!(
+        r#"{{"hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{{"command":{command:?}}},"tool_response":{{"stdout":"","stderr":""}}}}"#
+    )
+}
+
+#[test]
+fn residual_posix_syntax_surfaces_correction() {
+    // Regression guard for `pattern` semantics: it matches ctx.target (the
+    // command), never the tool output. A rule keyed on the string
+    // "nu::parser::shell_outerr" could never fire.
+    let home = PluginsHome::new();
+    home.write_rule("nu-shell.toml", RESIDUAL_RULE);
+    let out = home.run(
+        "post-tool-use",
+        &post_payload("godmode handoff 2>&1 | tail -30"),
+    );
+    let msg = system_message(&out).expect("expected systemMessage correction");
+    assert!(
+        msg.contains("out+err>"),
+        "correction must name out+err>, got: {msg}"
+    );
+}
+
+#[test]
+fn residual_rule_does_not_block_the_command() {
+    // The command already ran. notify must inform, never deny.
+    let home = PluginsHome::new();
+    home.write_rule("nu-shell.toml", RESIDUAL_RULE);
+    let out = home.run(
+        "post-tool-use",
+        &post_payload("godmode handoff 2>&1 | tail -30"),
+    );
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        !stdout.contains("\"deny\""),
+        "notify must not deny; stdout: {stdout}"
+    );
+}
+
+#[test]
+fn residual_rule_is_silent_for_valid_nu_commands() {
+    let home = PluginsHome::new();
+    home.write_rule("nu-shell.toml", RESIDUAL_RULE);
+    for command in ["ls | tail -3", "rm -rf /tmp/x; echo ok"] {
+        let out = home.run("post-tool-use", &post_payload(command));
+        assert_eq!(
+            system_message(&out),
+            None,
+            "no correction expected for valid nu syntax: {command}"
+        );
+    }
+}
