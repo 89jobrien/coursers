@@ -134,6 +134,26 @@ impl HookPipelineConfig {
 pub fn load_config() -> HookPipelineConfig {
     let mut config = HookPipelineConfig::default();
 
+    // `~/.config/crs/filters.toml` is NOT loaded here. It is applied one layer up, in
+    // `cmd_hook` (crates/coursers/src/crs_commands.rs) and `opencode::run_hook`, which are
+    // deliberately the composition roots for their pipelines — each loads the config, runs
+    // this pipeline so the Redact arm processes the raw output, and only then shapes the
+    // redacted text. Keeping the load out of here means the pipeline stays a pure function of
+    // its inputs, and the ordering invariant (redact before shape) lives with the code that
+    // enforces it.
+    //
+    // Redaction must come first. Shaping beforehand let a `match-lines` rule drop a
+    // secret-bearing line before obfsck saw it, and a rule that *kept* it emitted the secret
+    // verbatim — turning a context-economy rule into an accidental security control.
+    //
+    // Trade-off of that placement: the rules are a standing policy rather than a
+    // per-invocation choice, so a mode like `errors-only` that is reasonable when a
+    // human asks for it can be wrong when applied to every Bash call. That is a reason
+    // to review rule modes, not to move the load down here.
+    //
+    // Distinct from `hook/rewrite.rs`, which DOES read crs-filters.toml — but only its
+    // `[rewrites]` section, which rewrites commands rather than shaping output.
+
     // 1. Global config
     if let Some(home) = dirs::home_dir() {
         let global = home.join(".config/crs/hooks.toml");

@@ -1,5 +1,24 @@
 //! OpenCode hook payload translation and integration validation.
 
+// TODO(opencode-chain-path-parity): This path builds the `HookChain`
+// unconditionally (line ~118), but the Claude Code `pre`/`post` commands only
+// use that same chain when `COURSERS_HOOK_CHAIN=1` is set — the legacy
+// `hook::pre` / `hook::post` path is still the default
+// (`crates/coursers/src/lib.rs:232-248`, `chain_runner.rs:42`). The two
+// harnesses therefore do not run equivalent logic, and they are not even
+// configured symmetrically:
+//
+//   - signal exit codes (130/137/143) are excluded from failure learning on
+//     the legacy path but NOT on the chain path
+//     (`chain_runner.rs:18-21`)
+//   - `ls` enrichment of deny messages and hook-log writes exist only on the
+//     legacy path (`chain_runner.rs:22-24`)
+//   - the capture store is wired only on the legacy path
+//     (`chain_runner.rs:25-26`)
+//
+// The newest harness is running the least complete implementation. Either gate
+// this path on `chain_enabled()` too, or converge both paths (see the
+// unify-hook-paths marker in `chain_runner.rs:40`).
 use std::io::{self, Write};
 
 use coursers_core::hook::chain::{
@@ -110,6 +129,15 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
         ));
     }
 
+    // Load `filters.toml` for PostToolUse/Bash, but do NOT shape yet — the pipeline's Redact arm
+    // has to run first. See the comment after `run_pipeline`; `cmd_hook` does the same thing.
+    let filter_config = if event == HookEvent::PostToolUse && tool_name.as_deref() == Some("Bash") {
+        let config = coursers_core::filters::load();
+        (!config.filters.is_empty()).then_some(config)
+    } else {
+        None
+    };
+
     let mut response = OpenCodeHookResponse::default();
     let mut effective_input = tool_input.clone();
 
@@ -190,6 +218,26 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
     }
     if let Some(output) = pipeline.replace_output {
         response.replacement_output = Some(output);
+    }
+    // Shape AFTER redaction, never before. Redaction is the security boundary and must process
+    // the raw output in full; shaping first let a `match-lines` rule drop a secret-bearing line
+    // before obfsck saw it. See the matching block in `cmd_hook` for the full rationale.
+    if let Some(filters) = filter_config
+        && let Some(raw) = context.output.as_deref()
+    {
+        let base = response.replacement_output.as_deref().unwrap_or(raw);
+        response.replacement_output = match coursers_core::hook::filter_logic::shape_command_output(
+            &filters,
+            &context.target.clone().unwrap_or_default(),
+            base,
+            context.exit_code.unwrap_or(0),
+        ) {
+            coursers_core::hook::filter_logic::ShapedOutput::Unchanged => {
+                response.replacement_output.take()
+            }
+            coursers_core::hook::filter_logic::ShapedOutput::Suppressed => Some(String::new()),
+            coursers_core::hook::filter_logic::ShapedOutput::Replaced(text) => Some(text),
+        };
     }
     response.messages.extend(pipeline.messages);
     response.matched_rules.extend(pipeline.matched_rules);

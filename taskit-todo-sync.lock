@@ -217,21 +217,6 @@
       "issue_number": 114
     },
     {
-      "file": "crates/core/src/analyze/insights.rs",
-      "text": "TODO(insights-repo-attribution-always-empty): Only the first line is read, but Claude",
-      "issue_number": 115
-    },
-    {
-      "file": "crates/core/src/hook/pipeline.rs",
-      "text": "TODO(filters-not-applied-in-hook-path): `~/.config/crs/filters.toml` output-shaping",
-      "issue_number": 116
-    },
-    {
-      "file": "crates/coursers/src/crs_commands.rs",
-      "text": "TODO(discover-empty-scan-clobbers-report): Skip the write when the scan found",
-      "issue_number": 117
-    },
-    {
       "file": "crates/core/src/hook/pipeline.rs",
       "text": "TODO(plugins-dir-env-override): this path is only reachable through",
       "issue_number": 118

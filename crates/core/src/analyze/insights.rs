@@ -185,12 +185,39 @@ fn build_jsonl_index(projects_root: &Path) -> HashMap<String, PathBuf> {
     index
 }
 
-/// Read the first line of a `.jsonl` and extract git context.
+/// Read a `.jsonl` session file and extract git context.
+///
+/// Claude Code's first line is `{"type":"mode","mode":"normal","sessionId":"..."}`, which
+/// carries neither `cwd` nor `gitBranch`, so reading line 0 alone yielded an empty repo for
+/// every session (`top_repos: [[""， 225]]`, `top_branches: []`). `cwd` and `gitBranch` do
+/// appear a few lines in, on the first real transcript record, so scan a bounded prefix
+/// instead. The bound keeps this cheap: session files reach tens of MB and only the head
+/// matters.
 fn read_git_context(path: &Path) -> Option<GitContext> {
-    let content = std::fs::read_to_string(path).ok()?;
-    let first_line = content.lines().next()?;
-    let parsed: JsonlFirstLine = serde_json::from_str(first_line).ok()?;
+    /// Lines to search before giving up. Records carrying `cwd` appear within the first
+    /// handful; a session that needs more than this is not worth reading in full.
+    const MAX_LINES: usize = 50;
 
+    let file = std::fs::File::open(path).ok()?;
+    let reader = std::io::BufReader::new(file);
+
+    let mut found: Option<JsonlFirstLine> = None;
+    for line in std::io::BufRead::lines(reader).take(MAX_LINES).flatten() {
+        let Ok(parsed) = serde_json::from_str::<JsonlFirstLine>(&line) else {
+            continue;
+        };
+        // Prefer the earliest record that has a cwd; gitBranch and timestamp usually
+        // arrive with it, but do not require them — a repo name alone beats none.
+        if parsed.cwd.is_some() {
+            found = Some(parsed);
+            break;
+        }
+        if found.is_none() && (parsed.git_branch.is_some() || parsed.timestamp.is_some()) {
+            found = Some(parsed);
+        }
+    }
+
+    let parsed = found?;
     let cwd = parsed.cwd.unwrap_or_default();
     let repo = repo_name_from_cwd(&cwd);
 
@@ -315,5 +342,107 @@ mod tests {
             repo_name_from_cwd("/Users/joe/dev/orca-strait"),
             "orca-strait"
         );
+    }
+
+    /// Claude Code's first line carries no `cwd` — the real one arrives a few lines in.
+    /// Reading only line 0 yielded an empty repo for every session.
+    #[test]
+    fn read_git_context_finds_cwd_past_the_mode_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                r#"{"type":"mode","mode":"normal","sessionId":"abc"}"#,
+                "\n",
+                r#"{"type":"file-history-snapshot","messageId":"m1","snapshot":{}}"#,
+                "\n",
+                r#"{"type":"attachment","cwd":"/Users/joe/dev/crux","gitBranch":"fix/x","timestamp":"2026-09-30T00:00:00Z"}"#,
+                "\n",
+            ),
+        )
+        .unwrap();
+
+        let git = read_git_context(&path).expect("should find git context");
+        assert_eq!(git.repo, "crux");
+        assert_eq!(git.cwd, "/Users/joe/dev/crux");
+        assert_eq!(git.branch.as_deref(), Some("fix/x"));
+    }
+
+    #[test]
+    fn read_git_context_returns_none_when_no_line_carries_cwd() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                r#"{"type":"mode","mode":"normal","sessionId":"abc"}"#,
+                "\n",
+                r#"{"type":"file-history-snapshot","snapshot":{}}"#,
+                "\n",
+            ),
+        )
+        .unwrap();
+
+        assert!(read_git_context(&path).is_none());
+    }
+
+    #[test]
+    fn read_git_context_does_not_scan_past_the_bound() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        let mut content = String::new();
+        // 60 lines carrying neither cwd nor gitBranch, then the first one that does.
+        for _ in 0..60 {
+            content.push_str(r#"{"type":"file-history-snapshot","snapshot":{}}"#);
+            content.push('\n');
+        }
+        content.push_str(r#"{"type":"attachment","cwd":"/Users/joe/dev/late"}"#);
+        content.push('\n');
+        std::fs::write(&path, content).unwrap();
+
+        // Bounded scan: a cwd past MAX_LINES is deliberately not read, so a session
+        // whose records start late reports no context rather than reading the whole file.
+        assert!(read_git_context(&path).is_none());
+    }
+
+    #[test]
+    fn read_git_context_falls_back_to_branch_only_line() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                r#"{"type":"mode","mode":"normal","sessionId":"abc"}"#,
+                "\n",
+                r#"{"type":"attachment","gitBranch":"main"}"#,
+                "\n",
+            ),
+        )
+        .unwrap();
+
+        // No cwd anywhere, but a branch was found — a partial context beats none, and
+        // the repo simply stays empty.
+        let git = read_git_context(&path).expect("branch-only line should count");
+        assert_eq!(git.repo, "");
+        assert_eq!(git.branch.as_deref(), Some("main"));
+    }
+
+    #[test]
+    fn read_git_context_skips_unparseable_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("s.jsonl");
+        std::fs::write(
+            &path,
+            concat!(
+                "not json at all\n",
+                "\n",
+                r#"{"type":"attachment","cwd":"/Users/joe/dev/doob"}"#,
+                "\n",
+            ),
+        )
+        .unwrap();
+
+        assert_eq!(read_git_context(&path).unwrap().repo, "doob");
     }
 }

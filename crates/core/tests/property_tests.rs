@@ -165,3 +165,119 @@ proptest! {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// hook::filter_logic — shaping never invents or reorders lines
+// ---------------------------------------------------------------------------
+
+use coursers_core::filters::{FilterMode, FilterRule, FiltersConfig};
+use coursers_core::hook::filter_logic::{ShapedOutput, shape_command_output};
+
+fn cfg(pattern: &str, mode: FilterMode, match_pattern: Option<&str>) -> FiltersConfig {
+    FiltersConfig {
+        filters: vec![FilterRule {
+            pattern: pattern.to_string(),
+            mode,
+            max_lines: 50,
+            match_pattern: match_pattern.map(str::to_string),
+        }],
+        ..Default::default()
+    }
+}
+
+/// Subset invariant shared by `match-lines` and `truncate`: a shaping rule may drop lines or
+/// keep a prefix, but it may never invent one. Both modes are implemented as a filter over
+/// `output.lines()`, so every emitted line must exist in the input.
+///
+/// This is what makes shaping safe to run *after* redaction — it cannot manufacture a
+/// clean-looking line out of one that obfsck redacted. It says nothing about lines obfsck
+/// itself produced, which is upstream of shaping by construction.
+///
+/// One documented exception: `truncate` appends a synthetic `... (N lines omitted)` marker so
+/// the model can tell truncated output from complete output. Found by proptest, not by
+/// inspection — the first draft of this helper asserted a blanket no-invented-lines rule and
+/// the counterexample `keep=1` on `" \na\n \n \na\na"` was the marker itself.
+fn is_truncation_marker(line: &str) -> bool {
+    line.starts_with("... (") && line.ends_with(" lines omitted)")
+}
+
+fn assert_lines_from_input(shaped: &ShapedOutput, input: &str) -> Result<(), TestCaseError> {
+    let ShapedOutput::Replaced(text) = shaped else {
+        return Ok(());
+    };
+    let input_lines: std::collections::HashSet<&str> = input.lines().collect();
+    for line in text.lines() {
+        if is_truncation_marker(line) {
+            continue;
+        }
+        prop_assert!(
+            input_lines.contains(line),
+            "shaping invented a line not present in the input:\n  emitted: {line:?}\n  input:  {input:?}"
+        );
+    }
+    Ok(())
+}
+
+proptest! {
+    /// `match-lines` on success may only select lines from the input.
+    #[test]
+    fn match_lines_never_invents_a_line(
+        lines in prop::collection::vec("[a-z ]{1,12}", 1..20),
+    ) {
+        let output = lines.join("\n");
+        let shaped = shape_command_output(
+            &cfg("cargo test", FilterMode::MatchLines, Some("^b")),
+            "cargo test",
+            &output,
+            0,
+        );
+        assert_lines_from_input(&shaped, &output)?;
+    }
+
+    /// `truncate` keeps a prefix, so every emitted line is an input line too.
+    #[test]
+    fn truncate_never_invents_a_line(
+        lines in prop::collection::vec("[a-z ]{1,12}", 1..30),
+        keep in 1usize..12,
+    ) {
+        let output = lines.join("\n");
+        let mut config = cfg("doob todo list", FilterMode::Truncate, None);
+        config.filters[0].max_lines = keep;
+        let shaped = shape_command_output(&config, "doob todo list", &output, 0);
+        assert_lines_from_input(&shaped, &output)?;
+    }
+
+    /// On a non-zero exit `match-lines` is documented to pass everything through. Proving it
+    /// keeps the output byte-identical rules out the "quietly trimmed the failure" regression
+    /// that is easy to reintroduce by moving the short-circuit.
+    #[test]
+    fn match_lines_on_failure_is_byte_identical_passthrough(
+        lines in prop::collection::vec("[a-z ]{1,12}", 1..20),
+        code in 1i64..=255,
+    ) {
+        let output = lines.join("\n");
+        let shaped = shape_command_output(
+            &cfg("cargo clippy", FilterMode::MatchLines, Some("^zzz-never-matches")),
+            "cargo clippy",
+            &output,
+            code,
+        );
+        prop_assert_eq!(shaped, ShapedOutput::Unchanged);
+    }
+
+    /// A non-zero exit under `failures-only` is likewise untouched; only exit 0 suppresses.
+    #[test]
+    fn failures_only_on_failure_is_byte_identical_passthrough(
+        lines in prop::collection::vec("[a-z ]{1,12}", 1..20),
+        code in 1i64..=255,
+    ) {
+        let output = lines.join("\n");
+        let shaped = shape_command_output(
+            &cfg("cargo test", FilterMode::FailuresOnly, None),
+            "cargo test",
+            &output,
+            code,
+        );
+        prop_assert_eq!(shaped, ShapedOutput::Unchanged);
+    }
+}

@@ -5,7 +5,9 @@
 // TODO(split-crs-commands): replace this god-module with command-specific modules that return (#55)
 // typed results and keep protocol I/O and presentation at the CLI boundary.
 
-use coursers_core::hook::filter_logic::{FilterPayload, FilterResult, run_filter};
+use coursers_core::hook::filter_logic::{
+    FilterPayload, FilterResult, ShapedOutput, run_filter, shape_command_output,
+};
 use coursers_core::rewrite::RewriteConfig;
 use serde::Deserialize;
 use serde_json::Value;
@@ -819,6 +821,21 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
         crate::hook::pre::run_with(&loader, &store, &capture, &payload);
     }
 
+    // Load `filters.toml` for PostToolUse/Bash, but do NOT shape yet — the pipeline's Redact arm
+    // has to run first. See the comment after `run_pipeline` for why the order is now
+    // redact → filter → response.
+    //
+    // Scope matches `opencode.rs`: PostToolUse + Bash only. The rules match on command text, and
+    // `target` is only a command for Bash, so every other event and tool is untouched.
+    let filter_config = if event == coursers_core::hook_pipeline::HookEvent::PostToolUse
+        && tool_name.as_deref() == Some("Bash")
+    {
+        let config = coursers_core::filters::load();
+        (!config.filters.is_empty()).then_some(config)
+    } else {
+        None
+    };
+
     let config = load_config();
     let ctx = HookContext {
         event: Some(event),
@@ -829,7 +846,34 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
         output,
     };
 
-    let result = run_pipeline(&config, &ctx);
+    let mut result = run_pipeline(&config, &ctx);
+
+    // Shape AFTER redaction, never before.
+    //
+    // Redaction is the security boundary and must see the raw output in full. Shaping first let
+    // a `match-lines` rule drop a secret-bearing line before obfsck ever saw it — safe by
+    // accident, but it made a context-economy rule into an accidental security control, and any
+    // future non-subtractive filter would have been a silent leak. Redact first makes coverage
+    // unconditional: obfsck processes 100% of the output, then the filter decides what the model
+    // gets to read from already-safe text.
+    //
+    // when shaping changes nothing the redacted text must survive, so `replace_output` is
+    // driven explicitly from the shaping outcome rather than by a "first writer wins" helper.
+    if let Some(filters) = filter_config
+        && let Some(raw) = ctx.output.as_deref()
+    {
+        let base = result.replace_output.as_deref().unwrap_or(raw);
+        result.replace_output = match shape_command_output(
+            &filters,
+            &ctx.target.clone().unwrap_or_default(),
+            base,
+            ctx.exit_code.unwrap_or(0),
+        ) {
+            ShapedOutput::Unchanged => result.replace_output.take(),
+            ShapedOutput::Suppressed => Some(String::new()),
+            ShapedOutput::Replaced(text) => Some(text),
+        };
+    }
 
     // Log to redb only when a rule actually fired (skip silent passes).
     if !result.matched_rules.is_empty()
@@ -1448,20 +1492,23 @@ pub fn cmd_discover(
         _ => print_discover_text(&report),
     }
 
-    // TODO(discover-empty-scan-clobbers-report): Skip the write when the scan found
-    // nothing, instead of overwriting a good report with an empty one. Reproduced
-    // 2026-09-30: `crs discover` with the default `--since 30` scans 0 sessions
-    // (no transcript in ~/.claude/projects carries a Bash tool_use newer than the
-    // cutoff) and still rewrites a tracked 216-line .ctx/HANDOFF.tools.yaml down to
-    // 3 lines. Required `git checkout -- .ctx/HANDOFF.tools.yaml` twice to recover.
-    // The guard should be `report.scanned_commands == 0` — an empty scan carries no
-    // information, so preserving the previous report is strictly better than
-    // truncating it. Consider also warning on stderr when the scan is empty for a
-    // reason other than a too-narrow `--since`, since "0 sessions" is currently
-    // indistinguishable from "the history parser found nothing".
+    // An empty scan carries no information, so never let it overwrite a real report.
+    // Reproduced 2026-09-30: with the default `--since 30` the scan found 0 sessions and
+    // still rewrote a tracked 216-line .ctx/HANDOFF.tools.yaml down to 3 lines, which
+    // then had to be recovered with `git checkout --`. Preserving the previous report is
+    // strictly better than truncating it.
     let ctx = std::path::Path::new(".ctx");
     if ctx.is_dir() {
-        write_tools_yaml(&report, since, &rtk_map, ctx.join("HANDOFF.tools.yaml"));
+        if report.scanned_commands == 0 {
+            eprintln!(
+                "[crs] warning: discover scanned 0 Bash commands (since={since}); \
+                 keeping the existing HANDOFF.tools.yaml. Widen --since if this is \
+                 unexpected — an empty scan is also what a history parser that fails to \
+                 match the current transcript format looks like."
+            );
+        } else {
+            write_tools_yaml(&report, since, &rtk_map, ctx.join("HANDOFF.tools.yaml"));
+        }
 
         // Generate project-local obfsck filters from unhandled command examples.
         if generate_filters {
