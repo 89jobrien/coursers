@@ -2,6 +2,32 @@
 
 #![warn(unreachable_pub)]
 
+// TODO(adapters-crate-consolidation): Six separate TODOs in this workspace all
+// describe the same missing crate, `coursers-adapters`. Collect them here as a
+// single migration board so the ordering is explicit rather than implied:
+//
+//   core/src/lib.rs          — adapter-crate-log-io, adapter-crate-session-io,
+//                              adapter-crate-prefix-io
+//   core/src/analyze/mod.rs  — adapter-crate-analysis-io
+//   coursers/src/lib.rs      — adapter-crate-integration-io
+//   coursers/src/crs_commands.rs — bounded-process-runner
+//   types/src/filters.rs     — adapter-core-compat (deprecate the core loader)
+//
+// Blocked on the canonical-ports-migration marker in types/src/ports.rs: the
+// adapter boundary is only meaningful once the ports sit in a ring above core.
+// That marker also records that ~15 domain structs (obfsck, rtk, stats, history,
+// capture) are double-defined and must be re-pointed at `coursers_types`
+// *before* any trait can move, since the duplicate return types would otherwise
+// break every adapter.
+// Today `coursers-core` is not an inner ring at all — it does filesystem I/O,
+// owns the `redb` hook log, calls `dirs::home_dir()`, and spawns `obfsck` and
+// `git` as subprocesses.
+//
+// Recommended order: re-point the duplicated domain types in core, then land the
+// six infallible port traits in types, then move log/session/prefix/analysis I/O
+// out, then the subprocess clients, and only then delete the `deprecated` core
+// aliases.
+
 pub mod error;
 pub use error::CourserError;
 

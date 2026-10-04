@@ -1,6 +1,68 @@
 //! Port traits for the coursers hexagonal architecture.
 //!
 //! All traits use associated error types to keep this crate dependency-free.
+//!
+//! # STATUS: UNUSED — this module has zero consumers
+//!
+//! As of 2026-09-29 no code path in the workspace imports `coursers_types::ports`
+//! (verified: zero matches for `ports` across `crates/`). Every trait here is
+//! independently redefined in `coursers-core` with a **different error contract**:
+//! these use an associated `type Error: Debug`, the core copies take a concrete
+//! `crate::error::CourserError`.
+//!
+//! # The domain types must move FIRST
+//!
+//! Migrating a trait in isolation does not work. Six of these traits are
+//! infallible and have identical signatures to their core copies, but their
+//! return types are currently **two distinct Rust types**, because ~15 domain
+//! structs are also double-defined. Verified: 13 type names across 6 re-export
+//! sites resolve to this crate — `rules::{FailureLearning, Rule, RulesConfig}`
+//! (core/src/rules.rs:9), `state::{FailureEntry, State}` (core/src/state.rs:8),
+//! `filters::{FilterMode, FilterRule, FiltersConfig}` (core/src/hook/filters.rs:6),
+//! `filters::{FilterPayload, FilterResult}` (core/src/hook/filter_logic.rs:6),
+//! `filters::{RewriteConfig, RewriteRule}` (core/src/hook/rewrite.rs:5), and
+//! `filters::ToolSwapConfig` (core/src/hook/tool_swap.rs:8). In addition
+//! `core/src/lib.rs:35` re-exports the whole crate as `pub use coursers_types as
+//! types;`, which covers every remaining type. The following are NOT re-exported,
+//! and are redefined in core:
+//!
+//!   - `obfsck::{AuditHit, FilterSuggestion}`  (core/src/obfsck.rs:13,20)
+//!   - `rtk::{RtkDiscoverReport, RtkSupportedEntry, RtkUnsupportedEntry,
+//!     RtkGainReport, RtkSessionEntry, RtkVerifyResult, RtkHookAudit,
+//!     RtkAuditEntry, RtkProbeResult}`           (core/src/rtk.rs:13-96)
+//!   - `stats::Stats`                            (core/src/analyze/stats.rs:14)
+//!   - `history::{CommandRecord, DiscoverOpts}`  (core/src/analyze/history.rs:47,63)
+//!   - `capture::SuggestionRecord`               (core/src/analyze/capture.rs:24)
+//!
+//! So `types::ports::obfsck::ObfsckMcp::audit` returns
+//! `types::obfsck::AuditHit`, while `core::obfsck::ObfsckMcp::audit` returns
+//! `core::obfsck::AuditHit`. Swapping the trait definition alone would break
+//! every adapter (`NullObfsckMcpClient`, `ProcessObfsckMcpClient`,
+//! `NullRtkClient`, `ProcessRtkClient`, `JsonlCommandSource`,
+//! `MockCommandSource`, …). Correct order is data types -> traits.
+//!
+//! TODO(canonical-ports-migration): Step 1 — re-point the 15 duplicated domain
+//! types in `coursers-core` at their `coursers_types` counterparts via
+//! `pub use`, matching the pattern already used in `core/src/rules.rs:9` and
+//! `core/src/state.rs:8`. This is additive and breaks nothing, since the
+//! existing `core::` paths keep resolving. Watch for derive drift while doing
+//! it: `types::stats::Stats` derives `Serialize, Deserialize, Default`, and
+//! `types::history::DiscoverOpts` carries a `Default` impl that core's copy
+//! defines separately. Step 2 — only then swap the 6 infallible traits
+//! (`ObfsckMcp`, `RtkAnalysis`, `RtkRewrite`, `VarExpander`, `FileInfo`,
+//! `CommandSource`) to re-export from here. Step 3 — the 5 fallible traits
+//! (`RulesLoader`, `StateStore`, `CaptureStore`, `StatsStore`,
+//! `FiltersLoader`) are additionally blocked on `CourserError`, which lives in
+//! `coursers-core` and itself wraps `serde_json::Error`, `toml::de::Error`, and
+//! `redb::*`, so it can never sit in a dependency-free ring. That needs a
+//! decision between (a) letting this crate depend on serde/toml/redb, (b) a
+//! neutral `PortError` here that core adapters map onto, or (c) leaving the
+//! fallible ports in core and treating this module as infallible-only.
+//! (`StatsStore` also needs `record_block`, a provided method core has and this
+//! copy does not.)
+//!
+//! This file is registered as a hash-tracked protocol surface in `taskit.toml`,
+//! so `check-protocol-drift` gates on a module nothing reads.
 
 pub mod rules {
     use crate::rules::RulesConfig;
