@@ -1,9 +1,12 @@
 //! Data-driven end-to-end rule and hook scenarios.
 
-use serde::Deserialize;
-use std::io::Write;
+mod common;
+
+use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+
+use common::run_bin;
+use serde::Deserialize;
 use tempfile::{NamedTempFile, TempDir};
 
 // ---------------------------------------------------------------------------
@@ -48,46 +51,8 @@ struct PostFailures {
 }
 
 // ---------------------------------------------------------------------------
-// Harness helpers
+// Payload helpers
 // ---------------------------------------------------------------------------
-
-fn workspace_bin(name: &str) -> PathBuf {
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workspace = manifest.parent().unwrap().parent().unwrap();
-    let debug = workspace.join("target/debug").join(name);
-    let release = workspace.join("target/release").join(name);
-    if release.exists() {
-        release
-    } else {
-        assert!(
-            debug.exists(),
-            "binary {name:?} not found — run `cargo build --workspace` first\nchecked: {}",
-            debug.display()
-        );
-        debug
-    }
-}
-
-fn run_bin(bin: &str, subcommand: &str, payload: &str, envs: &[(&str, &str)]) -> Output {
-    let mut cmd = Command::new(workspace_bin(bin));
-    cmd.arg(subcommand)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    for (k, v) in envs {
-        cmd.env(k, v);
-    }
-    let mut child = cmd
-        .spawn()
-        .unwrap_or_else(|e| panic!("spawn {bin} {subcommand}: {e}"));
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(payload.as_bytes())
-        .unwrap();
-    child.wait_with_output().unwrap()
-}
 
 fn pre_payload(cmd: &str) -> String {
     format!(r#"{{"tool_name":"Bash","tool_input":{{"command":{cmd:?}}}}}"#)
@@ -147,14 +112,14 @@ fn run_scenario(path: &Path) {
     if let Some(ref pf) = sf.post_failures {
         for _ in 0..pf.count {
             let payload = post_payload(&pf.command, 1);
-            run_bin("coursers", "post", &payload, &pre_envs);
+            run_bin("coursers", &["post"], &payload, &pre_envs);
         }
     }
 
     // Phase: pre
     if let Some(ref pre) = sf.pre {
         let payload = pre_payload(&pre.command);
-        let out = run_bin("coursers", "pre", &payload, &pre_envs);
+        let out = run_bin("coursers", &["pre"], &payload, &pre_envs);
         match pre.expected_verdict.as_str() {
             "block" => assert!(
                 !out.status.success(),
@@ -182,7 +147,7 @@ fn run_scenario(path: &Path) {
             .unwrap_or_default();
 
         let payload = post_filter_payload(&fil.command, &fil.output, fil.exit_code);
-        let out = run_bin("crs", "filter", &payload, &filter_envs);
+        let out = run_bin("crs", &["filter"], &payload, &filter_envs);
         assert!(
             out.status.success(),
             "[{name}] filter: expected exit 0, got {:?}",

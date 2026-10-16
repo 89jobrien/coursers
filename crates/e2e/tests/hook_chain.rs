@@ -12,52 +12,16 @@
 //! The legacy path is exercised in parallel (without the env var) so outcomes can
 //! be compared for equivalence.
 
+mod common;
+
 use std::io::Write as _;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
+
+use common::run_bin;
 use tempfile::{NamedTempFile, TempDir};
 
 // ---------------------------------------------------------------------------
-// Helpers (shared with scenarios.rs pattern)
+// Helpers
 // ---------------------------------------------------------------------------
-
-fn workspace_bin(name: &str) -> PathBuf {
-    let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let workspace = manifest.parent().unwrap().parent().unwrap();
-    let debug = workspace.join("target/debug").join(name);
-    let release = workspace.join("target/release").join(name);
-    if release.exists() {
-        release
-    } else {
-        assert!(
-            debug.exists(),
-            "binary {name:?} not found — run `cargo build --workspace` first\nchecked: {}",
-            debug.display()
-        );
-        debug
-    }
-}
-
-fn run_bin_with_env(bin: &str, subcommand: &str, payload: &str, envs: &[(&str, &str)]) -> Output {
-    let mut cmd = Command::new(workspace_bin(bin));
-    cmd.arg(subcommand)
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    for (k, v) in envs {
-        cmd.env(k, v);
-    }
-    let mut child = cmd
-        .spawn()
-        .unwrap_or_else(|e| panic!("spawn {bin} {subcommand}: {e}"));
-    child
-        .stdin
-        .as_mut()
-        .unwrap()
-        .write_all(payload.as_bytes())
-        .unwrap();
-    child.wait_with_output().unwrap()
-}
 
 fn pre_payload(cmd: &str) -> String {
     format!(r#"{{"tool_name":"Bash","tool_input":{{"command":{cmd:?}}}}}"#)
@@ -130,7 +94,7 @@ fn chain_pre_denies_matching_rule() {
         ("COURSERS_RULES", rules.path().to_str().unwrap()),
     ];
 
-    let out = run_bin_with_env("coursers", "pre", &payload, &envs);
+    let out = run_bin("coursers", &["pre"], &payload, &envs);
 
     assert_eq!(
         out.status.code(),
@@ -165,7 +129,7 @@ fn legacy_pre_denies_matching_rule() {
     let payload = pre_payload("grep foo .");
     let envs = [("COURSERS_RULES", rules.path().to_str().unwrap())];
 
-    let out = run_bin_with_env("coursers", "pre", &payload, &envs);
+    let out = run_bin("coursers", &["pre"], &payload, &envs);
 
     assert_eq!(out.status.code(), Some(2), "legacy pre must exit 2 on deny");
     assert_eq!(parse_decision(&out.stdout), "deny");
@@ -182,7 +146,7 @@ fn chain_pre_allows_clean_command() {
         ("COURSERS_RULES", rules.path().to_str().unwrap()),
     ];
 
-    let out = run_bin_with_env("coursers", "pre", &payload, &envs);
+    let out = run_bin("coursers", &["pre"], &payload, &envs);
 
     assert_eq!(
         out.status.code(),
@@ -221,7 +185,7 @@ replace = "git status --short"
         ("CRS_FILTERS", filters.path().to_str().unwrap()),
     ];
 
-    let out = run_bin_with_env("coursers", "pre", &payload, &envs);
+    let out = run_bin("coursers", &["pre"], &payload, &envs);
 
     assert_eq!(
         out.status.code(),
@@ -278,7 +242,7 @@ replace = "rm -rf build"
         ("CRS_FILTERS", filters.path().to_str().unwrap()),
     ];
 
-    let out = run_bin_with_env("coursers", "pre", &payload, &envs);
+    let out = run_bin("coursers", &["pre"], &payload, &envs);
 
     assert_eq!(out.status.code(), Some(2));
     assert_eq!(parse_decision(&out.stdout), "deny");
@@ -313,7 +277,7 @@ max_lines = 50
         ("CRS_FILTERS", filters.path().to_str().unwrap()),
     ];
 
-    let out = run_bin_with_env("coursers", "post", &payload, &envs);
+    let out = run_bin("coursers", &["post"], &payload, &envs);
 
     assert_eq!(
         out.status.code(),
@@ -351,7 +315,7 @@ max_lines = 50
         ("CRS_FILTERS", filters.path().to_str().unwrap()),
     ];
 
-    let out = run_bin_with_env("coursers", "post", &payload, &envs);
+    let out = run_bin("coursers", &["post"], &payload, &envs);
 
     assert_eq!(
         out.status.code(),
@@ -404,7 +368,7 @@ fn chain_failure_learning_blocks_at_threshold() {
             ("COURSERS_STATE", state_path.to_str().unwrap()),
             ("CRS_FILTERS", filters.path().to_str().unwrap()),
         ];
-        let out = run_bin_with_env("coursers", "post", &payload, &envs);
+        let out = run_bin("coursers", &["post"], &payload, &envs);
         assert_eq!(
             out.status.code(),
             Some(0),
@@ -420,7 +384,7 @@ fn chain_failure_learning_blocks_at_threshold() {
         ("COURSERS_STATE", state_path.to_str().unwrap()),
         ("CRS_FILTERS", filters.path().to_str().unwrap()),
     ];
-    let out = run_bin_with_env("coursers", "pre", &payload, &envs);
+    let out = run_bin("coursers", &["pre"], &payload, &envs);
 
     assert_eq!(
         out.status.code(),
