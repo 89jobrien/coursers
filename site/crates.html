@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Claude Code hook pipeline for course-correcting AI-generated Bash commands.">
+    <title>coursers-types crates</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <nav class="nav" aria-label="Primary">
+      <a href="index.html" class="brand">coursers-types</a>
+      <a href="index.html">Overview</a>
+      <a href="guide.html">Guide</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="crates.html" aria-current="page">Crates</a>
+      <a href="features.html">Features</a>
+      <a href="cli.html">CLI</a>
+      <a href="commands.html">Commands</a>
+    </nav>
+
+    <main id="main">
+      <section id="crates" class="reveal">
+        <h2>Crates</h2>
+        <p>Every package in the workspace, with what it depends on inside it.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Crate</th><th>Version</th><th>Workspace deps</th><th>External deps</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>coursers-types</code></td>
+                <td>0.1.0</td>
+                <td>&mdash;</td>
+                <td>4</td>
+              </tr>
+              <tr>
+                <td><code>coursers-core</code></td>
+                <td>0.1.0</td>
+                <td><code>coursers-types</code></td>
+                <td>17</td>
+              </tr>
+              <tr>
+                <td><code>coursers</code></td>
+                <td>0.1.0</td>
+                <td><code>coursers-core</code>, <code>coursers-types</code>, <code>coursers-core</code></td>
+                <td>14</td>
+              </tr>
+              <tr>
+                <td><code>coursers-e2e</code></td>
+                <td>0.1.0</td>
+                <td>&mdash;</td>
+                <td>4</td>
+              </tr>
+              <tr>
+                <td><code>xtask</code></td>
+                <td>0.1.0</td>
+                <td>&mdash;</td>
+                <td>0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

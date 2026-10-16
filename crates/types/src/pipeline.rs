@@ -2,6 +2,24 @@
 
 use serde::Deserialize;
 
+// TODO(pipeline-types-deduplication): This module is an UNUSED duplicate of
+// `coursers_core::hook::pipeline`, which is the copy the runtime actually uses
+// (see `crates/coursers/src/opencode.rs:27`, which imports
+// `coursers_core::hook_pipeline::{HookContext as PipelineContext, HookEvent}`).
+// Zero imports of `coursers_types::pipeline` exist anywhere in the workspace.
+//
+// The two copies have already DIVERGED in both directions:
+//   - core has `HookAction::Redact { level }` — absent here
+//   - core has `HookContext::output` and `PipelineResult::replace_output`
+//     — absent here
+//   - here, `HookAction` has no `Redact` arm at all, so any code switching to
+//     this module loses output redaction and fails to match non-exhaustive
+//     patterns
+//
+// Pick one owner before either copy gains a consumer. If core wins, delete this
+// module and drop the hook-schema-parity marker below; if this module wins, core
+// must re-export from here and the `Redact` action plus the `output` /
+// `replace_output` fields must be ported across first.
 // TODO(hook-schema-parity): Keep schemas/crs-hooks.schema.json synchronized with every
 // runtime action, regex semantic, and supported template placeholder.
 // TODO(harness-neutral-contract): Define shared request, response, and protocol-adapter

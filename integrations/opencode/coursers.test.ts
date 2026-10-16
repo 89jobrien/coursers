@@ -255,7 +255,11 @@ describe("OpenCode review safeguards", () => {
     ).rejects.toThrow("prompt blocked")
   })
 
-  test("defaults missing exit metadata to zero", async () => {
+  // OpenCode's bash tool reports `exit: null` on abort and timeout, and omits it for
+  // other tools. That is "unknown", not "succeeded": coercing it to 0 let a suppressive
+  // output filter blank the output of a killed command, so the agent read the timeout as
+  // a clean pass. The bridge must carry the uncertainty through.
+  test("sends null rather than zero when the exit code is unknown", async () => {
     const { calls, hooks } = await harness([allow()])
 
     await hooks["tool.execute.after"]?.(
@@ -265,7 +269,23 @@ describe("OpenCode review safeguards", () => {
         callID: "call",
         args: { command: "cargo test" },
       },
-      { title: "shell", output: "ok", metadata: {} },
+      { title: "shell", output: "error: killed", metadata: { exit: null } },
+    )
+
+    expect(calls[0]?.payload.tool_response?.exit_code).toBeNull()
+  })
+
+  test("preserves a real zero exit", async () => {
+    const { calls, hooks } = await harness([allow()])
+
+    await hooks["tool.execute.after"]?.(
+      {
+        tool: "bash",
+        sessionID: "root",
+        callID: "call",
+        args: { command: "cargo test" },
+      },
+      { title: "shell", output: "ok", metadata: { exit: 0 } },
     )
 
     expect(calls[0]?.payload.tool_response?.exit_code).toBe(0)

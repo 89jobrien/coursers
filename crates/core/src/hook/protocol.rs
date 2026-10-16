@@ -49,24 +49,39 @@ pub fn tool_swap_response(tool_name: &str, tool_input: serde_json::Value) -> Str
     .to_string()
 }
 
-/// System message response (PostToolUse or other events).
-pub fn system_message_response(event: &str, text: &str) -> String {
+/// System message response, valid for any hook event.
+///
+/// Uses the top-level `systemMessage` field rather than nesting under
+/// `hookSpecificOutput`: the harness's `hookSpecificOutput.hookEventName` enum
+/// does not include every event name (notably `PreCompact`/`PostCompact`), so
+/// passing an arbitrary event string there fails schema validation and
+/// silently discards the message. The top-level field has no such
+/// restriction and works for every event, so `event` is unused here.
+pub fn system_message_response(_event: &str, text: &str) -> String {
     json!({
-        "hookSpecificOutput": {
-            "hookEventName": event,
-            "permissionDecision": "allow",
-            "systemMessage": text,
-        }
+        "systemMessage": text,
     })
     .to_string()
 }
 
 /// Filtered output response (PostToolUse).
+///
+/// No top-level `decision` field. Claude Code treats a top-level `decision` as the
+/// *legacy* approve|block field and rejects the whole hook response when the value
+/// is anything else — including `allow`:
+///
+///     Hook JSON output validation failed — decision: Invalid input (top-level
+///     decision is the legacy approve|block field; for "allow" use
+///     hookSpecificOutput.permissionDecision ...)
+///
+/// That error is non-fatal but it silently discards the redacted output and every
+/// accumulated notification. Permission decisions belong in
+/// `hookSpecificOutput.permissionDecision`, which this event does not set — it only
+/// reshapes output the tool already produced.
 pub fn filter_result_response(text: &str) -> String {
     json!({
         "type": "result",
-        "message": text,
-        "decision": "allow"
+        "message": text
     })
     .to_string()
 }
@@ -90,7 +105,6 @@ pub fn filter_result_with_messages_response(text: &str, messages: &[String]) -> 
     json!({
         "type": "result",
         "message": text,
-        "decision": "allow",
         "hookSpecificOutput": {
             "hookEventName": "PostToolUse",
             "additionalContext": joined,
@@ -144,6 +158,18 @@ mod tests {
         );
     }
 
+    /// Regression: `PreCompact`/`PostCompact` are not valid `hookSpecificOutput.hookEventName`
+    /// values in the harness schema, so the message must ride the top-level field instead.
+    #[test]
+    fn system_message_response_uses_top_level_field() {
+        for event in ["PreCompact", "PostCompact", "PostToolUse"] {
+            let json_str = system_message_response(event, "hello");
+            let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(v["systemMessage"], "hello");
+            assert!(v.get("hookSpecificOutput").is_none());
+        }
+    }
+
     #[test]
     fn extract_output_prefers_combined() {
         let v = json!({"output": "hello", "stdout": "world"});
@@ -174,11 +200,28 @@ mod tests {
         let json_str = filter_result_with_messages_response("REDACTED", &msgs);
         let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
         assert_eq!(v["message"], "REDACTED");
-        assert_eq!(v["decision"], "allow");
         assert_eq!(
             v["hookSpecificOutput"]["additionalContext"],
             "cargo check failed\nrun fmt"
         );
+    }
+
+    /// Regression: a top-level `decision` is the legacy approve|block field. Claude Code
+    /// rejects the entire PostToolUse response when it carries `decision: "allow"`,
+    /// which discards both the redaction and the notifications.
+    #[test]
+    fn filter_responses_omit_legacy_top_level_decision() {
+        let with_messages = filter_result_with_messages_response(
+            "REDACTED",
+            &["cargo gate FAILED (exit 101)".to_string()],
+        );
+        for json_str in [filter_result_response("REDACTED"), with_messages] {
+            let v: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+            assert!(
+                v.get("decision").is_none(),
+                "PostToolUse response must not carry a top-level `decision`: {json_str}"
+            );
+        }
     }
 
     #[test]

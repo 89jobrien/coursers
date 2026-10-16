@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Claude Code hook pipeline for course-correcting AI-generated Bash commands.">
+    <title>coursers-types guide</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <nav class="nav" aria-label="Primary">
+      <a href="index.html" class="brand">coursers-types</a>
+      <a href="index.html">Overview</a>
+      <a href="guide.html" aria-current="page">Guide</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="crates.html">Crates</a>
+      <a href="features.html">Features</a>
+      <a href="cli.html">CLI</a>
+      <a href="commands.html">Commands</a>
+    </nav>
+
+    <main id="main">
+      <section id="guide" class="reveal">
+        <h2>Guide</h2>
+        <p class="note">
+          Carried over from <code>README.md</code>. Edit the README, not this
+          page.
+        </p>
+        <h3 id="quick-start">Quick Start</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">just install</span></div>
+  <pre><span class="cmt"># Install both binaries</span>
+<span class="prompt">$</span> just install
+
+<span class="cmt"># Check the rules compile and the examples fire as expected</span>
+coursers validate
+
+<span class="cmt"># See what a rule would do to a command before running it</span>
+echo 'git commit -am &quot;wip&quot;' | crs probe
+
+<span class="cmt"># Rewrite a command into its prefixed equivalent, or exit 1 if blocked</span>
+crs rewrite
+
+<span class="cmt"># Review what the hooks have blocked and learned</span>
+crs log --limit 20
+</pre>
+</div>
+<p><code>coursers</code> and <code>crs</code> are wired into <code>~/.claude/settings.json</code> as <code>PreToolUse</code>
+and <code>PostToolUse</code> hooks. Once installed, a matching command is denied before
+it runs, and a command that keeps failing is denied on its Nth attempt even
+with no rule written for it.
+
+---</p>
+
+        <h3 id="commands">Commands</h3>
+<p>All 20 subcommands, in the order <code>coursers --help</code> lists them. <code>crs</code> exposes
+the same model. The sections below go deeper on the ones that carry the
+design.</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th>Command</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>pre</code></td><td>PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout</td></tr>
+<tr><td><code>post</code></td><td>PostToolUse hook — reads JSON payload from stdin, records failures</td></tr>
+<tr><td><code>filter</code></td><td>Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout</td></tr>
+<tr><td><code>rewrite</code></td><td>Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1</td></tr>
+<tr><td><code>discover</code></td><td>Discover missed savings from Claude Code session history</td></tr>
+<tr><td><code>validate</code></td><td>Validate rules: check patterns compile, examples fire, exceptions work</td></tr>
+<tr><td><code>probe</code></td><td>Probe a command against all rules — reads command from stdin</td></tr>
+<tr><td><code>stats</code></td><td>Show cumulative block counts by rule</td></tr>
+<tr><td><code>insights</code></td><td>Analyze session facets enriched with git context</td></tr>
+<tr><td><code>audit</code></td><td>Show rx prefix learning state</td></tr>
+<tr><td><code>suggest</code></td><td>Suggest new rules from unhandled commands</td></tr>
+<tr><td><code>history</code></td><td>Show recent blocked commands</td></tr>
+<tr><td><code>export</code></td><td>Dump rules + stats + state as portable JSON</td></tr>
+<tr><td><code>hook</code></td><td>Run the generic hook pipeline for a hook event</td></tr>
+<tr><td><code>validate-hooks</code></td><td>Validate hook pipeline config</td></tr>
+<tr><td><code>log</code></td><td>Query the hook execution log</td></tr>
+<tr><td><code>heat</code></td><td>Show heatmap of rule firings</td></tr>
+<tr><td><code>replay</code></td><td>Replay a session's Bash commands through the current ruleset</td></tr>
+<tr><td><code>nu-check</code></td><td>Validate nu scripts using <code>nu --ide-check</code></td></tr>
+<tr><td><code>help</code></td><td>Print this message or the help of the given subcommand(s)</td></tr>
+</tbody>
+</table>
+</div>
+<p>---</p>
+
+        <h3 id="rule-based-blocking---coursers-pre--">Rule-based blocking (`coursers pre`)</h3>
+<p>Reads the Claude Code <code>PreToolUse</code> JSON payload from stdin. If the <code>Bash</code> tool's command
+matches a rule in <code>~/.config/coursers/course-correct-rules.json</code>, the hook returns a <code>deny</code>
+response with a human-readable message.
+
+Rules support:
+
+- Regex pattern matching (with optional <code>i</code> flag)
+- Exception patterns — allow a command through even if the main pattern matches
+- Per-rule messages</p>
+
+        <h3 id="learned-failure-tracking---coursers-post--">Learned failure tracking (`coursers post`)</h3>
+<p>Reads the <code>PostToolUse</code> payload. When a <code>Bash</code> command exits non-zero (excluding signals and
+intentional failures), it records the command in a rolling failure log. If the same command
+fails ≥ N times in a sliding window, <code>coursers pre</code> will block it on the next attempt.
+
+This catches commands that aren't covered by static rules but are clearly not working.
+
+---</p>
+
+        <h3 id="installation">Installation</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">just install</span></div>
+  <pre><span class="prompt">$</span> just install
+</pre>
+</div>
+<p>That is a wrapper for <code>cargo install --path crates/coursers</code>, which installs
+**both** binaries from the one package: <code>coursers</code> and <code>crs</code>. Installing by
+path skips the release profile and the two-binary wiring, so prefer <code>just
+install</code> unless you are testing a local build.
+
+Install the front-controller hook chain into your local <code>~/.claude/settings.json</code>:</p>
+<pre><code>{
+  &quot;hooks&quot;: {
+    &quot;PreToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Bash&quot;,
+        &quot;hooks&quot;: [
+          { &quot;type&quot;: &quot;command&quot;, &quot;command&quot;: &quot;crs hook pre-tool-use&quot; }
+        ]
+      }
+    ],
+    &quot;PostToolUse&quot;: [
+      {
+        &quot;matcher&quot;: &quot;Bash&quot;,
+        &quot;hooks&quot;: [
+          { &quot;type&quot;: &quot;command&quot;, &quot;command&quot;: &quot;crs hook post-tool-use&quot; }
+        ]
+      }
+    ]
+  }
+}
+</code></pre>
+<p>Run <code>crs validate-hooks</code> after installing the hook block to verify the chain is wired
+correctly.
+
+For Codex, the top-level registry also points at <code>crs hook --target codex &lt;event&gt;</code>.
+Those entries dispatch to the existing <code>$HOME/.codex/hooks/*.crux</code> backends, which
+still compose <code>coursers pre/post</code> and <code>crs rewrite/filter</code> internally for Bash flows.
+
+For OpenCode, copy or symlink exactly <code>integrations/opencode/coursers.ts</code> and
+<code>integrations/opencode/opencode-plugin.d.ts</code> into project-local <code>.opencode/plugins/</code> or global
+<code>$HOME/.config/opencode/plugins/</code>. Do not copy the integration test file. Run
+<code>crs validate-hooks --target opencode</code> to verify both files and the required binaries. See
+[docs/opencode.md](docs/opencode.md) for event mappings and troubleshooting.
+
+---</p>
+
+        <h3 id="configuration">Configuration</h3>
+<p>Rules file: <code>~/.config/coursers/course-correct-rules.json</code>
+(override with <code>COURSERS_RULES</code> env var)</p>
+<pre><code>{
+  &quot;rules&quot;: [
+    {
+      &quot;id&quot;: &quot;no-grep-use-tool&quot;,
+      &quot;pattern&quot;: &quot;\\bgrep\\b|\\brg\\b&quot;,
+      &quot;exceptions&quot;: [&quot;\\| grep&quot;, &quot;\\| rg&quot;],
+      &quot;message&quot;: &quot;Use the Grep tool instead of shell grep/rg.&quot;
+    }
+  ],
+  &quot;failure_learning&quot;: {
+    &quot;enabled&quot;: true,
+    &quot;block_threshold&quot;: 3,
+    &quot;window_seconds&quot;: 300,
+    &quot;cleanup_after_seconds&quot;: 3600,
+    &quot;max_tracked_commands&quot;: 200
+  }
+}
+</code></pre>
+
+        <h3 id="rule-fields">Rule fields</h3>
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th>Field</th><th>Required</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>id</code></td><td>yes</td><td>Unique identifier shown in block messages</td></tr>
+<tr><td><code>pattern</code></td><td>yes</td><td>Regex matched against the full command string</td></tr>
+<tr><td><code>pattern_flags</code></td><td>no</td><td><code>&quot;i&quot;</code> for case-insensitive matching</td></tr>
+<tr><td><code>exceptions</code></td><td>no</td><td>List of regexes — if any match, the rule is skipped</td></tr>
+<tr><td><code>enabled</code></td><td>no</td><td>Defaults to <code>true</code></td></tr>
+<tr><td><code>message</code></td><td>no</td><td>Custom deny message; defaults to <code>Blocked by rule '&lt;id&gt;'</code></td></tr>
+</tbody>
+</table>
+</div>
+
+        <h3 id="failure-learning-fields">Failure learning fields</h3>
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th>Field</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>enabled</code></td><td><code>true</code></td><td>Toggle the whole subsystem</td></tr>
+<tr><td><code>block_threshold</code></td><td><code>3</code></td><td>Failures required to trigger a block</td></tr>
+<tr><td><code>window_seconds</code></td><td><code>300</code></td><td>Sliding window (5 minutes)</td></tr>
+<tr><td><code>cleanup_after_seconds</code></td><td><code>3600</code></td><td>Remove entries not seen in this long</td></tr>
+<tr><td><code>max_tracked_commands</code></td><td><code>200</code></td><td>Evict oldest when over limit</td></tr>
+<tr><td><code>state_file</code></td><td>—</td><td>Override state path; supports <code>~/</code> prefix</td></tr>
+<tr><td><code>message_template</code></td><td>—</td><td>Custom message with <code>{count}</code>, <code>{window}</code>, <code>{preview}</code> tokens</td></tr>
+</tbody>
+</table>
+</div>
+<p>---</p>
+
+        <h3 id="crs">crs</h3>
+<p><code>crs</code> extends the pipeline with output compression and command rewriting.</p>
+
+        <h3 id="-crs-filter---posttooluse-">`crs filter` (PostToolUse)</h3>
+<p>Reads PostToolUse output and suppresses or compresses it based on rules in
+<code>.ctx/crs-filters.toml</code> (project-local) or <code>~/.config/crs/filters.toml</code> (global).
+
+Filter modes per rule:</p>
+<div class="table-wrap">
+<table>
+<thead>
+<tr><th>Mode</th><th>Behaviour</th></tr>
+</thead>
+<tbody>
+<tr><td><code>passthrough</code></td><td>Output unchanged (default)</td></tr>
+<tr><td><code>failures-only</code></td><td>Suppress output on exit 0; pass through on failure</td></tr>
+<tr><td><code>errors-only</code></td><td>Only pass lines containing &quot;error&quot; (case-insensitive)</td></tr>
+<tr><td><code>truncate</code></td><td>Keep first N lines (<code>max_lines</code>, default 50)</td></tr>
+</tbody>
+</table>
+</div>
+<p>Example <code>.ctx/crs-filters.toml</code>:</p>
+<pre><code>[[filters]]
+pattern = &quot;cargo (build|check|clippy)&quot;
+mode = &quot;errors-only&quot;
+
+[[filters]]
+pattern = &quot;cargo nextest&quot;
+mode = &quot;failures-only&quot;
+</code></pre>
+<p>Wire into your local <code>~/.claude/settings.json</code>:</p>
+<pre><code>{ &quot;matcher&quot;: &quot;Bash&quot;, &quot;hooks&quot;: [{ &quot;type&quot;: &quot;command&quot;, &quot;command&quot;: &quot;crs filter&quot; }] }
+</code></pre>
+
+        <h3 id="-crs-rewrite---pretooluse-">`crs rewrite` (PreToolUse)</h3>
+<p>Rewrites commands before they run using regex replace rules. Exit 0 + JSON response means
+rewritten; exit 1 means passthrough unchanged.</p>
+<pre><code>[[rewrites]]
+pattern = &quot;^cargo build$&quot;
+replace = &quot;cargo build --message-format json&quot;
+</code></pre>
+<p>Wire into your local <code>~/.claude/settings.json</code>:</p>
+<pre><code>{
+  &quot;matcher&quot;: &quot;Bash&quot;,
+  &quot;hooks&quot;: [{ &quot;type&quot;: &quot;command&quot;, &quot;command&quot;: &quot;crs rewrite&quot; }]
+}
+</code></pre>
+
+        <h3 id="-crs-discover-">`crs discover`</h3>
+<p>Scans Claude Code session history (<code>~/.claude/projects/**/*.jsonl</code>) to surface Bash
+commands that match filter/rewrite rules but weren't intercepted.
+
+---</p>
+
+        <h3 id="workspace-structure">Workspace Structure</h3>
+<p>Five workspace members, plus a standalone fuzz workspace:</p>
+<pre><code>crates/
+  types/     # coursers-types — domain data and stable port traits
+  core/      # coursers-core — rules, parsing, state, filters, rewrite,
+             #   analysis, and hook composition
+  coursers/  # coursers — CLI dispatch, concrete adapters, protocol I/O.
+             #   Defines both binaries: `coursers` from src/main.rs and
+             #   `crs` from src/bin/crs.rs, both calling coursers::run
+  e2e/       # coursers-e2e — cross-command and hook-chain scenarios
+  xtask/     # taskit-backed workspace quality gates
+fuzz/        # standalone cargo-fuzz workspace, not a member
+schemas/     # rule schema definitions
+docs/        # mdbook sources
+agents/      # coursers-companion.md — Claude Code agent for diagnostics
+config/      # pipeline rule plugins
+scripts/     # smoke.nu — end-to-end smoke test
+tests/       # binary integration test fixtures
+</code></pre>
+<p>---</p>
+
+        <h3 id="license">License</h3>
+<p>MIT OR Apache-2.0</p>
+
+        <h3 id="further-reading">Further reading</h3>
+        <ul>
+          <li><code>docs/codex-profile.md</code></li>
+          <li><code>docs/opencode.md</code></li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

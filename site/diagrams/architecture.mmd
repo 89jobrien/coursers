@@ -1,0 +1,17 @@
+flowchart LR
+  coursersx2dxtypes["coursers-types<br/>0.1.0"]
+  coursersx2dxcore["coursers-core<br/>0.1.0"]
+  coursers["coursers<br/>0.1.0"]
+  bin_coursers["coursers, crs"]
+  coursersx2dxe2e["coursers-e2e<br/>0.1.0"]
+  bin_coursersx2dxe2e["e2e-placeholder"]
+  xtask["xtask<br/>0.1.0"]
+  bin_xtask["xtask"]
+  coursersx2dxcore --> coursersx2dxtypes
+  coursers --> coursersx2dxcore
+  coursers --> coursersx2dxtypes
+  coursers --> coursersx2dxcore
+  coursers --> bin_coursers
+  coursers --> bin_crs
+  coursersx2dxe2e --> bin_e2ex2dxplaceholder
+  xtask --> bin_xtask

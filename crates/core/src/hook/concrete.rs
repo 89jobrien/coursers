@@ -175,14 +175,20 @@ impl<F: FiltersLoader> PostHook for FilterHook<F> {
         let payload = FilterPayload {
             command: command.to_string(),
             output: output.text.clone(),
-            exit_code: output.exit_code,
+            exit_code: output.exit_code.unwrap_or(0),
         };
 
         let result = run_filter(&payload, &filters_cfg);
         Ok(match result {
             FilterResult::Passthrough => PostHookOutcome::Allow,
             FilterResult::Replace(text) => PostHookOutcome::Filter(text),
-            FilterResult::Suppress => PostHookOutcome::Filter(String::new()),
+            // An unknown exit is not a clean success. Suppressing here would blank the
+            // output of a command that was aborted or timed out, and the agent would
+            // read the timeout as a pass. Pass the output through instead.
+            FilterResult::Suppress if output.exit_code.is_some() => {
+                PostHookOutcome::Filter(String::new())
+            }
+            FilterResult::Suppress => PostHookOutcome::Allow,
         })
     }
 }
@@ -222,8 +228,12 @@ impl<R: RulesLoader, S: StateStore> Observer for FailureObserver<R, S> {
         output: &ToolOutput,
         _outcome: &PostHookOutcome,
     ) -> Result<(), CourserError> {
-        if output.exit_code == 0 {
-            return Ok(());
+        // Only a *known* non-zero exit is a failure worth learning from. An unknown exit
+        // (abort/timeout) is not evidence that the command was wrong, and recording it
+        // would teach the learner from a timeout.
+        match output.exit_code {
+            Some(0) | None => return Ok(()),
+            Some(_) => {}
         }
 
         let Some(command) = extract_command(&ctx.raw_input) else {
@@ -263,14 +273,22 @@ mod tests {
     fn success_output(text: &str) -> ToolOutput {
         ToolOutput {
             text: text.to_string(),
-            exit_code: 0,
+            exit_code: Some(0),
         }
     }
 
     fn failure_output(text: &str) -> ToolOutput {
         ToolOutput {
             text: text.to_string(),
-            exit_code: 1,
+            exit_code: Some(1),
+        }
+    }
+
+    /// A command whose fate the harness never reported — OpenCode's abort/timeout case.
+    fn unknown_exit_output(text: &str) -> ToolOutput {
+        ToolOutput {
+            text: text.to_string(),
+            exit_code: None,
         }
     }
 
@@ -514,6 +532,22 @@ mod tests {
         let ctx = HookContext::new("Read", json!({ "file_path": "/tmp/foo" }));
         let out = success_output("some output");
         assert_eq!(hook.run(&ctx, &out).unwrap(), PostHookOutcome::Allow);
+    }
+
+    /// An unknown exit is not a clean success. `failures-only` suppresses on exit 0, so
+    /// treating an unreported exit as 0 blanks the output of a command that was aborted or
+    /// timed out — the agent then reads the timeout as a pass.
+    #[test]
+    fn filter_hook_allows_on_unknown_exit_with_failures_only() {
+        let cfg = filters_with_failures_only("cargo nextest");
+        let hook = FilterHook::new(InMemoryFiltersLoader(cfg));
+        let ctx = bash_ctx("cargo nextest run");
+        let out = unknown_exit_output("error: killed");
+        assert_eq!(
+            hook.run(&ctx, &out).unwrap(),
+            PostHookOutcome::Allow,
+            "an unknown exit must not suppress output"
+        );
     }
 
     // ── FailureObserver ──────────────────────────────────────────────────────

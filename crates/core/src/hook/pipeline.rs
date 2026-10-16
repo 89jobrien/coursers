@@ -229,19 +229,25 @@ fn restrict_to_project_scope(rules: &[HookRule]) -> Vec<HookRule> {
 pub fn load_config() -> HookPipelineConfig {
     let mut config = HookPipelineConfig::default();
 
-    // TODO(filters-not-applied-in-hook-path): `~/.config/crs/filters.toml` output-shaping
-    // rules never run. This loader reads only hooks.toml, plugins.d/*.toml, and the
-    // project-local crs-hooks.toml — filters.toml is not one of them, and `crs filter`
-    // (its only consumer) is not invoked from ~/.claude/settings.json or any other live
-    // config. Verified 2026-09-30: no `crs filter` reference in settings.json; grep over
-    // ~/.claude and ~/.notfiles matched only transcripts. So every `[[filters]]` rule in
-    // that file is dead config, including `failures-only` for cargo test, `errors-only`
-    // for cargo check/clippy, and the `match-lines` rules for rustqual/kani.
-    // Note the distinction from `hook/rewrite.rs`, which DOES read crs-filters.toml — but
-    // only its `[rewrites]` section, which rewrites commands rather than shaping output.
-    // Decide whether the hook path should apply output filters (then wire it here) or
-    // whether filters.toml is intentionally manual-only (then say so in its header, which
-    // currently describes it as if it were active).
+    // `~/.config/crs/filters.toml` is NOT loaded here. It is applied one layer up, in
+    // `cmd_hook` (crates/coursers/src/crs_commands.rs) and `opencode::run_hook`, which are
+    // deliberately the composition roots for their pipelines — each loads the config, runs
+    // this pipeline so the Redact arm processes the raw output, and only then shapes the
+    // redacted text. Keeping the load out of here means the pipeline stays a pure function of
+    // its inputs, and the ordering invariant (redact before shape) lives with the code that
+    // enforces it.
+    //
+    // Redaction must come first. Shaping beforehand let a `match-lines` rule drop a
+    // secret-bearing line before obfsck saw it, and a rule that *kept* it emitted the secret
+    // verbatim — turning a context-economy rule into an accidental security control.
+    //
+    // Trade-off of that placement: the rules are a standing policy rather than a
+    // per-invocation choice, so a mode like `errors-only` that is reasonable when a
+    // human asks for it can be wrong when applied to every Bash call. That is a reason
+    // to review rule modes, not to move the load down here.
+    //
+    // Distinct from `hook/rewrite.rs`, which DOES read crs-filters.toml — but only its
+    // `[rewrites]` section, which rewrites commands rather than shaping output.
 
     // 1. Global config
     if let Some(home) = dirs::home_dir() {
@@ -457,26 +463,61 @@ pub fn run_pipeline(config: &HookPipelineConfig, ctx: &HookContext) -> PipelineR
 /// Pipe `text` through `obfsck redact`. Fails open (returns `text`
 /// unchanged) if `obfsck` is missing or errors — a hook must never crash
 /// the tool call it's observing.
+///
+/// Failing open is correct for availability but dangerous for secrecy: if `obfsck` is
+/// absent or broken, every secret in the output reaches the model in cleartext while the
+/// rule still logs `PASS`. So both failure paths warn on stderr. That channel is safe —
+/// hook stdout carries JSON — and `crs validate-hooks`/`crs log` stay unaffected.
+///
+/// An empty warning is also emitted when redaction succeeds but changes nothing, since
+/// that is the expected case for ordinary output and silence would make a genuine
+/// no-op indistinguishable from a skipped redaction.
 fn run_redact(text: &str, level: Option<&str>) -> String {
     use std::io::Write as _;
     use std::process::Stdio;
 
-    let mut cmd = redact_command(level);
+    let level = level.unwrap_or("minimal");
+    let mut cmd = redact_command(Some(level));
     cmd.stdin(Stdio::piped());
     cmd.stdout(Stdio::piped());
-    cmd.stderr(Stdio::null());
+    cmd.stderr(Stdio::piped());
 
-    let Ok(mut child) = cmd.spawn() else {
-        return text.to_string();
+    let mut child = match cmd.spawn() {
+        Ok(child) => child,
+        Err(e) => {
+            eprintln!(
+                "[crs] redact: could not run `obfsck redact --level {level}` ({e}); \
+                 output was NOT redacted"
+            );
+            return text.to_string();
+        }
     };
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(text.as_bytes());
     }
     match child.wait_with_output() {
         Ok(out) if out.status.success() => {
-            String::from_utf8_lossy(&out.stdout).trim_end().to_string()
+            let redacted = String::from_utf8_lossy(&out.stdout).trim_end().to_string();
+            if redacted == text.trim_end() {
+                eprintln!("[crs] redact: obfsck made no changes (level {level})");
+            }
+            redacted
         }
-        _ => text.to_string(),
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            let detail = stderr.trim();
+            eprintln!(
+                "[crs] redact: `obfsck redact --level {level}` exited {}; output was NOT redacted{}{}",
+                out.status,
+                if detail.is_empty() { "" } else { " — " },
+                detail.lines().next().unwrap_or(""),
+            );
+            text.to_string()
+        }
+        Err(e) => {
+            eprintln!("[crs] redact: waiting on obfsck failed ({e}); output was NOT redacted");
+            text.to_string()
+        }
     }
 }
 

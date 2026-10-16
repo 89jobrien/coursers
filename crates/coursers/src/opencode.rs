@@ -1,5 +1,24 @@
 //! OpenCode hook payload translation and integration validation.
 
+// TODO(opencode-chain-path-parity): This path builds the `HookChain`
+// unconditionally (line ~118), but the Claude Code `pre`/`post` commands only
+// use that same chain when `COURSERS_HOOK_CHAIN=1` is set — the legacy
+// `hook::pre` / `hook::post` path is still the default
+// (`crates/coursers/src/lib.rs:232-248`, `chain_runner.rs:42`). The two
+// harnesses therefore do not run equivalent logic, and they are not even
+// configured symmetrically:
+//
+//   - signal exit codes (130/137/143) are excluded from failure learning on
+//     the legacy path but NOT on the chain path
+//     (`chain_runner.rs:18-21`)
+//   - `ls` enrichment of deny messages and hook-log writes exist only on the
+//     legacy path (`chain_runner.rs:22-24`)
+//   - the capture store is wired only on the legacy path
+//     (`chain_runner.rs:25-26`)
+//
+// The newest harness is running the least complete implementation. Either gate
+// this path on `chain_enabled()` too, or converge both paths (see the
+// unify-hook-paths marker in `chain_runner.rs:40`).
 use std::io::{self, Write};
 
 use coursers_core::hook::chain::{
@@ -104,11 +123,26 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
         .and_then(|value| value.get("output"))
         .and_then(Value::as_str)
         .map(str::to_owned);
-    if event == HookEvent::PostToolUse && (exit_code.is_none() || output.is_none()) {
+    // `exit_code` may legitimately be null. OpenCode's bash tool reports `exit: null`
+    // whenever a command was aborted or timed out (`exit.kind === "exit" ? exit.code : null`),
+    // which is neither success nor failure. A missing or null exit is therefore accepted
+    // and carried as `None`, because the filter and chain paths treat an unknown exit as
+    // "pass through" — coercing it to 0 would let a suppressive rule blank the output of a
+    // killed command. `output` remains required, since every tool supplies it.
+    if event == HookEvent::PostToolUse && output.is_none() {
         return Err(miette::miette!(
-            "normalized OpenCode post-tool request requires integer exit_code and string output"
+            "normalized OpenCode post-tool request requires string output"
         ));
     }
+
+    // Load `filters.toml` for PostToolUse/Bash, but do NOT shape yet — the pipeline's Redact arm
+    // has to run first. See the comment after `run_pipeline`; `cmd_hook` does the same thing.
+    let filter_config = if event == HookEvent::PostToolUse && tool_name.as_deref() == Some("Bash") {
+        let config = coursers_core::filters::load();
+        (!config.filters.is_empty()).then_some(config)
+    } else {
+        None
+    };
 
     let mut response = OpenCodeHookResponse::default();
     let mut effective_input = tool_input.clone();
@@ -134,7 +168,7 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
             HookEvent::PostToolUse => {
                 let output = ToolOutput {
                     text: output.clone().unwrap_or_default(),
-                    exit_code: exit_code.unwrap_or(0),
+                    exit_code,
                 };
                 if let PostHookOutcome::Filter(text) = chain.run_post(&context, &output)? {
                     response.replacement_output = Some(text);
@@ -190,6 +224,28 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
     }
     if let Some(output) = pipeline.replace_output {
         response.replacement_output = Some(output);
+    }
+    // Shape AFTER redaction, never before. Redaction is the security boundary and must process
+    // the raw output in full; shaping first let a `match-lines` rule drop a secret-bearing line
+    // before obfsck saw it. See the matching block in `cmd_hook` for the full rationale.
+    if let Some(filters) = filter_config
+        && let Some(raw) = context.output.as_deref()
+    {
+        let base = response.replacement_output.as_deref().unwrap_or(raw);
+        response.replacement_output = match coursers_core::hook::filter_logic::shape_command_output(
+            &filters,
+            &context.target.clone().unwrap_or_default(),
+            base,
+            // `None` when OpenCode reported a null exit (abort/timeout). Passing it
+            // through stops a suppressive rule from blanking a killed command's output.
+            context.exit_code,
+        ) {
+            coursers_core::hook::filter_logic::ShapedOutput::Unchanged => {
+                response.replacement_output.take()
+            }
+            coursers_core::hook::filter_logic::ShapedOutput::Suppressed => Some(String::new()),
+            coursers_core::hook::filter_logic::ShapedOutput::Replaced(text) => Some(text),
+        };
     }
     response.messages.extend(pipeline.messages);
     response.matched_rules.extend(pipeline.matched_rules);
