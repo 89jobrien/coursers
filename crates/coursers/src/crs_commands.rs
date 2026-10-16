@@ -935,6 +935,30 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
     // No action — silent pass.
 }
 
+fn truncate_display(value: &str, max_bytes: usize) -> &str {
+    let mut end = value.len().min(max_bytes);
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    &value[..end]
+}
+
+fn format_log_outcome(outcome: &coursers_core::hook::log::Outcome) -> String {
+    match outcome {
+        coursers_core::hook::log::Outcome::Pass => "PASS".to_string(),
+        coursers_core::hook::log::Outcome::Deny { message } => {
+            format!("DENY: {}", truncate_display(message, 60))
+        }
+        coursers_core::hook::log::Outcome::Rewrite { to } => {
+            format!("REWRITE: {}", truncate_display(to, 60))
+        }
+        coursers_core::hook::log::Outcome::SideEffect { commands_run } => {
+            format!("RUN({commands_run})")
+        }
+        coursers_core::hook::log::Outcome::Notify { count } => format!("NOTIFY({count})"),
+    }
+}
+
 /// Queries or prunes the hook execution log and formats the results.
 pub fn cmd_log(
     limit: usize,
@@ -1003,21 +1027,7 @@ pub fn cmd_log(
             .map(|d| d.format("%H:%M:%S").to_string())
             .unwrap_or_else(|| "?".into());
 
-        let outcome_str = match &entry.outcome {
-            coursers_core::hook::log::Outcome::Pass => "PASS".to_string(),
-            // TODO(unicode-safe-truncation): centralize display truncation around UTF-8 character (#56)
-            // boundaries so valid user-controlled text cannot panic command rendering.
-            coursers_core::hook::log::Outcome::Deny { message } => {
-                format!("DENY: {}", &message[..message.len().min(60)])
-            }
-            coursers_core::hook::log::Outcome::Rewrite { to } => {
-                format!("REWRITE: {}", &to[..to.len().min(60)])
-            }
-            coursers_core::hook::log::Outcome::SideEffect { commands_run } => {
-                format!("RUN({commands_run})")
-            }
-            coursers_core::hook::log::Outcome::Notify { count } => format!("NOTIFY({count})"),
-        };
+        let outcome_str = format_log_outcome(&entry.outcome);
 
         let target_short = entry
             .target
@@ -2478,6 +2488,25 @@ mod cli_tests {
     use super::*;
     use crate::{Cli, Command};
     use clap::Parser;
+
+    #[test]
+    fn log_outcome_truncation_stops_before_partial_unicode_character() {
+        let value = format!("{}🦀suffix", "a".repeat(59));
+
+        let deny = coursers_core::hook::log::Outcome::Deny {
+            message: value.clone(),
+        };
+        let rewrite = coursers_core::hook::log::Outcome::Rewrite { to: value };
+
+        assert_eq!(
+            format_log_outcome(&deny),
+            format!("DENY: {}", "a".repeat(59))
+        );
+        assert_eq!(
+            format_log_outcome(&rewrite),
+            format!("REWRITE: {}", "a".repeat(59))
+        );
+    }
 
     #[test]
     fn discover_default_no_generate_filters() {
