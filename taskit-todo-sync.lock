@@ -32,11 +32,6 @@
       "issue_number": 72
     },
     {
-      "file": "crates/core/src/hook/pipeline.rs",
-      "text": "TODO(hook-config-trust): require explicit repository trust before project-local rules may (#50)",
-      "issue_number": 73
-    },
-    {
       "file": "crates/core/src/jsonl_source.rs",
       "text": "TODO(#41): pick one arrow style (-> vs the unicode arrow used elsewhere)",
       "issue_number": 74
