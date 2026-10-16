@@ -179,3 +179,48 @@ impl RtkRewrite for NullRtkClient {
         false
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn null_client_analysis_methods_are_none() {
+        let c = NullRtkClient;
+        assert!(c.discover(7).is_none());
+        assert!(c.gain().is_none());
+        assert!(c.session().is_none());
+        assert!(c.verify().is_none());
+        assert!(c.hook_audit().is_none());
+        assert!(c.version().is_none());
+    }
+
+    #[test]
+    fn null_client_rewrite_methods_are_noops() {
+        let c = NullRtkClient;
+        assert!(c.rewrite("ls").is_none());
+        assert!(c.probe("ls").is_none());
+        assert!(!c.check("ls"));
+        assert!(c.list_proxies().is_empty());
+        assert!(!c.flush());
+    }
+
+    #[test]
+    fn default_report_structs_are_empty() {
+        let discover = RtkDiscoverReport::default();
+        assert_eq!(discover.sessions_scanned, 0);
+        assert!(discover.supported.is_empty());
+        assert!(discover.unsupported.is_empty());
+
+        let gain = RtkGainReport::default();
+        assert_eq!(gain.tokens_saved, 0);
+        assert!(gain.by_command.is_empty());
+
+        let audit = RtkHookAudit::default();
+        assert!(audit.rewrites.is_empty());
+
+        let probe = RtkProbeResult::default();
+        assert!(!probe.supported);
+        assert!(probe.rewritten.is_none());
+    }
+}
