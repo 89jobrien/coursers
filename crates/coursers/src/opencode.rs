@@ -123,9 +123,15 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
         .and_then(|value| value.get("output"))
         .and_then(Value::as_str)
         .map(str::to_owned);
-    if event == HookEvent::PostToolUse && (exit_code.is_none() || output.is_none()) {
+    // `exit_code` may legitimately be null. OpenCode's bash tool reports `exit: null`
+    // whenever a command was aborted or timed out (`exit.kind === "exit" ? exit.code : null`),
+    // which is neither success nor failure. A missing or null exit is therefore accepted
+    // and carried as `None`, because the filter and chain paths treat an unknown exit as
+    // "pass through" — coercing it to 0 would let a suppressive rule blank the output of a
+    // killed command. `output` remains required, since every tool supplies it.
+    if event == HookEvent::PostToolUse && output.is_none() {
         return Err(miette::miette!(
-            "normalized OpenCode post-tool request requires integer exit_code and string output"
+            "normalized OpenCode post-tool request requires string output"
         ));
     }
 
@@ -162,7 +168,7 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
             HookEvent::PostToolUse => {
                 let output = ToolOutput {
                     text: output.clone().unwrap_or_default(),
-                    exit_code: exit_code.unwrap_or(0),
+                    exit_code,
                 };
                 if let PostHookOutcome::Filter(text) = chain.run_post(&context, &output)? {
                     response.replacement_output = Some(text);
@@ -230,7 +236,9 @@ pub(crate) fn run_hook(event: HookEvent, raw_json: &str) -> miette::Result<OpenC
             &filters,
             &context.target.clone().unwrap_or_default(),
             base,
-            context.exit_code.unwrap_or(0),
+            // `None` when OpenCode reported a null exit (abort/timeout). Passing it
+            // through stops a suppressive rule from blanking a killed command's output.
+            context.exit_code,
         ) {
             coursers_core::hook::filter_logic::ShapedOutput::Unchanged => {
                 response.replacement_output.take()

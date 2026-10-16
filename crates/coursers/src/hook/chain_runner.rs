@@ -153,11 +153,13 @@ pub fn run_post(profile_cfg: &ProfileConfig) {
         return;
     }
 
+    // `None` when the harness reported no exit code. Left unknown rather than coerced to 0:
+    // a post-hook that reads unknown as success will suppress the output of a command whose
+    // fate was never recorded.
     let exit_code = raw
         .get("tool_response")
         .and_then(|r| r.get("exit_code"))
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0);
+        .and_then(|v| v.as_i64());
 
     let output_text = raw
         .get("tool_response")

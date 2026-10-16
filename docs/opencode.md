@@ -90,8 +90,11 @@ A denial uses `decision: "deny"` and a reason while still exiting zero. Rewrites
 
 Invalid normalized JSON or an unknown event makes `crs` exit non-zero and write diagnostics to
 stderr. The plugin logs adapter failures and fails open. A valid structured denial is still
-applied. Missing or non-numeric `metadata.exit` defaults to zero, preventing unverified failure
-records. This may omit failure learning when a tool does not provide exit metadata.
+applied. Missing or non-numeric `metadata.exit` is sent as `null`, not `0`. OpenCode's bash tool
+reports `exit: null` on abort and timeout, which is neither success nor failure, so the bridge
+carries the uncertainty through rather than fabricating an outcome. An unknown exit produces no
+failure-learning record and never suppresses output — a timeout must never read to the agent as a
+clean pass.
 
 Notifications are written to OpenCode application logs at `info` level; they are not injected
 into model context. Lifecycle hooks that cannot block their originating event still perform
@@ -114,8 +117,9 @@ The command exits non-zero and identifies every missing requirement.
   supported plugin directory and run validation from the intended project.
 - **Bridge errors in logs:** run `crs hook --target opencode session-start` with a JSON object on
   stdin and inspect stderr. Adapter failures fail open by design.
-- **No failure-learning record:** confirm the OpenCode tool supplied numeric `metadata.exit`.
-  Missing values intentionally default to zero.
+- **No failure-learning record:** failure learning requires a *known* non-zero `metadata.exit`.
+  A null exit — abort, timeout, or a tool that reports none — is intentionally not recorded,
+  because a timeout is not evidence the command was wrong.
 - **Repeated or missing end events:** relationship and deduplication state is process-local;
   abrupt plugin termination can prevent best-effort `SessionEnd` delivery.
 - **Compaction hook unavailable:** `experimental.session.compacting` is version-sensitive; other

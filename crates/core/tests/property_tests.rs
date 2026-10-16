@@ -229,7 +229,7 @@ proptest! {
             &cfg("cargo test", FilterMode::MatchLines, Some("^b")),
             "cargo test",
             &output,
-            0,
+            Some(0),
         );
         assert_lines_from_input(&shaped, &output)?;
     }
@@ -243,7 +243,7 @@ proptest! {
         let output = lines.join("\n");
         let mut config = cfg("doob todo list", FilterMode::Truncate, None);
         config.filters[0].max_lines = keep;
-        let shaped = shape_command_output(&config, "doob todo list", &output, 0);
+        let shaped = shape_command_output(&config, "doob todo list", &output, Some(0));
         assert_lines_from_input(&shaped, &output)?;
     }
 
@@ -260,7 +260,7 @@ proptest! {
             &cfg("cargo clippy", FilterMode::MatchLines, Some("^zzz-never-matches")),
             "cargo clippy",
             &output,
-            code,
+            Some(code),
         );
         prop_assert_eq!(shaped, ShapedOutput::Unchanged);
     }
@@ -276,8 +276,27 @@ proptest! {
             &cfg("cargo test", FilterMode::FailuresOnly, None),
             "cargo test",
             &output,
-            code,
+            Some(code),
         );
+        prop_assert_eq!(shaped, ShapedOutput::Unchanged);
+    }
+
+    /// An unknown exit is neither success nor failure, so no mode may suppress on it.
+    /// A suppressed payload is indistinguishable from a clean run at the harness, which is
+    /// how an aborted or timed-out command reads as a pass.
+    #[test]
+    fn unknown_exit_never_suppresses(
+        lines in prop::collection::vec("[a-z ]{1,12}", 1..20),
+        mode in prop::sample::select(vec![
+            FilterMode::FailuresOnly,
+            FilterMode::ErrorsOnly,
+            FilterMode::MatchLines,
+        ]),
+    ) {
+        let output = lines.join("\n");
+        let mut config = cfg("cargo test", mode.clone(), Some("^zzz-never-matches"));
+        config.filters[0].match_pattern = None;
+        let shaped = shape_command_output(&config, "cargo test", &output, None);
         prop_assert_eq!(shaped, ShapedOutput::Unchanged);
     }
 }

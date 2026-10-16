@@ -103,21 +103,32 @@ impl ShapedOutput {
 }
 
 /// Apply the first matching filter rule to `output`.
+///
+/// `exit_code` is `None` when the harness could not report how the command ended.
+/// That is not the same fact as a clean exit: OpenCode's bash tool reports a null
+/// exit when a command is aborted or times out, and Claude Code's Bash
+/// `tool_response` carries no exit code at all. A suppressive mode (`failures-only`,
+/// `errors-only`, `match-lines`) that reads unknown as `0` blanks the output of a
+/// command that was killed mid-run, and the agent concludes it passed. An unknown
+/// exit therefore never suppresses — the output is passed through untouched.
 pub fn shape_command_output(
     config: &FiltersConfig,
     command: &str,
     output: &str,
-    exit_code: i64,
+    exit_code: Option<i64>,
 ) -> ShapedOutput {
     let payload = FilterPayload {
         command: command.to_string(),
         output: output.to_string(),
-        exit_code,
+        exit_code: exit_code.unwrap_or(0),
     };
+    // Preserve "unknown" through the rule, so a suppressive mode cannot fire on it.
+    let rule_may_suppress = exit_code.is_some();
     match run_filter(&payload, config) {
         FilterResult::Passthrough => ShapedOutput::Unchanged,
         FilterResult::Replace(text) => ShapedOutput::Replaced(text),
-        FilterResult::Suppress => ShapedOutput::Suppressed,
+        FilterResult::Suppress if rule_may_suppress => ShapedOutput::Suppressed,
+        FilterResult::Suppress => ShapedOutput::Unchanged,
     }
 }
 
@@ -232,7 +243,7 @@ mod tests {
     fn shape_is_unchanged_when_no_rule_matches() {
         let cfg = cfg_with(FilterMode::FailuresOnly);
         assert_eq!(
-            shape_command_output(&cfg, "ls -la", "total 8", 0),
+            shape_command_output(&cfg, "ls -la", "total 8", Some(0)),
             ShapedOutput::Unchanged
         );
     }
@@ -241,7 +252,7 @@ mod tests {
     fn shape_is_suppressed_for_a_suppressing_rule() {
         let cfg = cfg_with(FilterMode::FailuresOnly);
         assert_eq!(
-            shape_command_output(&cfg, "cargo nextest run", "3 passed", 0),
+            shape_command_output(&cfg, "cargo nextest run", "3 passed", Some(0)),
             ShapedOutput::Suppressed
         );
     }
@@ -249,7 +260,7 @@ mod tests {
     #[test]
     fn shape_is_replaced_for_a_transforming_rule() {
         let cfg = cfg_with(FilterMode::Truncate);
-        let shaped = shape_command_output(&cfg, "cargo nextest run", "a\nb\nc\nd\ne", 0);
+        let shaped = shape_command_output(&cfg, "cargo nextest run", "a\nb\nc\nd\ne", Some(0));
         assert!(matches!(shaped, ShapedOutput::Replaced(ref t) if t.contains("2 lines omitted")));
     }
 
@@ -259,8 +270,21 @@ mod tests {
     fn shape_is_unchanged_when_matched_rule_returns_identical_text() {
         let cfg = cfg_with(FilterMode::FailuresOnly);
         assert_eq!(
-            shape_command_output(&cfg, "cargo nextest run", "1 failed", 1),
+            shape_command_output(&cfg, "cargo nextest run", "1 failed", Some(1)),
             ShapedOutput::Unchanged
+        );
+    }
+
+    /// An unknown exit must never suppress. `failures-only` suppresses on a zero exit,
+    /// so coercing "unknown" to 0 would blank the output of a command that was aborted or
+    /// timed out — the agent would read the timeout as a clean pass.
+    #[test]
+    fn shape_does_not_suppress_on_an_unknown_exit() {
+        let cfg = cfg_with(FilterMode::FailuresOnly);
+        assert_eq!(
+            shape_command_output(&cfg, "cargo nextest run", "3 passed", None),
+            ShapedOutput::Unchanged,
+            "an unknown exit must pass output through, not blank it"
         );
     }
 

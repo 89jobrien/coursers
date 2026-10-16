@@ -703,7 +703,7 @@ mod tests {
             crate::hook::chain::HookContext::new("Bash", json!({ "command": "cargo test" }));
         let post_output = crate::hook::chain::ToolOutput {
             text: "ok".into(),
-            exit_code: 0,
+            exit_code: Some(0),
         };
         let post_outcome = chain.run_post(&post_ctx, &post_output).unwrap();
         assert_eq!(post_outcome, PostHookOutcome::Allow);

@@ -318,10 +318,15 @@ label = "regression/claude-default"
     );
     assert!(output.status.success());
     let json: Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(json["hookSpecificOutput"]["hookEventName"], "SessionStart");
-    assert_eq!(
-        json["hookSpecificOutput"]["systemMessage"],
-        "Claude session started"
+    // The message rides the top-level `systemMessage` field, not `hookSpecificOutput`.
+    // `SessionStart` is not a member of the harness's `hookSpecificOutput.hookEventName`
+    // enum, so nesting it there failed schema validation and silently discarded the
+    // notification (coursers 5cfa7a6). This assertion previously expected the nested
+    // shape and therefore pinned the bug.
+    assert_eq!(json["systemMessage"], "Claude session started");
+    assert!(
+        json.get("hookSpecificOutput").is_none(),
+        "session-start must not nest a message under hookSpecificOutput, got {json}"
     );
     assert!(json.get("decision").is_none());
 }

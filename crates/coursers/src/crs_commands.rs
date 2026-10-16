@@ -867,7 +867,10 @@ pub fn cmd_hook(hook_target: &str, event_str: &str) {
             &filters,
             &ctx.target.clone().unwrap_or_default(),
             base,
-            ctx.exit_code.unwrap_or(0),
+            // `None` when the harness reported no exit code. Claude Code's Bash
+            // `tool_response` carries none, and treating unknown as success would let a
+            // suppressive rule blank the output of a command whose fate is unrecorded.
+            ctx.exit_code,
         ) {
             ShapedOutput::Unchanged => result.replace_output.take(),
             ShapedOutput::Suppressed => Some(String::new()),

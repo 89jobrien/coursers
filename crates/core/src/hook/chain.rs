@@ -95,7 +95,13 @@ pub struct ToolOutput {
     /// Combined stdout / output text (may be empty).
     pub text: String,
     /// Exit code of the underlying process (0 = success).
-    pub exit_code: i64,
+    ///
+    /// `None` means the harness could not report how the command ended — OpenCode
+    /// sends a null exit on abort and timeout, and Claude Code's Bash `tool_response`
+    /// carries no exit code at all. That is distinct from `Some(0)`: a post-hook that
+    /// treats unknown as success will suppress the output of a killed command, and the
+    /// agent reads a timeout as a pass.
+    pub exit_code: Option<i64>,
 }
 
 /// Outcome returned by a [`PostHook`] implementation.
@@ -274,7 +280,7 @@ mod tests {
     fn success_output() -> ToolOutput {
         ToolOutput {
             text: "ok".into(),
-            exit_code: 0,
+            exit_code: Some(0),
         }
     }
 

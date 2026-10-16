@@ -5,7 +5,7 @@ import type { Plugin, PluginInput } from "@opencode-ai/plugin"
 export type BridgeRequest = {
   tool_name?: string
   tool_input?: Record<string, unknown>
-  tool_response?: { exit_code: number; output: string }
+  tool_response?: { exit_code: number | null; output: string }
   session_id?: string
   target?: string
   [key: string]: unknown
@@ -260,7 +260,12 @@ export function createCoursersPlugin(injectedBridge?: Bridge): Plugin {
           tool_name: normalizeToolName(input.tool),
           tool_input: normalizeToolInput(input.args),
           tool_response: {
-            exit_code: typeof exit === "number" ? exit : 0,
+            // `null`, never 0, when OpenCode could not report an exit code. Its bash
+            // tool sets `exit: null` on abort and timeout, which is neither success
+            // nor failure; coercing that to 0 made a killed command look like a clean
+            // one, and a suppressive output filter then blanked its output so the agent
+            // read the timeout as a pass.
+            exit_code: typeof exit === "number" ? exit : null,
             output: output.output,
           },
           session_id: input.sessionID,

@@ -162,6 +162,59 @@ mode = "failures-only"
 "#;
 
 // ---------------------------------------------------------------------------
+// REGRESSION: an unknown exit code must not be read as a clean success
+// ---------------------------------------------------------------------------
+
+/// The bug: `coursers.ts` sent `exit_code: 0` whenever OpenCode's `metadata.exit`
+/// was not a number, and OpenCode's bash tool sets `exit: null` whenever the command
+/// was aborted or timed out (`bash.ts`: `exit.kind === "exit" ? exit.code : null`).
+///
+/// The coercion turns "we do not know how this ended" into "this succeeded", and a
+/// suppressive rule (`failures-only`) then blanks the output of a command that was
+/// killed mid-run. The agent sees an empty tool result and concludes the command
+/// passed. A timeout and a clean build become indistinguishable.
+///
+/// This is the same class of bug as the `errors-only` revert already documented in
+/// `filters.toml`: a mode that is reasonable when a human asks for it is wrong when
+/// applied to every Bash call, because "not a failure" and "a success" are not the
+/// same fact.
+///
+/// Pinned at the bridge boundary with a null exit — the payload the plugin must send
+/// when OpenCode reports a timeout or abort. An empty replacement is the swallow.
+#[test]
+fn opencode_unknown_exit_is_not_treated_as_success() {
+    let f = Fixture::new(FAILURES_ONLY);
+    let payload = json!({
+        "tool_name": "Bash",
+        "tool_input": {"command": "cargo nextest run"},
+        "tool_response": {"exit_code": null, "output": "error: killed\n"},
+        "session_id": "ses-shaping",
+    })
+    .to_string();
+    let out = f.run("opencode", "post-tool-use", &payload);
+    assert!(
+        out.status.success(),
+        "a null exit must be accepted, not rejected: exited {:?}; stderr: {}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: Value = serde_json::from_slice(&out.stdout).unwrap();
+    // The error must reach the agent. Either the payload is echoed back as a
+    // replacement, or no replacement is emitted at all and the harness falls back to
+    // the tool's own output — both preserve it. Blanking it to "" is the swallow.
+    assert_ne!(
+        shaped(&json),
+        Some(String::new()),
+        "output was blanked for a command whose exit code was unknown (timeout/abort)"
+    );
+    let delivered = shaped(&json).unwrap_or_else(|| "error: killed\n".to_string());
+    assert!(
+        delivered.contains("error: killed"),
+        "the error must survive an unknown exit, got {delivered:?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
 // The regression: shaping must survive the pipeline's Redact arm
 // ---------------------------------------------------------------------------
 
