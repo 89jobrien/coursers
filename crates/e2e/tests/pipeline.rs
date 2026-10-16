@@ -138,7 +138,7 @@ fn pipeline_ls_allowed_and_filter_suppresses() {
     assert!(fil.status.success());
     let stdout = String::from_utf8_lossy(&fil.stdout);
     assert!(
-        stdout.contains(r#""message":""#),
+        stdout.contains("\"message\":\"\""),
         "expected suppress, got: {stdout}"
     );
 }
@@ -181,7 +181,7 @@ fn pipeline_cargo_test_rewritten_and_filtered() {
     let fil = pipe.run_filter("cargo nextest run --release", "42 tests passed", 0);
     let stdout = String::from_utf8_lossy(&fil.stdout);
     assert!(
-        stdout.contains(r#""message":""#),
+        stdout.contains("\"message\":\"\""),
         "expected suppress on success, got: {stdout}"
     );
 }
