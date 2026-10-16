@@ -1,0 +1,1625 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Claude Code hook pipeline for course-correcting AI-generated Bash commands.">
+    <title>coursers-types CLI</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <nav class="nav" aria-label="Primary">
+      <a href="index.html" class="brand">coursers-types</a>
+      <a href="index.html">Overview</a>
+      <a href="guide.html">Guide</a>
+      <a href="architecture.html">Architecture</a>
+      <a href="crates.html">Crates</a>
+      <a href="features.html">Features</a>
+      <a href="cli.html" aria-current="page">CLI</a>
+      <a href="commands.html">Commands</a>
+    </nav>
+
+    <main id="main">
+      <section id="cli" class="reveal">
+        <h2>CLI</h2>
+        <p class="note">
+          Captured by running each binary with <code>--help</code>. It cannot
+          drift from the tool the way a transcribed page can.
+        </p>
+        <h3 id="coursers---help">coursers --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-pre---help">coursers pre --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers pre --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-post---help">coursers post --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers post --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-filter---help">coursers filter --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers filter --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-rewrite---help">coursers rewrite --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers rewrite --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-discover---help">coursers discover --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers discover --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-validate---help">coursers validate --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers validate --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-probe---help">coursers probe --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers probe --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-stats---help">coursers stats --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers stats --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-insights---help">coursers insights --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers insights --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-audit---help">coursers audit --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers audit --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-suggest---help">coursers suggest --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers suggest --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-history---help">coursers history --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers history --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-export---help">coursers export --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers export --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="coursers-hook---help">coursers hook --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">coursers hook --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: coursers &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs---help">crs --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-pre---help">crs pre --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs pre --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-post---help">crs post --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs post --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-filter---help">crs filter --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs filter --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-rewrite---help">crs rewrite --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs rewrite --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-discover---help">crs discover --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs discover --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-validate---help">crs validate --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs validate --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-probe---help">crs probe --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs probe --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-stats---help">crs stats --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs stats --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-insights---help">crs insights --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs insights --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-audit---help">crs audit --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs audit --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-suggest---help">crs suggest --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs suggest --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-history---help">crs history --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs history --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-export---help">crs export --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs export --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="crs-hook---help">crs hook --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">crs hook --help</span></div>
+  <pre><span class="prompt">$</span> Claude Code course-correction hook pipeline
+
+Usage: crs &lt;COMMAND&gt;
+
+Commands:
+  pre             PreToolUse hook — reads JSON payload from stdin, writes hook response to stdout
+  post            PostToolUse hook — reads JSON payload from stdin, records failures
+  filter          Filter PostToolUse output — reads hook JSON from stdin, emits hook response to stdout
+  rewrite         Rewrite a PreToolUse command — reads hook JSON from stdin, emits rewritten command or exits 1
+  discover        Discover missed savings from Claude Code session history
+  validate        Validate rules: check patterns compile, examples fire, exceptions work
+  probe           Probe a command against all rules — reads command from stdin
+  stats           Show cumulative block counts by rule
+  insights        Analyze session facets enriched with git context
+  audit           Show rx prefix learning state
+  suggest         Suggest new rules from unhandled commands
+  history         Show recent blocked commands
+  export          Dump rules + stats + state as portable JSON
+  hook            Run the generic hook pipeline for a hook event
+  validate-hooks  Validate hook pipeline config
+  log             Query the hook execution log
+  heat            Show heatmap of rule firings
+  replay          Replay a session's Bash commands through the current ruleset
+  nu-check        Validate nu scripts using `nu --ide-check`
+  help            Print this message or the help of the given subcommand(s)
+
+Options:
+  -h, --help     Print help
+  -V, --version  Print version
+</pre>
+</div>
+        <h3 id="xtask---help">xtask --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-dev---help">xtask dev --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask dev --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-check---help">xtask check --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask check --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-test---help">xtask test --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask test --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-health---help">xtask health --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask health --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-protocol---help">xtask protocol --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask protocol --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-release---help">xtask release --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask release --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-flow---help">xtask flow --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask flow --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-self---help">xtask self --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask self --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-dashboard---help">xtask dashboard --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask dashboard --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-init---help">xtask init --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask init --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-changelog---help">xtask changelog --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask changelog --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+        <h3 id="xtask-help---help">xtask help --help</h3>
+<div class="terminal">
+  <div class="terminal-bar"><span class="label">xtask help --help</span></div>
+  <pre><span class="prompt">$</span> Config-driven CI pipeline runner
+
+Usage: taskit [OPTIONS] &lt;COMMAND&gt;
+
+Commands:
+  dev        Build, install, and workspace-setup commands
+  check      Quality gates: fmt, lint, test, CI
+  test       Extended testing: coverage, proptest, fuzz, bench
+  health     Codebase health and metrics
+  protocol   Protocol drift, TODO sync, dependency governance
+  release    Version bumps and publishing
+  flow       Git branching workflow: main -&gt; staging -&gt; release -&gt; main
+  self       Operate on the taskit binary itself: install, test, check tooling
+  dashboard  Live terminal dashboard: workspace health, CI telemetry, and drift
+  init       Generate taskit.toml and Cruxfile for the current workspace
+  changelog  Generate or preview CHANGELOG.md using git-cliff
+  help       Print this message or the help of the given subcommand(s)
+
+Options:
+      --dry-run
+          Print commands without executing them
+
+      --output &lt;OUTPUT&gt;
+          Output format: human (default), json, github, junit
+
+          Possible values:
+          - human:      Human-friendly console output
+          - compact:    One line per step; expands failed steps when verbose_on_failure is set
+          - json:       Structured JSON output for tooling
+          - github:     GitHub Actions annotation format
+          - junit:      JUnit XML output for CI parsers
+          - diagnostic: Rich diagnostic text output with source context
+          - sarif:      SARIF output for security/code scanning tools
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+</pre>
+</div>
+      </section>
+    </main>
+  </body>
+</html>
