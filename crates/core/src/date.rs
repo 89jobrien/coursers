@@ -26,12 +26,16 @@ pub const DAYS_PER_YEAR: u64 = 365;
 const RATA_DIE_EPOCH_OFFSET: u64 = 719_468;
 /// Years in one Gregorian era (400-year cycle).
 const YEARS_PER_ERA: u64 = 400;
-/// Rata Die month-of-year multiplier (numerator).
-const MP_NUMER: u64 = 5;
-/// Rata Die month-of-year accumulator offset.
-const MP_OFFSET: u64 = 2;
-/// Rata Die month-of-year divisor.
-const MP_DENOM: u64 = 153;
+/// Years in one Gregorian leap-year cycle.
+const YEARS_PER_LEAP_CYCLE: u64 = 4;
+/// Years in one Gregorian century.
+const YEARS_PER_CENTURY: u64 = 100;
+/// Rata Die March-based month multiplier.
+const MARCH_BASED_MONTH_MULTIPLIER: u64 = 5;
+/// Rata Die March-based month accumulator offset.
+const MARCH_BASED_MONTH_OFFSET: u64 = 2;
+/// Rata Die March-based month divisor.
+const MARCH_BASED_MONTH_DIVISOR: u64 = 153;
 /// March-based month threshold for year adjustment.
 const MARCH_MONTH_THRESHOLD: u64 = 10;
 /// March-based offset to convert to calendar month (mp < 10).
@@ -57,11 +61,13 @@ pub fn unix_secs_to_ymd(secs: u64) -> (u32, u32, u32) {
     let yoe =
         (z - z / (DAYS_PER_4Y - 1) + z / DAYS_PER_100Y - z / (DAYS_PER_400Y - 1)) / DAYS_PER_YEAR;
     let y = yoe + era * YEARS_PER_ERA;
-    let doy = z
-        - (DAYS_PER_YEAR * yoe + yoe / (DAYS_PER_4Y / DAYS_PER_YEAR)
-            - yoe / (DAYS_PER_100Y / DAYS_PER_YEAR));
-    let mp = (MP_NUMER * doy + MP_OFFSET) / MP_DENOM;
-    let d = doy - (MP_DENOM * mp + MP_OFFSET) / MP_NUMER + 1;
+    let doy = z - (DAYS_PER_YEAR * yoe + yoe / YEARS_PER_LEAP_CYCLE - yoe / YEARS_PER_CENTURY);
+    let mp =
+        (MARCH_BASED_MONTH_MULTIPLIER * doy + MARCH_BASED_MONTH_OFFSET) / MARCH_BASED_MONTH_DIVISOR;
+    let d = doy
+        - (MARCH_BASED_MONTH_DIVISOR * mp + MARCH_BASED_MONTH_OFFSET)
+            / MARCH_BASED_MONTH_MULTIPLIER
+        + 1;
     let m = if mp < MARCH_MONTH_THRESHOLD {
         mp + MONTH_ADJUST_ADD
     } else {
