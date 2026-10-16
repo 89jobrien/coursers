@@ -89,10 +89,12 @@ fn rewritten_command(out: &Output) -> Option<String> {
 fn system_message(out: &Output) -> Option<String> {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let v: serde_json::Value = serde_json::from_str(stdout.trim()).ok()?;
-    v.get("hookSpecificOutput")?
-        .get("systemMessage")?
-        .as_str()
-        .map(str::to_string)
+    // Top-level, not `hookSpecificOutput.systemMessage`: `PostToolUse` is not a
+    // member of the harness's `hookEventName` enum, so the nested form fails
+    // schema validation and the message is discarded (coursers 5cfa7a6). This
+    // helper predates that change and was reading the location that no longer
+    // carries the value.
+    v.get("systemMessage")?.as_str().map(str::to_string)
 }
 
 #[test]
