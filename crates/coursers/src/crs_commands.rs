@@ -3275,4 +3275,153 @@ mod cli_tests {
             "crs hook --target codex stop"
         ));
     }
+
+    #[test]
+    fn is_op_plugin_prefix_matches_exact_form() {
+        let prefix = vec![
+            "op".to_string(),
+            "plugin".to_string(),
+            "run".to_string(),
+            "--".to_string(),
+        ];
+        assert!(is_op_plugin_prefix(&prefix));
+    }
+
+    #[test]
+    fn is_op_plugin_prefix_rejects_wrong_length() {
+        let prefix = vec!["op".to_string(), "plugin".to_string(), "run".to_string()];
+        assert!(!is_op_plugin_prefix(&prefix));
+    }
+
+    #[test]
+    fn is_op_plugin_prefix_rejects_wrong_words() {
+        let prefix = vec![
+            "op".to_string(),
+            "item".to_string(),
+            "run".to_string(),
+            "--".to_string(),
+        ];
+        assert!(!is_op_plugin_prefix(&prefix));
+    }
+
+    #[test]
+    fn command_key_extracts_first_token() {
+        assert_eq!(command_key("git commit -m 'hi'"), "git");
+        assert_eq!(command_key("  cargo test  "), "cargo");
+    }
+
+    #[test]
+    fn command_key_falls_back_on_unparseable_input() {
+        // Unbalanced quote can't be split by shell-words; falls back to trimmed raw string.
+        assert_eq!(command_key("echo 'unterminated"), "echo 'unterminated");
+    }
+
+    #[test]
+    fn command_key_empty_string() {
+        assert_eq!(command_key(""), "");
+    }
+
+    #[test]
+    fn parse_hook_event_known_values() {
+        use coursers_core::hook_pipeline::HookEvent;
+        assert_eq!(
+            parse_hook_event("pre-tool-use"),
+            Some(HookEvent::PreToolUse)
+        );
+        assert_eq!(
+            parse_hook_event("post-tool-use"),
+            Some(HookEvent::PostToolUse)
+        );
+        assert_eq!(parse_hook_event("stop"), Some(HookEvent::Stop));
+        assert_eq!(
+            parse_hook_event("subagent-stop"),
+            Some(HookEvent::SubagentStop)
+        );
+    }
+
+    #[test]
+    fn parse_hook_event_unknown_value_returns_none() {
+        assert_eq!(parse_hook_event("not-a-real-event"), None);
+        assert_eq!(parse_hook_event(""), None);
+    }
+
+    #[test]
+    fn codex_backend_filename_session_start() {
+        use coursers_core::hook_pipeline::HookEvent;
+        assert_eq!(
+            codex_backend_filename(HookEvent::SessionStart, None),
+            Some("session-start.crux")
+        );
+    }
+
+    #[test]
+    fn codex_backend_filename_post_tool_use_edit_write() {
+        use coursers_core::hook_pipeline::HookEvent;
+        assert_eq!(
+            codex_backend_filename(HookEvent::PostToolUse, Some("Edit")),
+            Some("post-tool-use-edit-write.crux")
+        );
+        assert_eq!(
+            codex_backend_filename(HookEvent::PostToolUse, Some("Write")),
+            Some("post-tool-use-edit-write.crux")
+        );
+    }
+
+    #[test]
+    fn codex_backend_filename_post_tool_use_bash_default() {
+        use coursers_core::hook_pipeline::HookEvent;
+        assert_eq!(
+            codex_backend_filename(HookEvent::PostToolUse, Some("Bash")),
+            Some("post-tool-use-bash.crux")
+        );
+        assert_eq!(
+            codex_backend_filename(HookEvent::PostToolUse, None),
+            Some("post-tool-use-bash.crux")
+        );
+    }
+
+    #[test]
+    fn codex_backend_filename_session_end_is_none() {
+        use coursers_core::hook_pipeline::HookEvent;
+        assert_eq!(codex_backend_filename(HookEvent::SessionEnd, None), None);
+    }
+
+    #[test]
+    fn format_tokens_under_1000() {
+        assert_eq!(format_tokens(0), "~0 tokens");
+        assert_eq!(format_tokens(999), "~999 tokens");
+    }
+
+    #[test]
+    fn format_tokens_thousands_format() {
+        assert_eq!(format_tokens(1000), "~1.0K tokens");
+        assert_eq!(format_tokens(1500), "~1.5K tokens");
+        assert_eq!(format_tokens(123_456), "~123.5K tokens");
+    }
+
+    #[test]
+    fn trunc_pads_short_strings() {
+        assert_eq!(trunc("hi", 5), "hi   ");
+    }
+
+    #[test]
+    fn trunc_cuts_long_strings() {
+        assert_eq!(trunc("abcdefgh", 4), "abcd");
+    }
+
+    #[test]
+    fn trunc_exact_width_unchanged() {
+        assert_eq!(trunc("abcd", 4), "abcd");
+    }
+
+    #[test]
+    fn build_profile_defaults_build_without_panic() {
+        // Smoke test: no explicit overrides should still produce a usable config.
+        let _cfg = crate::build_profile(None, None, None);
+    }
+
+    #[test]
+    fn build_profile_with_explicit_profile_name() {
+        let _cfg = crate::build_profile(Some("codex".to_string()), None, None);
+    }
 }

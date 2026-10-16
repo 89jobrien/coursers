@@ -95,7 +95,7 @@ pub fn check_files(paths: &[PathBuf]) -> CheckResult {
 }
 
 /// Parse newline-delimited JSON diagnostics from `nu --ide-check` stdout.
-fn parse_diagnostics(output: &str, file: &Path, source: &str) -> Vec<NuError> {
+pub fn parse_diagnostics(output: &str, file: &Path, source: &str) -> Vec<NuError> {
     output
         .lines()
         .filter_map(|line| serde_json::from_str::<Diagnostic>(line).ok())
@@ -113,8 +113,14 @@ fn parse_diagnostics(output: &str, file: &Path, source: &str) -> Vec<NuError> {
 }
 
 /// Convert a byte offset to 1-based (line, col).
-fn byte_offset_to_line_col(source: &str, offset: usize) -> (usize, usize) {
-    let clamped = offset.min(source.len());
+pub fn byte_offset_to_line_col(source: &str, offset: usize) -> (usize, usize) {
+    let mut clamped = offset.min(source.len());
+    // `nu --ide-check` reports byte offsets; an untrusted/malformed offset could
+    // land inside a multi-byte UTF-8 sequence. Step back to the nearest char
+    // boundary rather than panicking on the slice below.
+    while clamped > 0 && !source.is_char_boundary(clamped) {
+        clamped -= 1;
+    }
     let before = &source[..clamped];
     // Count newlines directly — str::lines() does not count a trailing '\n'
     // as opening a new line, so it gives the wrong answer for offsets right
@@ -153,6 +159,23 @@ mod tests {
         assert_eq!(line, 1);
     }
 
+    #[test]
+    fn offset_inside_multibyte_char_does_not_panic() {
+        // 'é' occupies bytes 1..3; offset 2 lands mid-character.
+        let src = "héllo";
+        let (line, col) = byte_offset_to_line_col(src, 2);
+        assert_eq!(line, 1);
+        assert!(col >= 1);
+    }
+
+    #[test]
+    fn offset_inside_multibyte_char_past_newline_does_not_panic() {
+        let src = "line1\nhéllo";
+        // byte 8 is mid-'é' on the second line.
+        let (line, _col) = byte_offset_to_line_col(src, 8);
+        assert_eq!(line, 2);
+    }
+
     // ── unit: parse_diagnostics ────────────────────────────────────────────
 
     #[test]
@@ -180,6 +203,19 @@ mod tests {
         let json = "not json\n{\"incomplete\":\n";
         let diags = parse_diagnostics(json, Path::new("x.nu"), "");
         assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn parse_diagnostics_handles_empty_output() {
+        let diags = parse_diagnostics("", Path::new("x.nu"), "");
+        assert!(diags.is_empty());
+    }
+
+    #[test]
+    fn parse_diagnostics_span_beyond_source_does_not_panic() {
+        let json = r#"{"type":"diagnostic","severity":"Error","message":"oob","span":{"start":9999,"end":10000}}"#;
+        let diags = parse_diagnostics(json, Path::new("x.nu"), "short");
+        assert_eq!(diags.len(), 1);
     }
 
     // ── integration: check_file via real `nu` ──────────────────────────────
