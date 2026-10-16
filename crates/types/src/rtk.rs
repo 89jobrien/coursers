@@ -87,3 +87,65 @@ pub struct RtkProbeResult {
     pub supported: bool,
     pub rtk_equivalent: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rtk_discover_report_defaults() {
+        let report = RtkDiscoverReport::default();
+        assert_eq!(report.sessions_scanned, 0);
+        assert_eq!(report.total_commands, 0);
+        assert_eq!(report.since_days, 0);
+        assert!(report.supported.is_empty());
+        assert!(report.unsupported.is_empty());
+    }
+
+    #[test]
+    fn rtk_gain_report_defaults() {
+        let report = RtkGainReport::default();
+        assert_eq!(report.total_commands, 0);
+        assert_eq!(report.tokens_saved, 0);
+        assert_eq!(report.savings_pct, 0.0);
+        assert!(report.by_command.is_empty());
+    }
+
+    #[test]
+    fn rtk_verify_result_defaults() {
+        let result = RtkVerifyResult::default();
+        assert!(!result.hook_installed);
+        assert_eq!(result.tests_passed, 0);
+        assert_eq!(result.tests_total, 0);
+    }
+
+    #[test]
+    fn rtk_probe_result_defaults() {
+        let result = RtkProbeResult::default();
+        assert_eq!(result.original, "");
+        assert!(result.rewritten.is_none());
+        assert!(!result.supported);
+        assert!(result.rtk_equivalent.is_none());
+    }
+
+    #[test]
+    fn rtk_hook_audit_defaults_empty() {
+        let audit = RtkHookAudit::default();
+        assert!(audit.rewrites.is_empty());
+    }
+
+    #[test]
+    fn rtk_supported_entry_holds_fields() {
+        let entry = RtkSupportedEntry {
+            command: "cat".into(),
+            count: 5,
+            rtk_equivalent: "bat".into(),
+            category: "read".into(),
+            est_savings_tokens: 200,
+            est_savings_pct: 0.9,
+        };
+        assert_eq!(entry.command, "cat");
+        assert_eq!(entry.count, 5);
+        assert_eq!(entry.est_savings_pct, 0.9);
+    }
+}
