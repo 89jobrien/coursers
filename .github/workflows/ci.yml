@@ -43,3 +43,6 @@ jobs:
 
       - name: Run CI pipeline
         run: cargo xtask check ci --fail-fast
+
+      - name: Run smoke suite
+        run: nu scripts/smoke.nu
