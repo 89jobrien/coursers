@@ -1,0 +1,7 @@
+pip install --target ./vendor requests
+---
+pip install --prefix /opt/tool requests
+---
+pip install --root /chroot requests
+---
+pip install --isolated requests

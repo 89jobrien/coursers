@@ -1,0 +1,15 @@
+git commit -m "find .ctx stuff"
+---
+echo "could not find .config"
+---
+find . -name "*.tmp" -exec rm {} \;
+---
+find . -name "*.log" -delete
+---
+find . -newer marker.txt
+---
+find . -maxdepth 0
+---
+git -C /Users/joe/dev/coursers log --oneline -1
+---
+git log --oneline -1

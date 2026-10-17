@@ -1,0 +1,7 @@
+pip install requests
+---
+pip3 install requests
+---
+pip uninstall requests
+---
+pip upgrade pip

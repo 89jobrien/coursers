@@ -39,3 +39,4 @@ walkdir = { workspace = true }
 coursers-core = { workspace = true, features = ["testing"] }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
+proptest = "1"

@@ -1,0 +1,5 @@
+cat file.txt | sed -i 's/foo/bar/'
+---
+docker run -it image sed -i 's/foo/bar/' file.txt
+---
+sed 's/foo/bar/' file.txt

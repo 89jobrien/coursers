@@ -1,0 +1,3 @@
+kgx wiki write page.md --file payload.md
+---
+cat payload.md

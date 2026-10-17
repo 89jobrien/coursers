@@ -1,0 +1,5 @@
+cargo build | bw unlock
+---
+nu -c "bw status"
+---
+bw sync

@@ -1,0 +1,5 @@
+find . -name "*.rs"
+---
+find ./src -type f
+---
+find ~/dev -name "*.toml"

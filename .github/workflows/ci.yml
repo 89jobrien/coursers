@@ -44,5 +44,8 @@ jobs:
       - name: Run CI pipeline
         run: cargo xtask check ci --fail-fast
 
+      - name: Rule conformance + rewrite-engine fuzz gate
+        run: cargo test -p coursers --release --test rule_conformance --test rewrite_nu_syntax -- --test-threads=1
+
       - name: Run smoke suite
         run: nu scripts/smoke.nu

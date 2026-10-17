@@ -1,0 +1,7 @@
+cargo build | head -20
+---
+tail -f /var/log/system.log
+---
+tail --follow app.log
+---
+docker run -it image tail -20 log.txt

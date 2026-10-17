@@ -1,0 +1,11 @@
+cargo build && cargo test
+---
+foo || bar
+---
+echo $(date)
+---
+echo `date`
+---
+for i in 1 2 3; do echo $i; done
+---
+if true; then echo yes; fi

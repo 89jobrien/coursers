@@ -1,0 +1,7 @@
+bw status
+---
+bw unlock
+---
+bw list items
+---
+bw get item myitem

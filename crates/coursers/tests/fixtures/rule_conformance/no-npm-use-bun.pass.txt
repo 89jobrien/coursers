@@ -1,0 +1,11 @@
+npm publish
+---
+npm pack
+---
+npm version patch
+---
+npm audit fix
+---
+npx create-react-app myapp
+---
+npx --yes create-vite-app

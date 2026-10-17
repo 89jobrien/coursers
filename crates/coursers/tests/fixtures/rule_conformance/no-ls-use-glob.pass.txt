@@ -1,0 +1,7 @@
+find . -name "*.rs" | ls
+---
+ls /Users/joe/dev/coursers/aops-xtask/src
+---
+docker run -it image ls /app
+---
+nu -c "ls /tmp"

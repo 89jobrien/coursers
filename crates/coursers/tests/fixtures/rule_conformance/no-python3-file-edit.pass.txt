@@ -1,0 +1,5 @@
+nu -c "python3 -c 'open(\"f.txt\", \"w\")'"
+---
+cmd | python3 -c "open('f.txt', 'w')"
+---
+python3 -c "print(1)"

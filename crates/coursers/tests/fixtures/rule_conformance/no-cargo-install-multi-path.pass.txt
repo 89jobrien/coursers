@@ -1,0 +1,3 @@
+cargo install --path crates/coursers
+---
+cargo install ripgrep

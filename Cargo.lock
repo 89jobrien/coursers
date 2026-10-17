@@ -305,6 +305,7 @@ dependencies = [
  "coursers-types",
  "dirs",
  "miette",
+ "proptest",
  "regex",
  "serde",
  "serde_json",
