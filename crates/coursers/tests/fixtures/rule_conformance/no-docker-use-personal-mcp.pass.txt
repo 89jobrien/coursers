@@ -1,0 +1,5 @@
+cargo build | docker load
+---
+nu -c "docker images"
+---
+docker ps

@@ -1,0 +1,7 @@
+sleep 5
+---
+sleep 1m
+---
+timeout 30 cargo test
+---
+timeout 5 gh run view

@@ -1,0 +1,5 @@
+cargo build | kubectl apply -f -
+---
+docker run -it image kubectl get pods
+---
+nu -c "kubectl get pods"

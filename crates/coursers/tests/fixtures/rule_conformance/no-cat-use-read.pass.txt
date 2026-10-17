@@ -1,0 +1,17 @@
+cat <<EOF
+hello
+EOF
+---
+echo "use cat /dev/null trick"
+---
+cat -n file.txt
+---
+cat -A file.txt
+---
+cat /dev/null
+---
+docker run -it image cat foo
+---
+nu -c "cat foo"
+---
+cargo build | cat

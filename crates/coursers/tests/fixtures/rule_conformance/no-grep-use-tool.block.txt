@@ -1,0 +1,5 @@
+grep foo .
+---
+rg -r pattern src/
+---
+grep -r pattern src/

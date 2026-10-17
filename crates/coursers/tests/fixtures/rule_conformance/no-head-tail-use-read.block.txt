@@ -1,0 +1,5 @@
+head -20 file.txt
+---
+tail -50 file.txt
+---
+head -n 10 file.txt

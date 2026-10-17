@@ -1,0 +1,10 @@
+nu -c "cargo build; cargo test"
+---
+echo hi; echo bye
+---
+git commit -m "$(cat <<EOF
+message
+EOF
+)"
+---
+gh api repos/x/y/pulls/1/comments --jq '.[].body'

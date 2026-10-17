@@ -1,0 +1,19 @@
+cargo test sleep_test
+---
+echo "sleep 5"
+---
+git commit -m "remove sleep from test"
+---
+ssh host 'sleep 5'
+---
+grep sleep main.rs
+---
+timeout --preserve-status 30 cmd
+---
+timeout --foreground 30 cmd
+---
+timeout 30 sh -c "cmd"
+---
+timeout 30 bash -c "cmd"
+---
+timeout 30 nu -c "cmd"

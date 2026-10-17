@@ -1,0 +1,231 @@
+# Global crs filter rules — ~/.config/crs/filters.toml
+# Project-local .ctx/crs-filters.toml takes precedence.
+#
+# APPLIED TWICE, IN THIS ORDER:
+#   1. Automatically, on every PostToolUse/Bash, inside `crs hook post-tool-use`
+#      (crates/coursers/src/crs_commands.rs, cmd_hook). Shaping happens BEFORE the
+#      obfsck redaction step, so redaction sees already-shaped text.
+#   2. Manually, via the `crs filter` subcommand, which also feeds the rx probe
+#      lifecycle that the hook path does not.
+#
+# Because these rules now run on every Bash call, a mode choice is a standing
+# policy, not a one-off display preference. `errors-only` was tried here and
+# reverted — see the note above the `cargo (check|clippy)` rule.
+#
+# Modes:
+#   passthrough    — pass output unchanged (default)
+#   failures-only  — suppress on exit 0, pass on failure
+#   errors-only    — only pass lines containing "error" (case-insensitive)
+#   truncate       — keep first max_lines lines (default: 50)
+#   match-lines    — on failure pass everything; on success keep only lines
+#                    matching match_pattern (see the note above on which modes
+#                    treat failure as passthrough)
+#
+# SUPPRESSION REQUIRES A KNOWN EXIT CODE. "exit 0" means the harness reported a
+# clean success. When it reports no exit at all, crs passes the output through
+# untouched rather than suppressing — OpenCode sends `exit: null` on abort and
+# timeout, and Claude Code's Bash tool_response carries no exit code at all.
+# Without that distinction a timeout is indistinguishable from a pass at the
+# harness: the tool result comes back empty and the agent concludes the killed
+# command succeeded. An unknown exit also produces no failure-learning record,
+# because a timeout is not evidence the command was wrong.
+
+# Cargo test output: only show failures, not all the passing lines
+[[filters]]
+pattern = "cargo (nextest|test)"
+mode = "failures-only"
+
+# cargo check/clippy: drop progress noise, keep warnings AND errors.
+#
+# Was `mode = "errors-only"`, which was right for a human invoking `crs filter`
+# deliberately but wrong once the hook path started applying it automatically
+# (crates/coursers/src/crs_commands.rs, cmd_hook). `errors-only` returns Suppress
+# when no line contains "error", so every SUCCESSFUL check or clippy with
+# warnings came back as an empty string to the model — hiding exactly the signal
+# CLAUDE.md says to act on ("If clippy warnings exist, fix them proactively").
+#
+# `match-lines` keeps the signal and drops only the noise. Note its failure
+# behaviour: on a non-zero exit it passes the full output through unfiltered, so
+# a failing check is no longer trimmed to error lines. That is more information
+# for the model (and the triage message arrives alongside it), at the cost of
+# tokens on the less frequent path.
+#
+# Pattern is a TOML literal string, so \d and \[ reach the regex engine intact.
+[[filters]]
+pattern = "cargo (check|clippy)"
+mode = "match-lines"
+match_pattern = '^(warning|error|help|note):|-->|^error\[|Finished|generated \d+'
+
+# doob todo list: can be long — truncate to 30
+[[filters]]
+pattern = "doob todo list"
+mode = "truncate"
+max_lines = 30
+
+# cargo build: suppress success noise, show only errors
+[[filters]]
+pattern = "cargo build"
+mode = "failures-only"
+
+# gkg index: progress noise — truncate
+[[filters]]
+pattern = "gkg index"
+mode = "truncate"
+max_lines = 20
+
+# cargo kani: keep only result lines; Kani trace noise is high
+[[filters]]
+pattern = "cargo kani"
+mode = "match-lines"
+match_pattern = "FAILED|error|counterexample|VERIFICATION (FAILED|SUCCESSFUL)|^test "
+
+# rustqual: keep only finding and summary lines
+[[filters]]
+pattern = "rustqual"
+mode = "match-lines"
+match_pattern = "warning:|error:|^Summary|found \\d+"
+
+# cargo install: keep only result lines, drop Compiling/Downloading noise
+[[filters]]
+pattern = "cargo install"
+mode = "match-lines"
+match_pattern = "^(Installed|Replaced|Ignored|error|warning)\\b"
+
+# cargo deny: keep only advisory/warning result lines, drop DB-fetch noise
+[[filters]]
+pattern = "cargo deny"
+mode = "match-lines"
+match_pattern = "error|warning|advisory|^\\d+ (vulnerabilit|warning)"
+
+# godmode session-summary/trace-stats helpers: verbose, users already tail -N
+[[filters]]
+pattern = "session-summary\\.nu|trace-stats\\.nu"
+mode = "truncate"
+max_lines = 20
+
+# demo-rewrites/probe-vs-pre helper scripts: verbose diagnostic dumps
+[[filters]]
+pattern = "demo-rewrites\\.nu|probe-vs-pre\\.nu"
+mode = "truncate"
+max_lines = 20
+
+# --- Rewrites ---
+
+# Pipeline grep → rg (faster, respects .gitignore in subshells)
+[[rewrites]]
+pattern = '(\|\s*)grep(\s)'
+replace = '${1}rg${2}'
+
+# UUOC: `cat file | cmd` → `< file cmd` (saves a process)
+# The original rule had (?!tail\b) which the standard regex crate doesn't support;
+# dropped — `< file tail` is equivalent and valid.
+[[rewrites]]
+pattern = '^cat\s+(\S+)\s*\|\s*(.+)'
+replace = '< ${1} ${2}'
+
+# cargo test → cargo nextest run (preserves all flags/args)
+[[rewrites]]
+pattern = '^(cargo\s+test\b)(.*)'
+replace = 'cargo nextest run${2}'
+
+# 2>&1 | cmd is a bash-ism for merging stderr into a pipe — nu's equivalent
+# redirection operator is `o+e>|`, not `out+err>` (which needs a file target
+# and produces invalid syntax when followed by a pipe). Must precede the
+# bare-2>&1 rule below so the pipe case is consumed first.
+[[rewrites]]
+pattern = '\s+2>&1\s*\|'
+replace = ' o+e>|'
+
+# 2>&1 with no following pipe is a bash-ism for merging stderr into stdout
+# for display/capture — nu already shows both streams on a terminal, and
+# `out+err>` requires a file target (produces a parse error with none), so
+# strip it rather than rewrite it.
+[[rewrites]]
+pattern = '\s+2>&1'
+replace = ''
+
+# 2>/dev/null is a bash-ism — strip it. In nu, use
+# `do -i { cmd }` to suppress stderr.
+[[rewrites]]
+pattern = '\s+2>/dev/null'
+replace = ''
+
+# `hash -r` clears bash's command-path cache; nu has no such cache (and no
+# `hash` builtin), so it's a dead no-op left behind after PATH changes (e.g.
+# after `mise reshim`). Three cases, mutually exclusive by anchor so a
+# multi-rule cascade can't double-fire on the same occurrence:
+#   - mid/leading-in-chain (followed by `;`): drop it and the trailing `;`
+#   - trailing-in-chain (preceded by `;`): drop it and the leading `;`
+#   - the entire command is just `hash -r`: replace with a real no-op (`true`),
+#     since rewriting to an empty string produces an invalid external command.
+[[rewrites]]
+pattern = '\bhash\s+-r(\s+2>/dev/null)?\s*;\s*'
+replace = ''
+
+[[rewrites]]
+pattern = ';\s*\bhash\s+-r(\s+2>/dev/null)?\s*$'
+replace = ''
+
+[[rewrites]]
+pattern = '^hash\s+-r(\s+2>/dev/null)?$'
+replace = 'true'
+
+# cargo clippy without -D warnings: append -- -D warnings
+# Matches bare `cargo clippy` and flag-only forms (e.g. --workspace).
+# Does NOT match when ` -- ` separator is already present (stops matching
+# on non-flag tokens, so `-- -D warnings` causes the pattern to fail).
+[[rewrites]]
+pattern = '^(cargo\s+clippy\b)((?:\s+-\S+)*)$'
+replace = '${1}${2} -- -D warnings'
+
+# Bare `sudo ...` → route the password prompt through the GUI askpass helper
+# instead of failing with "a terminal is required". Doesn't match when
+# SUDO_ASKPASS is already set or -A/-S is already present.
+[[rewrites]]
+pattern = '^sudo\s+(-A\s+|-S\s+)?(.*)$'
+replace = 'SUDO_ASKPASS=/Users/joe/.local/bin/askpass-gui.sh sudo -A ${2}'
+
+# --- Godmode subcommand rewrites ---
+
+# Raw git worktree lifecycle ops → godmode's tracked worktree management
+# (keeps GODMODE wave/session state in sync with the actual worktree).
+[[rewrites]]
+pattern = '^git\s+worktree\s+(add|remove|list|prune)\b(.*)$'
+replace = 'godmode worktree ${1}${2}'
+
+# Manual nextest+clippy+fmt gate chain → the single godmode verify gate
+[[rewrites]]
+pattern = '^cargo\s+nextest\s+run(\s+\S+)*\s*&&\s*cargo\s+clippy\b.*&&\s*cargo\s+fmt\s+--check$'
+replace = 'godmode verify'
+
+# gh run log inspection → godmode's CI failure triage (maps failures to files)
+[[rewrites]]
+pattern = '^gh\s+run\s+view\s+(\S+\s+)?--log-failed$'
+replace = 'godmode ci'
+
+# Peeking at the task graph file directly → godmode status (fast, structured)
+[[rewrites]]
+pattern = '^(bat|less|more)\s+\.ctx/GODMODE\.tasks\.yaml$'
+replace = 'godmode status'
+
+# Manual toolchain/auth sanity checks (which/op whoami chains) → godmode doctor
+[[rewrites]]
+pattern = '^which\s+(cargo-nextest|cargo-deny|gh|op)(\s*;\s*which\s+\S+)*\s*;\s*op\s+whoami$'
+replace = 'godmode doctor'
+
+# Manual filtering for pending/runnable tasks → godmode task next
+# (must precede the generic task-list rewrite below — more specific pattern first)
+[[rewrites]]
+pattern = '^(yq|jq)\b.*(pending|runnable)\b.*\.ctx/GODMODE\.tasks\.yaml$'
+replace = 'godmode task next'
+
+# Ad-hoc dependency/blocked-status greps for parallel dispatch planning → godmode dispatch
+# (must precede the generic task-list rewrite below — more specific pattern first)
+[[rewrites]]
+pattern = '^(grep|yq|jq)\b.*(unblocked|independent|dispatch)\b.*\.ctx/GODMODE\.tasks\.yaml$'
+replace = 'godmode dispatch'
+
+# Raw grep/yq/jq peeks at the task graph file → structured task list output
+[[rewrites]]
+pattern = '^(grep|yq|jq)\b.*\.ctx/GODMODE\.tasks\.yaml$'
+replace = 'godmode task list'

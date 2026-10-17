@@ -1,0 +1,7 @@
+cat <<MD | kgx wiki write page.md
+content
+MD
+---
+cat <<EOF | kgx wiki write notes.md
+content
+EOF

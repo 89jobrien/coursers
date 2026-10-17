@@ -1,0 +1,7 @@
+nvm install 20
+---
+nvm use 18
+---
+nvm alias default 20
+---
+nvm ls

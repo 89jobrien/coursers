@@ -1,0 +1,11 @@
+cargo test | grep passed
+---
+echo "use grep for searching"
+---
+git commit -m "grep patterns are tricky"
+---
+cargo test grep_test
+---
+grep -c foo file.txt
+---
+nu -c "cargo test | grep passed"

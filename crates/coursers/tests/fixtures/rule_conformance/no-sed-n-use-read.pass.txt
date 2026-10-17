@@ -1,0 +1,3 @@
+cat file.txt | sed -n '1,20p'
+---
+echo "sed -n is handy"
